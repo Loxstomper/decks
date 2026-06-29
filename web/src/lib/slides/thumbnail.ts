@@ -80,6 +80,62 @@ export function buildThumbnailSrcdoc(
     ? `background-color: ${bgColor} !important;`
     : '';
 
+  // P16-4: data-background-image → CSS background-image (deck-relative path,
+  // offline-first: external URLs are silently dropped).
+  const bgImageRaw = getAttribute(section, 'data-background-image');
+  const bgImageSafe = bgImageRaw && !/^https?:\/\//i.test(bgImageRaw) ? bgImageRaw : null;
+  let bgImageInlineRule = '';
+  let bgImageOpacityExtraRule = '';
+  if (bgImageSafe) {
+    const bgSize = getAttribute(section, 'data-background-size') ?? 'cover';
+    const bgPos = getAttribute(section, 'data-background-position') ?? 'center';
+    const bgRepeat = getAttribute(section, 'data-background-repeat') ?? 'no-repeat';
+    const bgOpacity = getAttribute(section, 'data-background-opacity');
+    if (bgOpacity !== null) {
+      // Use a ::before pseudo-element so the opacity only affects the image
+      // layer (not the slide's text/content above it), mirroring how
+      // reveal.js achieves this via its .slide-background element.
+      bgImageOpacityExtraRule = `
+    .reveal .slides > section::before {
+      content: ''; position: absolute; inset: 0;
+      background-image: url('${bgImageSafe}');
+      background-size: ${bgSize}; background-position: ${bgPos};
+      background-repeat: ${bgRepeat}; opacity: ${bgOpacity};
+      pointer-events: none; z-index: 0;
+    }`;
+    } else {
+      bgImageInlineRule = `
+      background-image: url('${bgImageSafe}') !important;
+      background-size: ${bgSize} !important;
+      background-position: ${bgPos} !important;
+      background-repeat: ${bgRepeat} !important;`;
+    }
+  }
+
+  // P16-4: data-background-gradient → CSS background shorthand.
+  const bgGradient = getAttribute(section, 'data-background-gradient');
+  const bgGradientRule = bgGradient
+    ? `background: ${bgGradient} !important;`
+    : '';
+
+  // P16-4: data-background-video → neutral dark placeholder with a play glyph
+  // (thumbnails are script-free; no video playback is possible here).
+  const bgVideo = getAttribute(section, 'data-background-video');
+  let bgVideoInlineRule = '';
+  let bgVideoPlaceholderExtraRule = '';
+  if (bgVideo) {
+    bgVideoInlineRule = `background: #1a1a2e !important;`;
+    // \25B6 is the ▶ BLACK RIGHT-POINTING TRIANGLE — a recognisable
+    // play-button icon that requires no external resource.
+    bgVideoPlaceholderExtraRule = `
+    .reveal .slides > section::after {
+      content: '\\25B6'; position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 80px; line-height: 1;
+      color: rgba(255,255,255,0.45); pointer-events: none; z-index: 1;
+    }`;
+  }
+
   // Override stylesheet: reveal.js normally drives `.slides` positioning + the
   // visibility of the current section from JavaScript. With no JS we pin a single
   // section to the full logical canvas and force it visible/opaque so the static
@@ -108,7 +164,7 @@ export function buildThumbnailSrcdoc(
       opacity: 1 !important; visibility: visible !important;
       transform: none !important; pointer-events: none;
       box-sizing: border-box; padding: 40px;
-      ${bgColorRule}
+      ${bgColorRule}${bgImageInlineRule}${bgGradientRule}${bgVideoInlineRule}
     }
     /* Re-assert each top-level section's real display so it wins over reveal's
        display:none (no JS adds a .present class). For a section carrying data-lay
@@ -126,7 +182,7 @@ export function buildThumbnailSrcdoc(
     .reveal .slides > section > section { position: static; height: auto; }
     .reveal .slides > section > section ~ section { display: none; }
     /* Show all fragment steps in the thumbnail (no JS to advance them). */
-    .fragment { opacity: 1 !important; visibility: visible !important; }
+    .fragment { opacity: 1 !important; visibility: visible !important; }${bgImageOpacityExtraRule}${bgVideoPlaceholderExtraRule}
   `;
 
   // NOTE: the override <link>/<style> order matters — overrides come AFTER the

@@ -504,6 +504,103 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).not.toMatch(/https?:\/\//);
   });
 
+  describe('slide background types (P16-4)', () => {
+    it('renders data-background-image as background-image CSS with default size/position/repeat', () => {
+      const DECK_BG_IMG = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-image="assets/bg.jpg"><h1>Image BG</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_BG_IMG);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      expect(doc).toContain("background-image: url('assets/bg.jpg')");
+      expect(doc).toContain('background-size: cover');
+      expect(doc).toContain('background-position: center');
+      expect(doc).toContain('background-repeat: no-repeat');
+      // Offline-first: no external URLs.
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('honours explicit data-background-size/-position/-repeat overrides', () => {
+      const DECK_BG_IMG = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-image="assets/tile.png" data-background-size="contain" data-background-position="top left" data-background-repeat="repeat"><h1>Tiled</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_BG_IMG);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      expect(doc).toContain("background-image: url('assets/tile.png')");
+      expect(doc).toContain('background-size: contain');
+      expect(doc).toContain('background-position: top left');
+      expect(doc).toContain('background-repeat: repeat');
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('renders data-background-opacity via a ::before pseudo-element so image opacity does not bleed onto slide text', () => {
+      const DECK_BG_OPACITY = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-image="assets/bg.jpg" data-background-opacity="0.4"><h1>Semi-transparent BG</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_BG_OPACITY);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      // Image is placed in ::before (not inline on the section).
+      expect(doc).toContain('::before');
+      expect(doc).toContain("url('assets/bg.jpg')");
+      expect(doc).toContain('opacity: 0.4');
+      // No inline background-image on the section itself.
+      expect(doc).not.toContain("background-image: url('assets/bg.jpg') !important");
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('silently drops external data-background-image URLs — no CSS url() emitted (offline-first)', () => {
+      const DECK_EXT_IMG = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-image="https://example.com/bg.jpg"><h1>Ext</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_EXT_IMG);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      // The external URL must NOT appear inside a CSS url() expression — that
+      // would cause the browser to load the external resource. The attribute
+      // value may still appear in serialized HTML (harmless; browsers only
+      // fetch URLs in src/href/CSS, not arbitrary data-* attributes).
+      expect(doc).not.toMatch(/url\(['"]?https?:\/\//);
+      // No background-image CSS rule is injected for external paths.
+      expect(doc).not.toContain('background-image: url(');
+    });
+
+    it('renders data-background-gradient as a CSS background shorthand', () => {
+      const DECK_BG_GRAD = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"><h1>Gradient BG</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_BG_GRAD);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      expect(doc).toContain('background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)');
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('renders a neutral dark placeholder for data-background-video — no <video> element, play glyph via ::after', () => {
+      const DECK_BG_VIDEO = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-video="assets/demo.mp4"><h1>Video BG</h1></section>
+</div></div></body></html>`;
+      const model = parseDeck(DECK_BG_VIDEO);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      // Dark background applied to the section.
+      expect(doc).toContain('background: #1a1a2e !important');
+      // Play-button glyph via ::after (no scripting required).
+      expect(doc).toContain('::after');
+      // The video src is NOT echoed into a <video> element (no playback).
+      expect(doc).not.toContain('<video');
+      // No external URLs.
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+  });
+
   it('does not force flex on every section (lets data-lay display win)', () => {
     const model = parseDeck(DECK);
     const s1 = topLevelSlides(model)[0];

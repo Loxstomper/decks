@@ -86,6 +86,7 @@ import {
   addSlideFromLayout as addSlideFromLayoutOp,
   changeSlideLayout as changeSlideLayoutOp,
 } from '$lib/slides';
+import { uploadAsset } from '$lib/blocks/api';
 import { undoStore } from './undo.svelte';
 import { highlightStore } from './highlight.svelte';
 import { decideExternalChange, lineDiff, type DiffLine } from './conflict';
@@ -159,6 +160,92 @@ function safeParse(html: string): DeckModel | null {
   } catch {
     return null;
   }
+}
+
+/**
+ * P16-1: Per-slide background delta — the UI-facing vocabulary for the unified
+ * Slide Background command. Each key maps to one reveal.js `data-background-*`
+ * attribute (spec 16). Per-key semantics (identical convention to setThemeProps):
+ *   • `undefined` (key absent) → leave that attribute untouched.
+ *   • `null`                   → clear just that one attribute.
+ *   • a string                 → set/override that one attribute.
+ *
+ * `image` / `video` srcs MUST already be deck-relative ('assets/…'): the store
+ * performs NO network calls — localization happens up-front in the UI via
+ * uploadAsset / copySharedAsset / fetchProviderImage (blocks/api.ts).
+ */
+export interface SlideBackgroundDelta {
+  /** `data-background-color` — solid colour; may underlay any other type. */
+  color?: string | null;
+  /** `data-background-image` — relative asset path. Type: clears gradient+video. */
+  image?: string | null;
+  /** `data-background-size` — CSS background-size modifier for the image. */
+  size?: string | null;
+  /** `data-background-position` — CSS background-position modifier. */
+  position?: string | null;
+  /** `data-background-repeat` — CSS background-repeat modifier. */
+  repeat?: string | null;
+  /** `data-background-opacity` — 0–1 opacity modifier. */
+  opacity?: string | null;
+  /** `data-background-gradient` — CSS gradient. Type: clears image+video. */
+  gradient?: string | null;
+  /** `data-background-video` — relative asset path. Type: clears image+gradient. */
+  video?: string | null;
+  /** `data-background-video-loop` — loop flag modifier for the video. */
+  videoLoop?: string | null;
+  /** `data-background-video-muted` — muted flag modifier for the video. */
+  videoMuted?: string | null;
+}
+
+/** A non-null, non-undefined value is being explicitly SET (vs cleared/untouched). */
+function isSet(v: string | null | undefined): v is string {
+  return v !== undefined && v !== null;
+}
+
+/**
+ * P16-1: Translate a {@link SlideBackgroundDelta} into a `Partial<ThemeProps>`
+ * for setThemeProps, ENFORCING a coherent single background TYPE.
+ *
+ * A slide background is exactly one of {image, gradient, video} (a solid `color`
+ * may underlay any of them). So setting one type clears the other two — and the
+ * video flags when video is cleared — to avoid contradictory `data-background-*`
+ * combinations that reveal.js would resolve unpredictably. Modifiers (size /
+ * position / repeat / opacity) are not types and are left to the caller.
+ *
+ * This is the SINGLE source for the managed background-color write: applySlide-
+ * Theme also routes its theme colour through here (Phase 10 consolidation).
+ */
+function buildBackgroundProps(delta: SlideBackgroundDelta): Partial<ThemeProps> {
+  const props: Partial<ThemeProps> = {};
+  if (delta.color !== undefined) props.backgroundColor = delta.color;
+  if (delta.image !== undefined) props.backgroundImage = delta.image;
+  if (delta.size !== undefined) props.backgroundSize = delta.size;
+  if (delta.position !== undefined) props.backgroundPosition = delta.position;
+  if (delta.repeat !== undefined) props.backgroundRepeat = delta.repeat;
+  if (delta.opacity !== undefined) props.backgroundOpacity = delta.opacity;
+  if (delta.gradient !== undefined) props.backgroundGradient = delta.gradient;
+  if (delta.video !== undefined) props.backgroundVideo = delta.video;
+  if (delta.videoLoop !== undefined) props.backgroundVideoLoop = delta.videoLoop;
+  if (delta.videoMuted !== undefined) props.backgroundVideoMuted = delta.videoMuted;
+
+  // Type exclusivity: a non-null set of one type clears the competing types.
+  if (isSet(delta.image)) {
+    props.backgroundGradient = null;
+    props.backgroundVideo = null;
+    props.backgroundVideoLoop = null;
+    props.backgroundVideoMuted = null;
+  }
+  if (isSet(delta.gradient)) {
+    props.backgroundImage = null;
+    props.backgroundVideo = null;
+    props.backgroundVideoLoop = null;
+    props.backgroundVideoMuted = null;
+  }
+  if (isSet(delta.video)) {
+    props.backgroundImage = null;
+    props.backgroundGradient = null;
+  }
+  return props;
 }
 
 class DeckStore {
@@ -586,10 +673,9 @@ class DeckStore {
    * (the colour looked up from the cached /api/themes/backgrounds map). Passing
    * `themeName === null` removes both — restoring the deck-level theme/background.
    *
-   * PHASE 16 NOTE: spec 16 says the background colour should ultimately flow
-   * through the unified Slide Background command. Phase 16 is not built yet, so
-   * we write `data-background-color` directly here. When Phase 16 lands, the
-   * colour write should be consolidated into that command instead of this one.
+   * The managed background colour is written THROUGH buildBackgroundProps (the
+   * single source for the background-color write, shared with applySlideBackground
+   * — P16 consolidation), so theme colours and explicit background edits agree.
    *
    * Invalid theme names throw (via setThemeProps) — same fail-fast convention as
    * setLayoutProps. Unknown eid is a safe no-op.
@@ -599,13 +685,15 @@ class DeckStore {
     const el = findByEid(this.model, eid);
     if (!el) return;
     if (themeName === null) {
-      // Clear both the named theme and its managed background.
-      setThemeProps(el, { theme: null, backgroundColor: null });
+      // Clear both the named theme and its managed background colour.
+      setThemeProps(el, { theme: null, ...buildBackgroundProps({ color: null }) });
     } else {
       const backgrounds = await this.#fetchThemeBackgrounds();
-      // PHASE 16: write the managed background colour directly for now.
       const backgroundColor = backgrounds[themeName] ?? null;
-      setThemeProps(el, { theme: themeName as ThemeName, backgroundColor });
+      setThemeProps(el, {
+        theme: themeName as ThemeName,
+        ...buildBackgroundProps({ color: backgroundColor }),
+      });
     }
     this.updateFromModel();
     await this.commitCommand();
@@ -671,6 +759,49 @@ class DeckStore {
     setThemeProps(el, delta);
     this.updateFromModel();
     await this.commitCommand();
+  }
+
+  /**
+   * P16-1: Apply (or clear) the UNIFIED slide background on the section with
+   * `eid` as ONE undo entry + ONE autosave (spec 16).
+   *
+   * The `delta` carries any of { color, image, size, position, repeat, opacity,
+   * gradient, video, videoLoop, videoMuted }; per-key undefined=untouched,
+   * null=clear, value=set. buildBackgroundProps enforces a coherent single
+   * background TYPE — setting image clears gradient+video, setting gradient
+   * clears image+video, setting video clears image+gradient — while `color`
+   * may coexist as an underlay.
+   *
+   * P16-2: NO network here. `image` / `video` srcs MUST already be deck-relative
+   * ('assets/…'); the UI localizes up-front via uploadAsset / copySharedAsset /
+   * fetchProviderImage (blocks/api.ts). See applySlideBackgroundImageFile for the
+   * thin upload-then-apply convenience.
+   *
+   * Only the targeted section goes dirty, so every other element round-trips
+   * byte-for-byte (spec 12 #4). Unknown eid is a safe no-op (stale selection).
+   */
+  async applySlideBackground(eid: string, delta: SlideBackgroundDelta): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setThemeProps(el, buildBackgroundProps(delta));
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P16-2: Convenience — upload a local image File into the deck's assets/ dir
+   * (POST stays in blocks/api.ts → uploadAsset), then set it as the slide
+   * background via {@link applySlideBackground}. The store itself performs no
+   * other network calls; this is the single sanctioned File → background path so
+   * components don't have to wire upload + apply by hand.
+   *
+   * No-op when no deck is open. Propagates upload errors to the caller.
+   */
+  async applySlideBackgroundImageFile(eid: string, file: File): Promise<void> {
+    if (!this.name) return;
+    const src = await uploadAsset(this.name, file);
+    await this.applySlideBackground(eid, { image: src });
   }
 
   /**

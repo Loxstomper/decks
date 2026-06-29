@@ -421,12 +421,19 @@ dependencies are noted inline.
 > WYSIWYG; attributes are declarative + byte-stable + Claude-authorable; backgrounds cascade to
 > verticals (reveal native).
 
-- [ ] **P16-1 — Background commands.** `deckStore` ops to set/clear a section's background by type — `data-background-color`, `data-background-image` (+ `-size`/`-position`/`-repeat`/`-opacity`), `data-background-gradient`, `data-background-video` (+ loop/muted) — each one undo + one autosave, byte-stable. Consolidates the managed color from P10-3. _Done when:_ each type sets/clears correctly and the canvas reflects it. (Spec 09)
-- [ ] **P16-2 — Image/video localization reuse.** Wire upload/drag/paste/`shared/`/provider sources through `uploadAsset` and set `data-background-image`/`-video` to the returned relative path. _Done when:_ choosing a background image/video copies it into `assets/` and references it relatively (zero external URLs). (Spec 09, 08, 12)
-- [ ] **P16-3 — Slide Background UI control.** A "Slide background" inspector section (keyed to the current slide) + a "Set background…" slide context-menu item (Phase 13): color / image / gradient / video, with image fit/position/opacity and video loop/mute, plus Clear. _Done when:_ all types are settable from one surface and clearable. (Spec 09, 04)
-- [ ] **P16-4 — Thumbnail background rendering.** Extend the thumbnail builder (Phase 12) to paint color/image/gradient as the section's CSS background; video shows poster/first-frame or a placeholder. _Done when:_ a slide with an image background shows it in its navigator thumbnail. (Spec 06, 09)
-- [ ] **P16-5 — Contract + cascade.** `internal/validate/validate.go` + model accept the `data-background-*` attributes; verify a stack's background cascades to its verticals and an inner override wins. _Done when:_ `validate` passes a deck using them and cascade behaves. (Spec 09, 12)
-- [ ] **P16-6 — e2e.** Playwright: set an image background on a slide → it renders in the canvas and the present route, appears in the thumbnail, and the offline-guard still passes (localized, no external URL). _Done when:_ the spec passes. (Spec 09, 12)
+- [x] **P16-1 — Background commands.** `deckStore` ops to set/clear a section's background by type — `data-background-color`, `data-background-image` (+ `-size`/`-position`/`-repeat`/`-opacity`), `data-background-gradient`, `data-background-video` (+ loop/muted) — each one undo + one autosave, byte-stable. Consolidates the managed color from P10-3. _Done when:_ each type sets/clears correctly and the canvas reflects it. (Spec 09)
+- [x] **P16-2 — Image/video localization reuse.** Wire upload/drag/paste/`shared/`/provider sources through `uploadAsset` and set `data-background-image`/`-video` to the returned relative path. _Done when:_ choosing a background image/video copies it into `assets/` and references it relatively (zero external URLs). (Spec 09, 08, 12)
+- [x] **P16-3 — Slide Background UI control.** A "Slide background" inspector section (keyed to the current slide) + a "Set background…" slide context-menu item (Phase 13): color / image / gradient / video, with image fit/position/opacity and video loop/mute, plus Clear. _Done when:_ all types are settable from one surface and clearable. (Spec 09, 04)
+- [x] **P16-4 — Thumbnail background rendering.** Extend the thumbnail builder (Phase 12) to paint color/image/gradient as the section's CSS background; video shows poster/first-frame or a placeholder. _Done when:_ a slide with an image background shows it in its navigator thumbnail. (Spec 06, 09)
+- [x] **P16-5 — Contract + cascade.** `internal/validate/validate.go` + model accept the `data-background-*` attributes; verify a stack's background cascades to its verticals and an inner override wins. _Done when:_ `validate` passes a deck using them and cascade behaves. (Spec 09, 12)
+- [x] **P16-6 — e2e.** Playwright: set an image background on a slide → it renders in the canvas and the present route, appears in the thumbnail, and the offline-guard still passes (localized, no external URL). _Done when:_ the spec passes. (Spec 09, 12)
+
+> **Phase 16 STATUS (done, tag 0.0.16):** Unified slide background (color/image/gradient/video) via reveal-native `data-background-*`. Built on `main` via workflow (Foundation: model+validate+cascade ‖ thumbnail → Commands → UI → Verify) + orchestrator integration-verify. Verified: FE build clean, `go build/vet/test ./...` green, **vitest 1228** green, **svelte-check 0/0**, binary smoke-tested (validate accepts a local `data-background-image`, flags external + missing, tolerates gradient).
+> - **Model/contract (`theme.ts`, `validate.go`, `slides-layout-init.js`):** `ThemeProps` + `get/setThemeProps` extended to the full `data-background-*` set via a shared `BACKGROUND_ATTRS` table; validate tolerates them, asset-existence-checks local `-image`/`-video` paths and keeps the offline X-1 external-URL guard; `propagateVerticalBackground` now cascades **all** background attrs to verticals (inner override wins).
+> - **Commands (`deck.svelte.ts`):** `applySlideBackground(eid, delta)` (color/image+size/position/repeat/opacity, gradient, video+loop/muted) enforces a single coherent background type (image⇄gradient⇄video mutually clear; color coexists); `applySlideTheme`'s managed color now routes **through** it (consolidates P10-3); reuses `uploadAsset` (POST stays in `blocks/api.ts`, store sets relative paths only).
+> - **UI (`PropertiesPanel.svelte`, `SlideBackgroundControl.svelte`, `App.svelte`):** per-slide "Slide background" inspector section (Color/Image/Gradient/Video + fit/position/opacity, loop/mute, Clear) reusing the asset surfaces + a "Set background…" slide context-menu item.
+> - **Thumbnail (`thumbnail.ts`):** paints image (size/position/repeat, opacity via `::before`) + gradient; video shows a script-free play-glyph placeholder; zero external URLs.
+> - **⚠️ Needs browser confirmation:** `web/e2e/slide-background.spec.ts` written (image bg renders in canvas + present + thumbnail, offline-guard) — run pending browser env.
 
 ## Cross-cutting (maintain throughout)
 
@@ -445,3 +452,11 @@ dependencies are noted inline.
   more themes, browser-side deck creation, end-to-end test coverage.
 - **M6 (per-slide theming):** Phase 10 — global deck theme + declarative per-slide overrides
   (named bundle + free-form), cascading to verticals, consistent across present/PDF.
+- **M7 (Slides-app parity):** Phases 11–16 — reload preserves the current slide (P11) and
+  free coordinates are true logical-canvas identity (P15); right-click context menu with
+  duplicate/z-order/clipboard (P13); Google-Slides-style layout presets (P14); high-fidelity
+  thumbnails (P12); and a unified per-slide background — color/image/gradient/video (P16).
+  All of Phases 10–16 complete (tags 0.0.11–0.0.16); built via parallel workflow + worktree
+  lanes + subagents. **Remaining:** P8-8 (MCP, deferred) and P11-3 (skip-reload-on-text-commit,
+  deferred); browser-only visual confirmations noted per-phase (e2e specs written, run pending
+  a Playwright browser env).

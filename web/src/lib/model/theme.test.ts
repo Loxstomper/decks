@@ -160,6 +160,76 @@ describe('setThemeProps() round-trip', () => {
   });
 });
 
+// ─── 4b. Full data-background-* set (spec 16) ──────────────────────────────
+
+describe('data-background-* set', () => {
+  // [ThemeProps key, attribute name, sample value]
+  const BG_CASES: ReadonlyArray<readonly [string, string, string]> = [
+    ['backgroundColor', 'data-background-color', '#ff0000'],
+    ['backgroundImage', 'data-background-image', 'assets/img/x.png'],
+    ['backgroundSize', 'data-background-size', 'cover'],
+    ['backgroundPosition', 'data-background-position', 'top left'],
+    ['backgroundRepeat', 'data-background-repeat', 'no-repeat'],
+    ['backgroundOpacity', 'data-background-opacity', '0.5'],
+    ['backgroundGradient', 'data-background-gradient', 'linear-gradient(to bottom, red, blue)'],
+    ['backgroundVideo', 'data-background-video', 'assets/v.mp4'],
+    ['backgroundVideoLoop', 'data-background-video-loop', 'true'],
+    ['backgroundVideoMuted', 'data-background-video-muted', 'true'],
+  ];
+
+  it('getThemeProps reads every background attribute', () => {
+    const attrs = BG_CASES.map(([, attr, val]) => `${attr}="${val}"`).join(' ');
+    const el = parseSectionEl(attrs);
+    const props = getThemeProps(el);
+    for (const [key, , val] of BG_CASES) {
+      expect((props as unknown as Record<string, unknown>)[key]).toBe(val);
+    }
+  });
+
+  it('getThemeProps returns null for every background prop when absent', () => {
+    const el = parseSectionEl();
+    const props = getThemeProps(el) as unknown as Record<string, unknown>;
+    for (const [key] of BG_CASES) {
+      expect(props[key]).toBeNull();
+    }
+  });
+
+  it('set then get round-trips for every background prop', () => {
+    for (const [key, attr, val] of BG_CASES) {
+      const el = parseSectionEl();
+      setThemeProps(el, { [key]: val });
+      expect(getAttribute(el, attr)).toBe(val);
+      expect((getThemeProps(el) as unknown as Record<string, unknown>)[key]).toBe(val);
+    }
+  });
+
+  it('set null removes each background attribute', () => {
+    for (const [key, attr, val] of BG_CASES) {
+      const el = parseSectionEl(`${attr}="${val}"`);
+      expect(getAttribute(el, attr)).toBe(val);
+      setThemeProps(el, { [key]: null });
+      expect(getAttribute(el, attr)).toBeNull();
+      expect((getThemeProps(el) as unknown as Record<string, unknown>)[key]).toBeNull();
+    }
+  });
+
+  it('partial delta on one background prop leaves the others untouched', () => {
+    const el = parseSectionEl('data-background-image="assets/a.png" data-background-size="cover"');
+    setThemeProps(el, { backgroundSize: 'contain' });
+    expect(getAttribute(el, 'data-background-image')).toBe('assets/a.png');
+    expect(getAttribute(el, 'data-background-size')).toBe('contain');
+  });
+
+  it('byte-stable: get→set→get reproduces the full snapshot identically', () => {
+    const attrs = BG_CASES.map(([, attr, val]) => `${attr}="${val}"`).join(' ');
+    const el = parseSectionEl(attrs);
+    const props1 = getThemeProps(el);
+    setThemeProps(el, props1);
+    const props2 = getThemeProps(el);
+    expect(props2).toEqual(props1);
+  });
+});
+
 // ─── 5. inlineVars (--r-*) ────────────────────────────────────────────────
 
 describe('setThemeProps() inlineVars', () => {

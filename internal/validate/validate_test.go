@@ -189,6 +189,76 @@ func TestValidate_DataBackgroundColorTolerated(t *testing.T) {
 	}
 }
 
+func TestValidate_DataBackgroundSetTolerated(t *testing.T) {
+	// The full data-background-* pass-through set (spec 16) must be tolerated
+	// without enum validation: size/position/repeat/opacity/gradient + video flags.
+	html := `<section data-eid="s1"` +
+		` data-background-size="cover"` +
+		` data-background-position="center"` +
+		` data-background-repeat="no-repeat"` +
+		` data-background-opacity="0.5"` +
+		` data-background-gradient="linear-gradient(to bottom, red, blue)"` +
+		` data-background-video-loop="true"` +
+		` data-background-video-muted="true"` +
+		`><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), "")
+	if !res.OK {
+		t.Fatalf("full data-background-* set must be tolerated, got: %+v", res.Errors)
+	}
+}
+
+func TestValidate_DataBackgroundImageLocalAsset(t *testing.T) {
+	dir := t.TempDir()
+	// Missing local image → flagged.
+	html := `<section data-eid="s1" data-background-image="assets/img/x.png"><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), dir)
+	if res.OK || !hasCode(res, "missing-asset") {
+		t.Fatalf("expected missing-asset for absent background image, got: %+v", res.Errors)
+	}
+
+	// Create the file → check passes.
+	if err := os.MkdirAll(filepath.Join(dir, "assets", "img"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "assets", "img", "x.png"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	res2 := Bytes([]byte(html), dir)
+	if hasCode(res2, "missing-asset") {
+		t.Fatalf("expected background image to resolve once created, got: %+v", res2.Errors)
+	}
+}
+
+func TestValidate_DataBackgroundImageExternalFlagged(t *testing.T) {
+	// External http(s):// background image violates the offline X-1 guard.
+	html := `<section data-eid="s1" data-background-image="https://example.com/x.png"><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), "")
+	if res.OK || !hasCode(res, "external-url") {
+		t.Fatalf("expected external-url for https background image, got: %+v", res.Errors)
+	}
+}
+
+func TestValidate_DataBackgroundVideoLocalAndExternal(t *testing.T) {
+	dir := t.TempDir()
+	// Missing local video → flagged.
+	missing := `<section data-eid="s1" data-background-video="assets/v.mp4"><h2 data-eid="t1">x</h2></section>`
+	if res := Bytes([]byte(missing), dir); res.OK || !hasCode(res, "missing-asset") {
+		t.Fatalf("expected missing-asset for absent background video, got: %+v", res.Errors)
+	}
+	// External video → offline guard.
+	external := `<section data-eid="s1" data-background-video="http://example.com/v.mp4"><h2 data-eid="t1">x</h2></section>`
+	if res := Bytes([]byte(external), ""); res.OK || !hasCode(res, "external-url") {
+		t.Fatalf("expected external-url for http background video, got: %+v", res.Errors)
+	}
+	// Present local video → passes.
+	if err := os.WriteFile(filepath.Join(dir, "v.mp4"), []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if res := Bytes([]byte(`<section data-eid="s1" data-background-video="v.mp4"><h2 data-eid="t1">x</h2></section>`), dir); hasCode(res, "missing-asset") {
+		t.Fatalf("expected background video to resolve once created, got: %+v", res.Errors)
+	}
+}
+
 func TestValidate_InlineRVarsTolerated(t *testing.T) {
 	// Inline --r-* CSS custom properties in the style attribute must pass
 	// through without any validation error (P10-3/4 output).

@@ -286,6 +286,25 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 			"black|white|league|beige|night|moon|solarized|solarized-dark|dracula|sky", line, eid))
 	}
 
+	// data-background-* set (reveal.js per-slide background, spec 16). ALL of
+	// these are TOLERATED with no enum: -color, -size, -position, -repeat,
+	// -opacity, -gradient, -video-loop, -video-muted are plain pass-through
+	// strings reveal.js renders natively in 5.x. The two that reference loadable
+	// assets — data-background-image and data-background-video — get the same
+	// treatment as <img src>/<video src>: the offline X-1 guard flags http(s)://
+	// values, and LOCAL relative paths are asset-existence-checked. Everything
+	// else passes through untouched.
+	//
+	// Dual-encoded: also see getThemeProps/setThemeProps + BACKGROUND_ATTRS in
+	// web/src/lib/model/theme.ts (keep the attribute set in sync). The TS model
+	// round-trips the whole set; this validator only constrains the two asset
+	// references and the offline guard.
+	for _, bgAsset := range []string{"data-background-image", "data-background-video"} {
+		if v, ok := attrs[bgAsset]; ok {
+			issues = append(issues, checkResourceURL(name, bgAsset, v, line, eid, deckDir)...)
+		}
+	}
+
 	// data-layout (P14): layout-preset MARKER on <section> elements.
 	// Intentionally NOT enum-restricted — the value is the preset name (e.g.
 	// "title-body", "two-column") chosen from the preset list, but that list is

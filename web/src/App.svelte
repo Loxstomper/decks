@@ -365,6 +365,15 @@
         run: () => void deckStore.setSlideHidden(slideEid, !hidden),
       },
       changeLayoutItem,
+      {
+        label: 'Set background…',
+        run: () => {
+          // Select the slide so the Properties panel shows the SlideBackgroundControl,
+          // then switch to the Properties tab so the control is immediately visible.
+          selectionStore.select(slideEid);
+          rightTab = 'properties';
+        },
+      },
       { label: '', separator: true },
       { label: 'Delete slide', danger: true, run: () => void deckStore.deleteSlide(slideEid) },
     ];

@@ -84,12 +84,59 @@ export interface ThemeProps {
    */
   backgroundColor: string | null;
   /**
+   * `data-background-image` — reveal.js per-slide background image. Usually a
+   * local relative asset path (offline-first); pass-through string.
+   */
+  backgroundImage: string | null;
+  /** `data-background-size` — CSS background-size (e.g. "cover", "contain", "100px"). */
+  backgroundSize: string | null;
+  /** `data-background-position` — CSS background-position (e.g. "center", "top left"). */
+  backgroundPosition: string | null;
+  /** `data-background-repeat` — CSS background-repeat (e.g. "no-repeat", "repeat"). */
+  backgroundRepeat: string | null;
+  /** `data-background-opacity` — reveal.js background opacity (0–1, string). */
+  backgroundOpacity: string | null;
+  /** `data-background-gradient` — CSS gradient string for the slide background. */
+  backgroundGradient: string | null;
+  /**
+   * `data-background-video` — reveal.js per-slide background video. Usually a
+   * local relative asset path (offline-first); may be a comma-separated list.
+   */
+  backgroundVideo: string | null;
+  /** `data-background-video-loop` — reveal.js video loop flag (string, e.g. "true"). */
+  backgroundVideoLoop: string | null;
+  /** `data-background-video-muted` — reveal.js video muted flag (string, e.g. "true"). */
+  backgroundVideoMuted: string | null;
+  /**
    * Inline CSS custom properties whose names start with `--r-` (reveal.js
    * variable overrides). Read from the section's `style` attribute and written
    * back into it. Other style declarations are preserved verbatim.
    */
   inlineVars: Record<string, string> | null;
 }
+
+/**
+ * Map of pass-through background `ThemeProps` keys to their reveal.js
+ * `data-background-*` attribute names. These are all plain-string accessors:
+ * `null` clears, any non-null value is written verbatim (no format validation —
+ * reveal.js renders them natively in 5.x). Kept as a single table so get/set
+ * stay byte-stable and trivially in sync.
+ *
+ * NOTE: `data-background-color` is handled here too (alongside its legacy
+ * dedicated handling) so the whole background set round-trips uniformly.
+ */
+const BACKGROUND_ATTRS: ReadonlyArray<readonly [keyof ThemeProps, string]> = [
+  ['backgroundColor', 'data-background-color'],
+  ['backgroundImage', 'data-background-image'],
+  ['backgroundSize', 'data-background-size'],
+  ['backgroundPosition', 'data-background-position'],
+  ['backgroundRepeat', 'data-background-repeat'],
+  ['backgroundOpacity', 'data-background-opacity'],
+  ['backgroundGradient', 'data-background-gradient'],
+  ['backgroundVideo', 'data-background-video'],
+  ['backgroundVideoLoop', 'data-background-video-loop'],
+  ['backgroundVideoMuted', 'data-background-video-muted'],
+];
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 
@@ -162,14 +209,32 @@ export function getThemeProps(el: ElementNode): ThemeProps {
   const theme: ThemeName | null =
     themeRaw !== null && isThemeName(themeRaw) ? themeRaw : null;
 
-  const backgroundColor = getAttribute(el, 'data-background-color');
-
   const styleRaw = getAttribute(el, 'style');
   const parsedVars = styleRaw !== null ? parseInlineRVars(styleRaw) : {};
   const inlineVars: Record<string, string> | null =
     Object.keys(parsedVars).length > 0 ? parsedVars : null;
 
-  return { theme, backgroundColor, inlineVars };
+  // Read the full data-background-* set (color/image/size/.../video flags) as
+  // pass-through strings; absent → null.
+  const bg: Record<string, string | null> = {};
+  for (const [key, attr] of BACKGROUND_ATTRS) {
+    bg[key as string] = getAttribute(el, attr);
+  }
+
+  return {
+    theme,
+    backgroundColor: bg.backgroundColor,
+    backgroundImage: bg.backgroundImage,
+    backgroundSize: bg.backgroundSize,
+    backgroundPosition: bg.backgroundPosition,
+    backgroundRepeat: bg.backgroundRepeat,
+    backgroundOpacity: bg.backgroundOpacity,
+    backgroundGradient: bg.backgroundGradient,
+    backgroundVideo: bg.backgroundVideo,
+    backgroundVideoLoop: bg.backgroundVideoLoop,
+    backgroundVideoMuted: bg.backgroundVideoMuted,
+    inlineVars,
+  };
 }
 
 /**
@@ -199,11 +264,17 @@ export function setThemeProps(el: ElementNode, delta: Partial<ThemeProps>): void
     }
   }
 
-  if ('backgroundColor' in delta) {
-    if (delta.backgroundColor === null || delta.backgroundColor === undefined) {
-      removeAttribute(el, 'data-background-color');
-    } else {
-      setAttribute(el, 'data-background-color', delta.backgroundColor);
+  // Pass-through data-background-* set (color/image/size/position/repeat/
+  // opacity/gradient/video + video flags). null/undefined clears, any value is
+  // written verbatim. Keys absent from delta are untouched (true partial update).
+  for (const [key, attr] of BACKGROUND_ATTRS) {
+    if (key in delta) {
+      const value = delta[key] as string | null | undefined;
+      if (value === null || value === undefined) {
+        removeAttribute(el, attr);
+      } else {
+        setAttribute(el, attr, value);
+      }
     }
   }
 

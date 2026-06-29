@@ -56,6 +56,7 @@
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
   import TextColorControl from './TextColorControl.svelte';
+  import SlideBackgroundControl from './SlideBackgroundControl.svelte';
 
   // ── Component props ────────────────────────────────────────────────────────
 
@@ -325,6 +326,12 @@
           />
         </div>
       </div>
+    {/if}
+
+    <!-- ── P16-3a: slide background — shown when the resolved container is a Slide ── -->
+    {#if containerKind === 'Slide' && containerEid}
+      <div class="separator"></div>
+      <SlideBackgroundControl slideEid={containerEid} />
     {/if}
 
   {/if}
