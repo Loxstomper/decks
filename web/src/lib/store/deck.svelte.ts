@@ -1203,6 +1203,26 @@ class DeckStore {
   }
 
   /**
+   * P17-11: Set the `alt` attribute on the IMG element with `eid` as ONE undo
+   * entry + ONE autosave (spec 08 / spec 12 byte-stability — only the element's
+   * `alt` attribute goes dirty).
+   *
+   * Empty string is valid: `alt=""` is a legitimate accessibility value for
+   * decorative images (WCAG 2.1). We NEVER remove the attribute — the serializer
+   * emits `alt=""` for the empty-string case, which is correct HTML.
+   *
+   * Unknown eid is a safe no-op (stale selection after an external reload).
+   */
+  async applyAltText(eid: string, alt: string): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setAttribute(el, 'alt', alt);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
    * P6-4: Reorder the top-level slide at `fromIndex` to `toIndex`. Returns true
    * on success.
    */
