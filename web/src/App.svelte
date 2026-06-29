@@ -140,6 +140,16 @@
     await deckStore.load(name);
   }
 
+  // P9-12: Called by Navigator after POST /api/decks/{name} succeeds.
+  // Refresh the deck list then open the new deck so the user lands in it.
+  async function onDeckCreated(name: string): Promise<void> {
+    try {
+      const res = await fetch('/api/decks');
+      if (res.ok) decks = await res.json();
+    } catch { /* best-effort */ }
+    await openDeck(name);
+  }
+
   // ── Aspect ratio (P4-7) ─────────────────────────────────────────────────────
   // The logical canvas size is the spec-05 single source of truth living inside
   // the deck's `Reveal.initialize({ width, height })` call. The aspectStore holds
@@ -323,7 +333,7 @@
 
       <!-- Slide filmstrip (P6-1..P6-6). Fills the remaining height and scrolls. -->
       <div class="flex-1 min-h-0 overflow-y-auto border-t border-surface-overlay pt-2">
-        <Navigator iframeEl={canvasIframe} />
+        <Navigator iframeEl={canvasIframe} {onDeckCreated} />
       </div>
     </div>
   {/snippet}
