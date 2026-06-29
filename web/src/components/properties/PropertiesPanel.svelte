@@ -52,11 +52,20 @@
     type AlignValue,
     type JustifyValue,
   } from '$lib/model/layout';
-  import { getAttribute, findByEid, isTextLeaf, getInlineColor } from '$lib/model';
+  import {
+    getAttribute,
+    findByEid,
+    isTextLeaf,
+    getInlineColor,
+    getChartProps,
+    hasAttribute,
+    type ChartProps,
+  } from '$lib/model';
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
   import TextColorControl from './TextColorControl.svelte';
   import AltTextControl from './AltTextControl.svelte';
+  import ChartDataControl from './ChartDataControl.svelte';
   import SlideBackgroundControl from './SlideBackgroundControl.svelte';
 
   // ── Component props ────────────────────────────────────────────────────────
@@ -148,6 +157,24 @@
   const textLeaf: ElementNode | null = $derived(deriveTextLeaf(selectedEid));
   const textColor: string | null = $derived(textLeaf ? getInlineColor(textLeaf) : null);
 
+  // ── P17-15: chart-data editor (spec 03 "Chart" leaf) ───────────────────────
+  //
+  // Shown only when the SELECTED element itself is a <canvas data-chart> chart
+  // leaf. Its type + JSON config are edited in ChartDataControl, which commits
+  // via deckStore.applyChartData.
+
+  /** The selected element when it is a chart canvas, else null. */
+  function deriveChartLeaf(eid: string | null): ElementNode | null {
+    if (!eid || !deckStore.model) return null;
+    const el = findByEid(deckStore.model, eid);
+    return el && el.tagName.toLowerCase() === 'canvas' && hasAttribute(el, 'data-chart')
+      ? el
+      : null;
+  }
+
+  const chartLeaf: ElementNode | null = $derived(deriveChartLeaf(selectedEid));
+  const chartProps: ChartProps | null = $derived(chartLeaf ? getChartProps(chartLeaf) : null);
+
   function onTextColorChange(value: string | null): void {
     if (!selectedEid) return;
     // Panel already depends on deckStore (model reads); call the command directly
@@ -235,6 +262,12 @@
   <!-- ── P17-11: alt text — shown whenever an IMG leaf is selected ─────────── -->
   {#if imageLeaf}
     <AltTextControl alt={imageAlt} {onAltChange} />
+    <div class="separator"></div>
+  {/if}
+
+  <!-- ── P17-15: chart data — shown whenever a chart canvas is selected ─────── -->
+  {#if chartLeaf && chartProps && selectedEid}
+    <ChartDataControl eid={selectedEid} type={chartProps.type} data={chartProps.data} />
     <div class="separator"></div>
   {/if}
 

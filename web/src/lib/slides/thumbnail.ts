@@ -35,7 +35,14 @@
  */
 
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '$lib/coords';
-import { serializeDeck, getAttribute, type ElementNode } from '$lib/model';
+import {
+  serializeDeck,
+  getAttribute,
+  createElement,
+  createText,
+  appendChild,
+  type ElementNode,
+} from '$lib/model';
 import { applyThumbnailLayout } from './thumbnail-layout';
 
 /**
@@ -46,6 +53,75 @@ import { applyThumbnailLayout } from './thumbnail-layout';
  */
 export function serializeSection(section: ElementNode): string {
   return serializeDeck({ nodes: [section] });
+}
+
+// ── Chart placeholder (P17-16) ──────────────────────────────────────────────
+//
+// KNOWN THUMBNAIL-ONLY FIDELITY GAP (joins code highlighting + KaTeX math):
+// thumbnails render script-free (sandbox="", no JS — see the file header), but a
+// Chart.js chart is JS-driven: `<canvas data-chart>` is painted at runtime by the
+// vendored chart plugin, which never runs here. So a chart would render as a blank
+// box. Instead we SUBSTITUTE each chart canvas with a static, script-free SVG
+// bar-chart placeholder of the same size, captioned with the chart type. This is
+// purely a thumbnail approximation; the live canvas/editor + PDF export render the
+// real chart. (Code blocks degrade to unhighlighted text; math to raw LaTeX — the
+// same "static approximation, full fidelity at runtime" tradeoff.)
+
+/** True when `el` is a chart canvas the editor owns (mirrors classify.ts). */
+function isChartCanvas(el: ElementNode): boolean {
+  return el.tagName.toLowerCase() === 'canvas' && getAttribute(el, 'data-chart') !== null;
+}
+
+/** Build a static SVG bar-chart placeholder div the size of the chart canvas. */
+function buildChartPlaceholder(canvas: ElementNode): ElementNode {
+  const w = getAttribute(canvas, 'width') ?? '600';
+  const h = getAttribute(canvas, 'height') ?? '400';
+  const type = (getAttribute(canvas, 'data-chart') ?? '').trim() || 'chart';
+
+  const div = createElement('div', {
+    class: 'sb-chart-placeholder',
+    style: `width: ${w}px; height: ${h}px`,
+  });
+
+  // Three ascending bars on an L-axis — a recognisable, resource-free chart glyph.
+  const svg = createElement('svg', {
+    class: 'sb-chart-glyph',
+    viewBox: '0 0 64 48',
+    fill: 'none',
+    stroke: 'currentColor',
+    'stroke-width': '3',
+    'stroke-linecap': 'round',
+    'stroke-linejoin': 'round',
+    'aria-hidden': 'true',
+  });
+  appendChild(svg, createElement('path', { d: 'M8 6v36h48' })); // axes
+  appendChild(svg, createElement('path', { d: 'M18 42V30' })); // bar 1
+  appendChild(svg, createElement('path', { d: 'M32 42V18' })); // bar 2
+  appendChild(svg, createElement('path', { d: 'M46 42V24' })); // bar 3
+  appendChild(div, svg);
+
+  const label = createElement('span', { class: 'sb-chart-label' });
+  appendChild(label, createText(`${type} chart`));
+  appendChild(div, label);
+
+  return div;
+}
+
+/**
+ * Replace every `<canvas data-chart>` in the (already-cloned) subtree with a
+ * static chart placeholder, in place. Operates ONLY on a clone (the caller passes
+ * the applyThumbnailLayout output), so the live model is never mutated.
+ */
+export function substituteChartPlaceholders(node: ElementNode): void {
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i];
+    if (child.type !== 'element') continue;
+    if (isChartCanvas(child)) {
+      node.children[i] = buildChartPlaceholder(child);
+    } else {
+      substituteChartPlaceholders(child);
+    }
+  }
 }
 
 /** Options for buildThumbnailSrcdoc. */
@@ -72,7 +148,11 @@ export function buildThumbnailSrcdoc(
   // x/y/w/h/rot) into inline styles BEFORE serializing, so the script-free
   // thumbnail renders the same static geometry the runtime slides-layout-init.js
   // produces on the live canvas. Operates on a clone — the model is untouched.
-  const sectionHtml = serializeSection(applyThumbnailLayout(section));
+  const laidOut = applyThumbnailLayout(section);
+  // P17-16: charts are JS-driven; swap each <canvas data-chart> for a static SVG
+  // placeholder so the script-free thumbnail shows something meaningful.
+  substituteChartPlaceholders(laidOut);
+  const sectionHtml = serializeSection(laidOut);
 
   // Per-slide background color from data-background-color attribute.
   const bgColor = getAttribute(section, 'data-background-color');
@@ -182,7 +262,20 @@ export function buildThumbnailSrcdoc(
     .reveal .slides > section > section { position: static; height: auto; }
     .reveal .slides > section > section ~ section { display: none; }
     /* Show all fragment steps in the thumbnail (no JS to advance them). */
-    .fragment { opacity: 1 !important; visibility: visible !important; }${bgImageOpacityExtraRule}${bgVideoPlaceholderExtraRule}
+    .fragment { opacity: 1 !important; visibility: visible !important; }
+    /* P17-16: static chart placeholder (charts are JS-driven; see header). */
+    .sb-chart-placeholder {
+      display: inline-flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 12px;
+      max-width: 100%; box-sizing: border-box;
+      border: 2px dashed rgba(128,128,128,0.45); border-radius: 8px;
+      background: rgba(128,128,128,0.08);
+      color: rgba(128,128,128,0.75);
+    }
+    .sb-chart-glyph { width: 96px; height: 72px; }
+    .sb-chart-label {
+      font-size: 28px; letter-spacing: 0.04em; text-transform: lowercase;
+    }${bgImageOpacityExtraRule}${bgVideoPlaceholderExtraRule}
   `;
 
   // NOTE: the override <link>/<style> order matters — overrides come AFTER the

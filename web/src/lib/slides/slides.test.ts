@@ -478,6 +478,23 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).toContain('visibility: visible !important');
   });
 
+  it('substitutes a static placeholder for a <canvas data-chart> (P17-16)', () => {
+    const DECK_WITH_CHART = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1"><canvas data-eid="c1" data-chart="bar" width="600" height="400" data-chart-data='{"type":"bar","data":{"labels":["A"],"datasets":[{"data":[1]}]}}'></canvas></section>
+</div></div></body></html>`;
+    const model = parseDeck(DECK_WITH_CHART);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    // Charts are JS-driven; the script-free thumbnail must NOT keep the <canvas>.
+    expect(doc).not.toContain('<canvas');
+    // It shows the static placeholder + the chart type caption instead.
+    expect(doc).toContain('sb-chart-placeholder');
+    expect(doc).toContain('bar chart');
+    // Still offline (no external URLs).
+    expect(doc).not.toMatch(/https?:\/\//);
+  });
+
   it('applies data-background-color as the section background in the thumbnail', () => {
     const DECK_WITH_BG = `<!doctype html>
 <html><body><div class="reveal"><div class="slides">

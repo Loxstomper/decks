@@ -28,6 +28,7 @@
 package validate
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -331,6 +332,52 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 		issues = append(issues, Issue{
 			Code:    "invalid-attr",
 			Message: "data-slot must be a non-empty string (slot name)",
+			Line:    line,
+			EID:     eid,
+		})
+	}
+
+	// data-chart / data-chart-data (P17-15): Chart.js chart block on a <canvas>.
+	//   • data-chart      — the chart TYPE string ("bar", "line", "pie", …). Any
+	//                       non-empty string is valid (the Chart.js type list is
+	//                       open-ended; do not enum-couple it here). Empty → error.
+	//   • data-chart-data — a JSON Chart.js config `{type, data, options?}` the
+	//                       runtime plugin JSON.parses. It MUST be present and
+	//                       parse as JSON; malformed JSON is flagged invalid-attr.
+	// Dual-encoded: also see getChartProps/setChartProps in
+	// web/src/lib/model/layout.ts and the canvas-data-chart leaf rule in
+	// web/src/lib/model/classify.ts (keep in sync on the attribute names).
+	if v, ok := attrs["data-chart"]; ok {
+		if strings.TrimSpace(v) == "" {
+			issues = append(issues, Issue{
+				Code:    "invalid-attr",
+				Message: "data-chart must be a non-empty string (chart type)",
+				Line:    line,
+				EID:     eid,
+			})
+		}
+		// A chart marker implies a data config; require it to be present + parseable.
+		raw, hasData := attrs["data-chart-data"]
+		if !hasData {
+			issues = append(issues, Issue{
+				Code:    "invalid-attr",
+				Message: "data-chart requires a data-chart-data JSON config attribute",
+				Line:    line,
+				EID:     eid,
+			})
+		} else if !json.Valid([]byte(raw)) {
+			issues = append(issues, Issue{
+				Code:    "invalid-attr",
+				Message: "data-chart-data must be parseable JSON (Chart.js config)",
+				Line:    line,
+				EID:     eid,
+			})
+		}
+	} else if raw, ok := attrs["data-chart-data"]; ok && !json.Valid([]byte(raw)) {
+		// data-chart-data present without data-chart (unusual) — still validate it.
+		issues = append(issues, Issue{
+			Code:    "invalid-attr",
+			Message: "data-chart-data must be parseable JSON (Chart.js config)",
 			Line:    line,
 			EID:     eid,
 		})

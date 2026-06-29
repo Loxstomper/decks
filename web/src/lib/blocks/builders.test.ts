@@ -8,7 +8,14 @@
 
 import { describe, it, expect } from 'vitest';
 import { parseDeck, serializeDeck, getAttribute, hasAttribute } from '$lib/model';
-import { buildImageBlock, buildCodeBlock, buildMathBlock } from './builders';
+import {
+  buildImageBlock,
+  buildCodeBlock,
+  buildMathBlock,
+  buildChartBlock,
+  CHART_WIDTH,
+  CHART_HEIGHT,
+} from './builders';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -286,5 +293,63 @@ describe('buildMathBlock', () => {
     const el = buildMathBlock(latex);
     const out = serialize(el);
     expect(out).toContain('\\int_0^\\infty');
+  });
+});
+
+// ── buildChartBlock (P17-15) ──────────────────────────────────────────────────
+
+describe('buildChartBlock', () => {
+  const sampleJson = '{"type":"bar","data":{"labels":["A","B"],"datasets":[{"data":[1,2]}]}}';
+
+  it('produces a <canvas> with data-chart (type) + data-chart-data (JSON)', () => {
+    const el = buildChartBlock('bar', sampleJson);
+    expect(el.tagName).toBe('canvas');
+    expect(getAttribute(el, 'data-chart')).toBe('bar');
+    expect(getAttribute(el, 'data-chart-data')).toBe(sampleJson);
+  });
+
+  it('sets explicit width/height (responsive is off in the plugin)', () => {
+    const el = buildChartBlock('line', sampleJson);
+    expect(getAttribute(el, 'width')).toBe(String(CHART_WIDTH));
+    expect(getAttribute(el, 'height')).toBe(String(CHART_HEIGHT));
+  });
+
+  it('is NOT void and carries no children', () => {
+    const el = buildChartBlock('pie', sampleJson);
+    expect(el.isVoid).toBe(false);
+    expect(el.children).toHaveLength(0);
+  });
+
+  it('falls back to "bar" for an empty type', () => {
+    const el = buildChartBlock('   ', sampleJson);
+    expect(getAttribute(el, 'data-chart')).toBe('bar');
+  });
+
+  it('round-trips byte-stable: the JSON survives serialize→parse intact', () => {
+    const el = buildChartBlock('bar', sampleJson);
+    const out = serialize(el);
+    // Re-parse the emitted markup and read the attribute back as a decoded literal.
+    const reparsed = parseDeck(
+      `<!DOCTYPE html><html><head></head><body>${out}</body></html>`,
+    );
+    let canvas: ReturnType<typeof buildChartBlock> | null = null;
+    const findCanvas = (n: { type: string; tagName?: string; children?: unknown[] }) => {
+      if (n.type === 'element' && (n as { tagName: string }).tagName === 'canvas') {
+        canvas = n as unknown as ReturnType<typeof buildChartBlock>;
+      }
+      for (const c of (n as { children?: unknown[] }).children ?? []) {
+        findCanvas(c as { type: string; tagName?: string; children?: unknown[] });
+      }
+    };
+    for (const n of reparsed.nodes) findCanvas(n as never);
+    expect(canvas).not.toBeNull();
+    expect(getAttribute(canvas!, 'data-chart-data')).toBe(sampleJson);
+    expect(JSON.parse(getAttribute(canvas!, 'data-chart-data')!)).toMatchObject({ type: 'bar' });
+  });
+
+  it('classifies as a leaf (selectable, eid-stampable)', async () => {
+    const { classify } = await import('$lib/model');
+    const el = buildChartBlock('bar', sampleJson);
+    expect(classify(el)).toBe('leaf');
   });
 });

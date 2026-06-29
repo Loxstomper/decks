@@ -118,3 +118,45 @@ export function buildMathBlock(latex: string): ElementNode {
   appendChild(div, createText(`\\[ ${latex} \\]`));
   return div;
 }
+
+// ── Chart block (P17-15) ───────────────────────────────────────────────────
+
+/** Default canvas dimensions (logical px). Charts run with reveal's responsive
+ *  sizing OFF (see the vendored plugin), so the canvas needs an explicit size. */
+export const CHART_WIDTH = 600;
+export const CHART_HEIGHT = 400;
+
+/**
+ * Build a Chart.js canvas block:
+ *   <canvas width="600" height="400"
+ *           data-chart="{type}"
+ *           data-chart-data='{"type":"{type}","data":{…},"options":{…}}'></canvas>
+ *
+ * `type`     — the Chart.js chart type ("bar", "line", "pie", …). Stamped on the
+ *              `data-chart` attribute (the marker the vendored plugin scans for)
+ *              AND expected to match the `type` field inside `dataJson`. The
+ *              panel keeps the two in sync; this builder writes both verbatim.
+ *
+ * `dataJson` — a JSON string holding a Chart.js config object
+ *              `{type, data, options?}`. Written VERBATIM (no re-stringify) so the
+ *              attribute is byte-stable and round-trips exactly what the editor
+ *              produced. Callers MUST pass valid JSON (the panel/inspector
+ *              validate before calling).
+ *
+ * WHY a sized <canvas> (not a wrapper): the vendored chart plugin
+ * (internal/deck/vendor/chart/plugin.js) renders with `responsive:false`, so the
+ * canvas must carry intrinsic width/height. <canvas> is NOT a void element; we
+ * leave it childless (a fallback text child is allowed but unnecessary).
+ *
+ * OFFLINE-FIRST (spec 12): emits zero external URLs — Chart.js + the plugin are
+ * vendored into the deck by the scaffold (Lane GO / P17-14).
+ */
+export function buildChartBlock(type: string, dataJson: string): ElementNode {
+  const safeType = type.trim() || 'bar';
+  return createElement('canvas', {
+    width: String(CHART_WIDTH),
+    height: String(CHART_HEIGHT),
+    'data-chart': safeType,
+    'data-chart-data': dataJson,
+  });
+}
