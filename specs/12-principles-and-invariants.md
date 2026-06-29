@@ -30,6 +30,16 @@ Cross-cutting rules every other spec depends on.
 - Such elements/slides get a small **"source only / partially editable"** badge rather than
   being dropped or mangled. Trust over cleverness.
 
+## Input sanitization
+
+- Content entered through `contenteditable` or **paste** is sanitized before it reaches the
+  model: only the inline-mark allowlist survives ([02](02-document-model.md)), and **scripts,
+  event handlers, external resource URLs, and `javascript:` link hrefs are stripped**. This
+  protects both the offline invariant (no smuggled remote resources) and the document model (no
+  arbitrary HTML soup).
+- Pasted images are localized through the asset pipeline ([08](08-assets-and-media.md)), never
+  left as a remote `src`.
+
 ## Validation
 
 - `slides validate` ([11](11-claude-code-integration.md)) gates both Claude Code edits and the

@@ -70,7 +70,7 @@ inspector/toolbar already use (single source of truth).
   reload.
 - **Actions are context-dependent** on element kind (a pure `menuItemsFor(selection)`):
   - *Any:* Delete · **Duplicate** · Cut / Copy / Paste · Jump to source.
-  - *Text leaf:* Edit text · Text color.
+  - *Text leaf:* Edit text · Text color · Format (bold / italic / …) · Link.
   - *Structured:* Make free · move up/down among siblings.
   - *Free:* Make structured · **Bring to front / Send to back** · Align/Distribute (multi).
   - *Container:* Insert block inside · Equal columns · quick align.
@@ -94,6 +94,39 @@ These are the only net-new model commands (each one undo entry + one autosave, b
   *Paste* inserts a clone with **freshly regenerated `data-eid`s** after the current selection
   (or as the last child of a selected container), so paste works across slides without eid
   collisions.
+
+## Rich text editing & formatting
+
+Text leaves are edited in place (`contenteditable`, [02](02-document-model.md)); formatting acts
+on the **current selection within** that edit, so a word or phrase can be styled independently —
+not only the whole element.
+
+- **Floating selection toolbar.** Selecting text inside an active edit pops a small toolbar at
+  the selection: **bold / italic / underline / strikethrough**, **font size**, **text colour**
+  (the per-element colour control, here scoped to the run), and **link**. Each toggles an inline
+  mark on the selected range — a range wrap/unwrap, *not* `document.execCommand` (inconsistent
+  across browsers).
+- **Allowlisted marks only.** Buttons map to the `strong` / `em` / `u` / `s` / `span[style]` /
+  `a` allowlist ([02](02-document-model.md)); writeback serializes them canonically and
+  byte-stable, and pasted content is sanitized to the same allowlist
+  ([12](12-principles-and-invariants.md)).
+- **Block-level controls** (whole-leaf, in the inspector — not the floating toolbar): **text
+  alignment** (left / center / right / justify) and **list indent / outdent**.
+- **Links** target either a **selected text range** (wrap in `<a href>`) or a **whole selected
+  element** (wrap the element); a small href editor adds / edits / removes the link. An external
+  `href` is allowed — it is navigation, not an offline-breaking resource load
+  ([12](12-principles-and-invariants.md)) — only `javascript:` URLs are rejected. Add / edit /
+  remove is one undo entry + one autosave.
+
+## Command palette & keyboard help
+
+- **Command palette** (⌘/Ctrl-K): a searchable list of editor commands — insert blocks, slide
+  ops, layout / align, formatting, theme, present / export — each dispatching the **same
+  `deckStore` command** the menus and inspector use (one source of truth, like the context
+  menu). Discovery without hunting through panels.
+- **Shortcut help** (`?`): a cheat-sheet overlay of the keyboard shortcuts already in the editor
+  (nudge, undo / redo, delete, marquee modifiers, save, present), so they are discoverable
+  rather than folkloric.
 
 ## Two drag semantics
 

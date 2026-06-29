@@ -58,6 +58,32 @@ When parsing, each node is one of:
 - Used by: canvas selection, Claude Code targeting, auto-animate `data-id` derivation
   (see [07](07-motion-and-transitions.md)), and "highlight what Claude changed".
 
+## Inline content model (rich text)
+
+A **text leaf** (heading / paragraph / list item) may hold more than a single text node — a
+small set of **inline marks**: `strong`, `em`, `u`, `s`, `a[href]`, and `span[style]`. So a
+*word or phrase* can be bold / italic / coloured / linked, not just the whole element (the
+whole-element text-color escape hatch in [09](09-theming-and-styles.md) is the degenerate case;
+this is the Google-Slides "select a word, bold it" expectation).
+
+- **Constrained allowlist.** Only those tags, each with a fixed attribute allowlist
+  (`a` → `href` / `target` / `rel`; `span` → `style` limited to `color` and `font-size`). The
+  leaf's inline subtree serializes **canonically** when dirty and is byte-stable round-trip.
+  Anything already inside a leaf that is *off-allowlist* is treated as passthrough — preserved,
+  not edited.
+- **Writeback preserves marks.** Committing an in-place `contenteditable` edit serializes the
+  leaf's inline DOM back to allowlisted HTML instead of flattening to plain text. (This replaces
+  the text-only writeback, which discarded inline markup on every commit.) Only the leaf's child
+  subtree goes `dirty`; its open/close tag bytes and every sibling pass through untouched.
+- **Sub-leaf nodes carry no `data-eid`.** Marks are content *within* a leaf, addressed by the
+  leaf's eid plus a selection range — not independently selectable elements. (A link is the one
+  mark that may instead wrap a *whole element*; see [03](03-layout-vocabulary.md),
+  [04](04-canvas-interaction.md).)
+- **Sanitization is mandatory.** `contenteditable` — and especially **paste** — can introduce
+  arbitrary HTML; the serializer strips everything off-allowlist (scripts, event handlers,
+  external resource URLs, `javascript:` hrefs) before it reaches the model. This is a security +
+  offline invariant, not a nicety ([12](12-principles-and-invariants.md)).
+
 ## Serialization rules
 
 - Deterministic output: same model → same bytes, every time.

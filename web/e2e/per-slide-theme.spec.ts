@@ -201,6 +201,44 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
   });
 
   /**
+   * P18-1 (per-slide theme colours): the themed slide's PARAGRAPH text must have
+   * a different computed `color` than the plain slide's — not just a different
+   * --r-main-color var. This is the precise regression the Phase 18 fix targets:
+   * reveal sets `color: var(--r-main-color)` on the `.reveal` ANCESTOR, and
+   * `color` inherits as a computed value, so merely rebinding the var on a
+   * descendant section did NOT recompute body text. The generated CSS now
+   * re-asserts `color: var(--r-main-color)` ON section[data-theme], so the body
+   * paragraph actually restyles.
+   */
+  test('themed slide paragraph has different computed color than plain (P18-1)', async ({ page }) => {
+    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.locator('.reveal').waitFor({ timeout: 10_000 });
+
+    const readColor = (eid: string) =>
+      page.evaluate((id: string) => {
+        /* eslint-disable @typescript-eslint/no-explicit-any */
+        const doc = (globalThis as any).document as { querySelector(s: string): any };
+        const gcs = (globalThis as any).getComputedStyle as (el: any) => any;
+        const el = doc.querySelector(`p[data-eid="${id}"]`);
+        if (!el) return null;
+        return (gcs(el).color as string).trim();
+      }, eid);
+
+    const themedP = await readColor(`${THEMED_EID}-text`);
+    const plainP = await readColor(`${PLAIN_EID}-text`);
+
+    expect(themedP, 'themed paragraph must exist').not.toBeNull();
+    expect(plainP, 'plain paragraph must exist').not.toBeNull();
+    // The themed paragraph's body color must differ from the inherited default —
+    // proves `color` is re-asserted at section scope, not only the var rebinding.
+    expect(
+      themedP,
+      `Themed paragraph color (${themedP}) must differ from plain (${plainP}); ` +
+      `P18-1 section-scoped \`color: var(--r-main-color)\` is not applying`,
+    ).not.toBe(plainP);
+  });
+
+  /**
    * P10-7 (vertical cascade): A child section inside a themed vertical stack
    * must inherit the stack's --r-main-color via CSS custom property inheritance.
    * No JS is needed for the var cascade — this test verifies the CSS behavior.

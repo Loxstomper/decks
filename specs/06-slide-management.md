@@ -86,8 +86,10 @@ otherwise do the work, so the thumbnail is **faithful to the actual slide**:
 - **Fragments show their final state** (forced visible), rather than vanishing under reveal's
   `opacity:0` default.
 - **Backgrounds honored** — a section's `data-background-color` is rendered as its background.
-- **Accepted approximation:** code highlighting and KaTeX math (reveal plugins, JS-driven) are
-  not run, so they render plain. This is the one acknowledged fidelity gap, not a bug.
+- **Accepted approximation:** code highlighting, KaTeX math, and **Chart.js charts** (reveal
+  plugins, JS-driven) are not run, so they render plain or as a placeholder
+  ([03](03-layout-vocabulary.md)). These are the acknowledged thumbnail-only fidelity gaps, not
+  bugs — they render correctly everywhere JS runs (editor, present, PDF).
 
 ## Related
 

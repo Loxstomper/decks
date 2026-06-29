@@ -435,6 +435,101 @@ dependencies are noted inline.
 > - **Thumbnail (`thumbnail.ts`):** paints image (size/position/repeat, opacity via `::before`) + gradient; video shows a script-free play-glyph placeholder; zero external URLs.
 > - **⚠️ Needs browser confirmation:** `web/e2e/slide-background.spec.ts` written (image bg renders in canvas + present + thumbnail, offline-guard) — run pending browser env.
 
+## Phase 17 — Rich text, links, charts, alt text, command palette, slide numbers/footers, present-mode polish
+> Goal: close the everyday-authoring gaps that remain after M7 — true **inline** text
+> formatting + hyperlinks, image **alt text**, a **command palette** + shortcut help, a **chart**
+> block, **slide numbers / footers**, and **present-mode** drawing/laser/auto-advance. Specs:
+> [02](specs/02-document-model.md), [03](specs/03-layout-vocabulary.md),
+> [04](specs/04-canvas-interaction.md), [07](specs/07-motion-and-transitions.md),
+> [08](specs/08-assets-and-media.md), [09](specs/09-theming-and-styles.md),
+> [10](specs/10-presenting-and-export.md), [12](specs/12-principles-and-invariants.md).
+>
+> **Decisions (locked):**
+> - **Inline formatting = true ranges**, not whole-leaf only. Bold/italic/underline/strike/size/
+>   colour/link apply to a **selected word or phrase** via an allowlisted inline-mark model
+>   (`strong`/`em`/`u`/`s`/`a`/`span[style]`). This requires replacing the v1 flatten-to-text
+>   writeback with an inline-HTML writeback + **sanitizer** — the load-bearing foundation
+>   (Lane A) that Links (Lane C) also build on.
+> - **Charts via reveal's Chart.js plugin** (canvas, JS-runtime). Renders in editor/present/PDF
+>   (all run JS); the **only** casualty is the script-free navigator thumbnail → painted as a
+>   placeholder, joining code/KaTeX as a documented thumbnail-only gap. Data is a JSON config on
+>   `<canvas data-chart>`.
+> - **Footers are CSS-based** (a managed `custom.css` overlay rule + per-slide `data-footer-hidden`
+>   opt-out), not a per-slide element — single source, no per-section churn. Slide numbers use
+>   reveal's native `slideNumber`.
+> - **Present-mode annotations are ephemeral** — never written to `deck.html` (byte-stability).
+>   All four present aids ship: drawing/annotation, laser pointer, auto-advance, on-screen number.
+>
+> **Dependency:** Lane A (P17-1..5) gates Lanes B (formatting UI) and C (links). Lanes D–H are
+> independent and parallelizable. **Cross-cutting:** keep `internal/validate/validate.go` ⟷
+> `web/src/lib/model/layout.ts` allowed-sets in sync for every new attribute; every offline
+> plugin (Chart.js, chalkboard, laser) is `go:embed`'d + copied per deck + linked relatively
+> (zero external URLs); sanitization (P17-2) is a security invariant ([12](specs/12-principles-and-invariants.md)).
+> Built via worktree lanes + workflow subagents (per PROMPT_BUILD).
+
+### Lane A — Rich-text foundation (gates B + C)
+- [ ] **P17-1 — Inline serializer + allowlist.** A pure `contenteditable` DOM → canonical inline-HTML serializer over a fixed allowlist (`strong`/`em`/`u`/`s`/`a[href,target,rel]`/`span[style: color,font-size]`); normalize browser junk (`<div>`/`<font>`/`&nbsp;`/style soup) to the allowlist. _Done when:_ a leaf with mixed marks round-trips byte-stable; off-allowlist input is normalized; unit-tested. (Spec 02, 03)
+- [ ] **P17-2 — Paste & input sanitization.** Strip scripts, event handlers, external resource URLs, and `javascript:` hrefs from contenteditable/paste before it reaches the model; localize pasted images via the existing asset pipeline. _Done when:_ pasting hostile/styled HTML yields only allowlisted marks; a pasted image is localized; offline-guard holds. (Spec 12, 08)
+- [ ] **P17-3 — Inline-aware writeback.** Replace the flatten-to-text `applyTextEditToModel` path with an inline-preserving `applyRichTextEdit(eid, html)` — serializes the leaf's inline DOM to allowlisted HTML; only the leaf's child subtree goes dirty. _Done when:_ committing an edit on a leaf containing `<strong>`/`<a>` preserves them; the element tag bytes and all siblings are byte-identical. (Spec 02)
+- [ ] **P17-4 — Model + validate recognize inline marks.** `classify` treats allowlisted marks as managed inline content *within* leaves (not new leaves, not passthrough); `validate.go` + `layout.ts` accept them; no `data-eid` is stamped on a mark. Keep allowed-sets synced. _Done when:_ `validate` passes a deck with inline marks; marks carry no eid. (Spec 02, 12)
+- [ ] **P17-5 — Round-trip corpus extension.** Add inline-mark + link fixtures to the golden byte-stability corpus (X-2). _Done when:_ the golden suite covers inline marks/links and stays byte-stable. (Spec 12)
+
+### Lane B — Formatting UI (depends A)
+- [ ] **P17-6 — Range mark commands.** `toggleInline(tag)` wrap/unwrap over the live selection range for bold/italic/underline/strike + font-size + colour-run (range wrap, not `execCommand`); each one undo + one autosave, byte-stable. _Done when:_ selecting a word and toggling bold writes `<strong>` around just that range; toggling again removes it cleanly. (Spec 04, 02)
+- [ ] **P17-7 — Floating selection toolbar.** On text selection within an active in-place edit, show a toolbar at the selection (B/I/U/S, font size, text colour, link); Cmd/Ctrl+B/I/U shortcuts; dismiss on blur/Escape. _Done when:_ the toolbar appears on selection and each control applies its mark to the run. (Spec 04)
+- [ ] **P17-8 — Block-level text controls.** Inspector controls (whole-leaf): text-align (left/center/right/justify) + list indent/outdent. _Done when:_ align writes inline style on the leaf and indent/outdent re-nests the list; byte-stable + undoable. (Spec 04, 09)
+
+### Lane C — Links (depends A)
+- [ ] **P17-9 — Link commands.** `linkRange` (wrap the selected range in `<a href>`) and `linkElement` (wrap a whole selected element), plus edit/remove; reject `javascript:` hrefs; external hrefs allowed (navigation, not a resource load). One undo + one autosave each, byte-stable. _Done when:_ linking a range/element writes `<a href>`, edit updates the href, remove unwraps; `javascript:` is refused. (Spec 04, 02, 12)
+- [ ] **P17-10 — Link editor UI + context menu.** An href popover (add/edit/remove) wired into the selection toolbar (P17-7) and the text-leaf context-menu actions. _Done when:_ both entry points add/edit/remove a link; the offline-guard is unaffected by an external href. (Spec 04)
+
+### Lane D — Image alt text
+- [ ] **P17-11 — Alt-text inspector field.** Editable `alt` on a selected image; seed from the provider description on insert; carried through upload/drag/paste; empty `alt=""` allowed. _Done when:_ editing `alt` writes the attribute byte-stable + undoable; provider inserts seed `alt`. (Spec 08)
+
+### Lane E — Command palette + shortcut help
+- [ ] **P17-12 — Command registry + palette.** A pure command registry (label/run/when) shared with menus; ⌘/Ctrl-K opens a searchable palette dispatching the **same `deckStore` commands**. _Done when:_ the palette opens, filters, and runs a command via the same path as the menu. (Spec 04)
+- [ ] **P17-13 — Shortcut help overlay.** `?` opens a cheat-sheet of the editor's existing shortcuts (nudge/undo/redo/delete/marquee/save/present), guarded against text-editing focus; Escape dismisses. _Done when:_ `?` shows the overlay listing current shortcuts and is not triggered mid-edit. (Spec 04)
+
+### Lane F — Charts (Go + FE)
+- [ ] **P17-14 — Vendor Chart.js reveal plugin (offline).** `go:embed` the plugin into the binary, copy it into `decks/<name>/assets/vendor/` on `slides new`/`slides vendor`, enable it in the scaffold template; linked relatively. _Done when:_ a fresh deck links the chart plugin locally with zero external URLs. (Spec 03, 12, 01)
+- [ ] **P17-15 — Chart block + data editor.** Insert-palette chart block (type: bar/line/pie/…) writing `<canvas data-chart data-chart-data='…'>`; inspector JSON data/options editor. _Done when:_ inserting a chart renders it in the canvas; editing the data updates it; persists byte-stable. (Spec 03)
+- [ ] **P17-16 — Chart contract + thumbnail placeholder.** `validate.go` + model accept `data-chart`/`data-chart-data`; the thumbnail builder paints a chart placeholder (script-free). _Done when:_ `validate` passes a chart deck and the thumbnail shows a placeholder, no external URLs. (Spec 03, 06, 12)
+
+### Lane G — Slide numbers + footers
+- [ ] **P17-17 — Slide-number toggle.** Deck-level control writing reveal's `slideNumber` (with a format option) into the deck's reveal init. _Done when:_ toggling shows numbers in edit + present; byte-stable. (Spec 09, 10)
+- [ ] **P17-18 — Deck footer (CSS-based).** Footer text + optional logo as a **managed `custom.css`** overlay rule; per-slide `data-footer-hidden` opt-out (recognized by `validate.go` + model). _Done when:_ setting a footer shows a fixed overlay across slides, a marked slide hides it, and it round-trips byte-stable. (Spec 09, 12)
+
+### Lane H — Present-mode polish
+- [ ] **P17-19 — Vendor annotation + laser plugins (offline, ephemeral).** `go:embed` + per-deck copy of a chalkboard/annotation plugin and a laser pointer, enabled **only on the present route**; annotations never write to `deck.html`. _Done when:_ the present route loads both locally, drawing/laser work, `deck.html` is unchanged after use, zero external URLs. (Spec 10, 12)
+- [ ] **P17-20 — Auto-advance settings UI.** Per-deck default + per-slide `data-autoslide` + loop (declarative). _Done when:_ setting auto-advance writes `data-autoslide`/loop and the present route advances on the timer; byte-stable. (Spec 07, 10)
+
+### Verification
+- [ ] **P17-21 — Tests + e2e.** Unit: serializer/sanitizer round-trip, range commands, link ops, chart contract, footer/number. Playwright: bold-a-word persists + survives reload; link add/remove; insert-chart renders (+ thumbnail placeholder); command palette runs a command; footer/number show; present-mode annotation loads offline; the offline-guard stays green. _Done when:_ all suites pass. (Spec 12)
+
+## Phase 18 — Per-slide theme colours (bug fix)
+> Goal: a per-slide `data-theme` override restyles the slide's **text, headings, and links** —
+> not just its background. Spec: [09](specs/09-theming-and-styles.md) "Per-slide theme override".
+> Independent of Phase 17; can land immediately.
+>
+> Two root causes: **(1)** the generated `slides-slide-themes.css` only **rebinds** the theme's
+> `--r-*` vars; reveal sets body `color: var(--r-main-color)` on `.reveal` (an *ancestor* of the
+> section) and `color` inherits as a *computed* value, so rebinding the var on a descendant
+> section never recomputes body text — headings/links update, body text does not. **(2)** Decks
+> created before Phase 10 never had the `slides-slide-themes.css` `<link>` injected into
+> `deck.html` (`vendor`/`upgrade` copy the file but don't edit the `<head>`), so `data-theme`
+> has no rules to match and only the managed `data-background-color` shows.
+
+- [x] **P18-1 — Re-assert colours at section scope in the generated CSS.** `GenerateSlideThemesCSS` (`internal/deck/theme.go`) emits, per theme, not just the `--r-*` rebindings but also `color: var(--r-main-color)` on `.reveal section[data-theme="<name>"]`, plus `:is(h1,h2,h3,h4,h5,h6){color:var(--r-heading-color)}` and `a{color:var(--r-link-color)}` rules scoped under the section. Output stays byte-deterministic (sorted/stable). The same fix flows to navigator thumbnails for free (they link this stylesheet, P12-5). _Done when:_ a slide with `data-theme` shows a different computed `color` on its **paragraph** text — not only headings/links/background — vs an inherited slide. (Spec 09)
+- [x] **P18-2 — Inject the stylesheet link on migration.** `slides upgrade` (and `vendor`) adds `<link rel="stylesheet" href="assets/vendor/slides-slide-themes.css">` to an existing `deck.html` when absent — idempotent, byte-stable otherwise, ordered consistently with the scaffold (`slides-layout.css` → `slides-slide-themes.css` → `custom.css`). _Done when:_ upgrading a pre-Phase-10 deck adds the link exactly once and per-slide themes then apply; re-running is a no-op. (Spec 09, 13)
+- [x] **P18-3 — Re-vendor refreshes the generated CSS.** Confirm `slides vendor` rewrites `assets/vendor/slides-slide-themes.css` from `GenerateSlideThemesCSS`, so existing decks pick up the P18-1 fix (the file is generated, never hand-edited). _Done when:_ re-vendoring a deck replaces its slide-themes CSS with the corrected, colour-asserting version. (Spec 09, 13)
+- [x] **P18-4 — Test + e2e.** Unit (Go): the generated block for a theme contains the `color` / heading / link assertions and is deterministic. Playwright: a `data-theme` slide's paragraph computed `color` differs from an inherited slide (extend `web/e2e/per-slide-theme.spec.ts`); offline-guard stays green. _Done when:_ suites pass. (Spec 09, 12)
+
+> **Phase 18 STATUS (done, tag 0.0.17):** Per-slide theme colours bug fix. Implemented directly (small, self-contained Go change) + e2e spec extension; verified `go build/test ./...` green, e2e `tsc -p e2e/tsconfig.json` clean.
+> - **P18-1 (`internal/deck/theme.go`):** `GenerateSlideThemesCSS` now emits, per theme, beyond the `--r-*` var rebindings: `color: var(--r-main-color)` on `.reveal section[data-theme="<name>"]`, `:is(h1..h6){color:var(--r-heading-color)}`, and `a{color:var(--r-link-color)}` — each guarded by var presence. Fixes the root cause: reveal sets body `color` on the `.reveal` ANCESTOR and `color` inherits as a computed value, so rebinding the var on a descendant section never recomputed body text (only headings/links, which have their own rules, updated). Output stays byte-deterministic (sorted keys, stable rule order). Flows to thumbnails for free (they link this stylesheet, P12-5).
+> - **P18-2 (`internal/deck/deck.go`):** pure `injectSlideThemesLink(html)` adds `<link ... slides-slide-themes.css>` after the `slides-layout.css` link (scaffold order: layout → slide-themes → custom) when absent; idempotent + byte-stable; wired into `Upgrade` alongside `upgradeInitialize`. Pre-Phase-10 decks (file copied by vendor but link never in `<head>`) now match data-theme rules after `slides upgrade`.
+> - **P18-3:** already satisfied — `Vendor` → `writeSlideThemesCSS` → `GenerateSlideThemesCSS` regenerates the file every vendor, so re-vendoring picks up the P18-1 fix. Asserted via new determinism test.
+> - **P18-4:** Go tests (`theme_test.go`): `TestGenerateSlideThemesCSS_AssertsColorAtSectionScope` (every theme has the 3 color assertions), `TestGenerateSlideThemesCSS_Deterministic`, `TestInjectSlideThemesLink_PreP10Deck` / `_ScaffoldUnchanged`. e2e (`per-slide-theme.spec.ts`): new test asserts the themed paragraph's computed `color` differs from the plain slide's (run pending browser env).
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
@@ -452,6 +547,8 @@ dependencies are noted inline.
   more themes, browser-side deck creation, end-to-end test coverage.
 - **M6 (per-slide theming):** Phase 10 — global deck theme + declarative per-slide overrides
   (named bundle + free-form), cascading to verticals, consistent across present/PDF.
+  (Per-slide colour fidelity — text/headings/links, not just background — is completed by the
+  **Phase 18** bug fix.)
 - **M7 (Slides-app parity):** Phases 11–16 — reload preserves the current slide (P11) and
   free coordinates are true logical-canvas identity (P15); right-click context menu with
   duplicate/z-order/clipboard (P13); Google-Slides-style layout presets (P14); high-fidelity
@@ -460,3 +557,7 @@ dependencies are noted inline.
   lanes + subagents. **Remaining:** P8-8 (MCP, deferred) and P11-3 (skip-reload-on-text-commit,
   deferred); browser-only visual confirmations noted per-phase (e2e specs written, run pending
   a Playwright browser env).
+- **M8 (everyday-authoring parity):** Phase 17 — true inline text formatting + hyperlinks
+  (with the sanitizing inline writeback that replaces the v1 flatten-to-text path), image alt
+  text, command palette + shortcut help, a Chart.js chart block, slide numbers + CSS footers,
+  and present-mode drawing / laser / auto-advance. **Planned** (specs updated; not yet built).

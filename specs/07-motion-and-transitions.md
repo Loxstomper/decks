@@ -19,6 +19,16 @@ signature feature that the stable-ID architecture makes nearly free.
   (`slide` / `fade` / `convex` / `concave` / `zoom` / `none`).
 - Transition speed → `data-transition-speed`.
 
+## Auto-advance (reveal-native)
+
+- A deck can advance on a timer: a per-deck default and per-slide override via **`data-autoslide`**
+  (milliseconds; `0` / absent = manual), plus a **loop** option (reveal's `loop`). Declarative
+  attributes — byte-stable, Claude-authorable.
+- Surfaced as an auto-advance control in the editor; consumed by the present route
+  ([10](10-presenting-and-export.md)).
+- Distinct from fragments / transitions (which animate *within* and *between* steps) — this
+  drives the *timing* of advancement.
+
 ## Auto-animate authoring (signature feature)
 
 reveal's auto-animate tweens elements between two consecutive `data-auto-animate` slides,

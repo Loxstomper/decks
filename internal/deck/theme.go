@@ -106,7 +106,27 @@ func GenerateSlideThemesCSS() []byte {
 		for _, k := range keys {
 			fmt.Fprintf(&b, "  %s: %s;\n", k, vars[k])
 		}
-		b.WriteString("}\n\n")
+		b.WriteString("}\n")
+
+		// Re-asserting `color` at section scope (P18-1). reveal sets
+		// `color: var(--r-main-color)` on `.reveal` — an ANCESTOR of the section.
+		// `color` inherits as a COMPUTED value, so merely rebinding --r-main-color
+		// on a descendant section never recomputes the inherited body text colour
+		// (headings/links use their own per-element rules, so they updated; body
+		// paragraphs did not). We must explicitly set `color` (and re-assert the
+		// heading/link colours) ON the section so the override actually restyles
+		// the slide's text, not just its background. Emitted only when the theme
+		// declares the corresponding var, keeping the output theme-faithful.
+		if _, ok := vars["--r-main-color"]; ok {
+			fmt.Fprintf(&b, ".reveal section[data-theme=%q] {\n  color: var(--r-main-color);\n}\n", name)
+		}
+		if _, ok := vars["--r-heading-color"]; ok {
+			fmt.Fprintf(&b, ".reveal section[data-theme=%q] :is(h1, h2, h3, h4, h5, h6) {\n  color: var(--r-heading-color);\n}\n", name)
+		}
+		if _, ok := vars["--r-link-color"]; ok {
+			fmt.Fprintf(&b, ".reveal section[data-theme=%q] a {\n  color: var(--r-link-color);\n}\n", name)
+		}
+		b.WriteString("\n")
 	}
 	return b.Bytes()
 }

@@ -29,6 +29,15 @@ to local. They are the only network-dependent features, and degrade gracefully o
 
 Design the asset layer so providers are interchangeable behind one "image provider" interface.
 
+## Image accessibility (alt text)
+
+- Every inserted image carries an **`alt`** attribute, editable from the inspector when an image
+  is selected. Provider images seed `alt` from the result description; uploads / drag / paste
+  start empty for the author to fill.
+- `alt` round-trips like any other attribute (one undo + one autosave, byte-stable) and is the
+  one accessibility field the editor surfaces directly. An empty `alt=""` is allowed (decorative
+  images); the field just makes it explicit and editable.
+
 ## Video
 
 - Local `<video>` referencing `assets/`.

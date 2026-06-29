@@ -74,6 +74,9 @@ feature investigation this project grew out of.)
   reflows on resize/aspect change.
 - **Free element** — an element opted into absolute positioning (`data-free`), using logical
   coordinates. The escape hatch.
+- **Inline mark** — allowlisted inline formatting (`strong` / `em` / `u` / `s` / `a` /
+  `span[style]`) inside a text leaf; rich text *within* content, addressed by the leaf's
+  `data-eid` plus a selection range, not its own element. See [02](02-document-model.md).
 - **Passthrough** — HTML the editor doesn't manage but preserves verbatim in the model.
 - **`data-eid`** — stable per-element ID stamped by the editor; lets the canvas and Claude
   Code reference the same element.

@@ -416,6 +416,46 @@ func upgradeInitialize(html string) (string, bool) {
 	return b.String(), true
 }
 
+// slideThemesLinkRE detects an existing slides-slide-themes.css <link> so the
+// injection is idempotent (matches any quoting/whitespace around the href).
+var slideThemesLinkRE = regexp.MustCompile(`<link[^>]+slides-slide-themes\.css`)
+
+// slideThemesLinkTag is the exact <link> tag the scaffold emits, reused so an
+// upgraded deck's head matches a freshly scaffolded one byte-for-byte.
+const slideThemesLinkTag = `<link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />`
+
+// injectSlideThemesLink ensures deck.html links the per-slide theme stylesheet
+// (P18-2). Decks scaffolded before Phase 10 never had the <link> written into
+// their <head>; vendor/upgrade copied the file but left the markup alone, so
+// data-theme overrides had no rules to match. This adds the link exactly once,
+// ordered right after the slides-layout.css link (matching the scaffold:
+// slides-layout.css → slides-slide-themes.css → custom.css). Pure + idempotent:
+// returns the HTML unchanged (changed=false) when the link is already present,
+// or when no anchor to position it against is found.
+func injectSlideThemesLink(html string) (string, bool) {
+	if slideThemesLinkRE.MatchString(html) {
+		return html, false
+	}
+	// Anchor on the slides-layout.css link line so ordering matches the scaffold.
+	anchorRE := regexp.MustCompile(`(?m)^([ \t]*)<link[^>]+slides-layout\.css[^>]*>[^\n]*\n`)
+	loc := anchorRE.FindStringSubmatchIndex(html)
+	if loc == nil {
+		// No layout link to anchor against (unusual). Fall back to before the
+		// custom.css link, else give up rather than guess at <head> structure.
+		fallbackRE := regexp.MustCompile(`(?m)^([ \t]*)<link[^>]+href="custom\.css"[^>]*>[^\n]*\n`)
+		loc = fallbackRE.FindStringSubmatchIndex(html)
+		if loc == nil {
+			return html, false
+		}
+		indent := html[loc[2]:loc[3]]
+		insertAt := loc[0]
+		return html[:insertAt] + indent + slideThemesLinkTag + "\n" + html[insertAt:], true
+	}
+	indent := html[loc[2]:loc[3]]
+	insertAt := loc[1] // end of the matched layout-link line (incl. newline)
+	return html[:insertAt] + indent + slideThemesLinkTag + "\n" + html[insertAt:], true
+}
+
 // Upgrade migrates an existing deck to the current vendored assets and the
 // Phase 15 coordinate-identity reveal config. It:
 //
@@ -441,14 +481,16 @@ func Upgrade(root, name string) error {
 	if err != nil {
 		return fmt.Errorf("upgrade: read deck.html: %w", err)
 	}
-	updated, changed := upgradeInitialize(string(html))
-	if changed {
+	updated, changedInit := upgradeInitialize(string(html))
+	updated, changedLink := injectSlideThemesLink(updated)
+	if changedInit || changedLink {
 		if err := Write(root, name, []byte(updated)); err != nil {
 			return fmt.Errorf("upgrade: write deck.html: %w", err)
 		}
-		log.Printf("deck: upgraded reveal config in %s", filepath.Join(root, DecksDir, name, "deck.html"))
+		log.Printf("deck: upgraded deck.html in %s (reveal config: %v, slide-themes link: %v)",
+			filepath.Join(root, DecksDir, name, "deck.html"), changedInit, changedLink)
 	} else {
-		log.Printf("deck: reveal config already current in %s (no change)", name)
+		log.Printf("deck: deck.html already current in %s (no change)", name)
 	}
 	return nil
 }

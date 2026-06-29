@@ -89,8 +89,25 @@ Styling classes the editor doesn't recognize pass through verbatim ([02](02-docu
 ## Leaf block types
 
 Text (heading / paragraph / list, `contenteditable`) · Image · Code (highlighted) · Math
-(KaTeX) · Table · Shape / line / arrow · Embed / iframe · SVG / icon. Each is insertable,
-selectable, individually styleable, and knows how to serialize itself.
+(KaTeX) · Table · **Chart** · Shape / line / arrow · Embed / iframe · SVG / icon. Each is
+insertable, selectable, individually styleable, and knows how to serialize itself.
+
+### Chart (data-bound)
+
+A chart leaf renders from declarative data via reveal's bundled **Chart.js** plugin (vendored
+offline, [01](01-architecture.md) / [13](13-project-structure.md)):
+`<canvas data-chart="bar|line|pie|…" data-chart-data='…'>`, with the dataset + options as a JSON
+config the inspector edits. Because Chart.js draws to `<canvas>` at runtime, the chart renders
+correctly in the editor, the present route, and PDF (all run JS) — but **not** in the
+script-free navigator thumbnail, where it shows a placeholder, joining code-highlight and KaTeX
+as a documented thumbnail-only fidelity gap ([06](06-slide-management.md)).
+
+### Inline marks (rich text)
+
+Within a text leaf, a sub-range can carry inline emphasis / colour / size / links — the inline
+content model in [02](02-document-model.md), driven by the formatting toolbar in
+[04](04-canvas-interaction.md). This is leaf *content*, not a layout primitive (no reflow
+semantics).
 
 ## Nesting → requires a layers/outline panel
 

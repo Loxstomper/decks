@@ -35,11 +35,27 @@ fatally, break PDF export, where `?print-pdf` renders every slide visible at onc
 1. **Global** — the `<head>` theme `<link>`. The base every slide inherits.
 2. **Named per-slide bundle** — `data-theme="<bundled-theme>"` on a `<section>`. A generated,
    vendored stylesheet (`slides-slide-themes.css`, embedded + copied into the deck like
-   `slides-layout.css`) carries, for each bundled theme, a scoped block:
-   `.reveal section[data-theme="<name>"] { --r-main-color: …; --r-heading-color: …;
-   --r-link-color: …; --r-main-font: …; … }`. Because these are the same `--r-*` custom
-   properties reveal themes already drive, custom-property **inheritance** pushes them onto
-   every element in that slide.
+   `slides-layout.css`) carries, for each bundled theme, a scoped block that both **rebinds the
+   theme's `--r-*` custom properties** *and* **re-asserts the colour properties at section
+   scope**:
+
+   ```css
+   .reveal section[data-theme="<name>"] {
+     --r-main-color: …; --r-heading-color: …; --r-link-color: …; --r-main-font: …; …
+     color: var(--r-main-color);                 /* body text — see below */
+   }
+   .reveal section[data-theme="<name>"] :is(h1,h2,h3,h4,h5,h6) { color: var(--r-heading-color); }
+   .reveal section[data-theme="<name>"] a { color: var(--r-link-color); }
+   ```
+
+   Rebinding the vars alone is **not sufficient**. reveal sets body `color: var(--r-main-color)`
+   on **`.reveal`** — an *ancestor* of the section — and `color` inherits as a *computed* value,
+   so a descendant section that only rebinds `--r-main-color` never recomputes its body text
+   colour. Headings and links *do* update from the rebound vars (their rules match elements
+   *inside* the section), but **body text must be re-asserted explicitly** with a `color`
+   declaration scoped to the section. The block re-declares `color` for the section (and
+   heading/link rules for robustness) so a per-slide theme restyles text, headings, *and* links —
+   not just the background.
 3. **Free-form tweaks** — an arbitrary per-slide override written as inline custom properties
    on the section (`style="--r-heading-color:#fff; --r-main-color:#ddd"`). Closer scope, so it
    layers on top of a named bundle or stands alone.
@@ -73,6 +89,11 @@ once: the `--r-*` vars inherit via CSS, and reveal already propagates a stack's
 - **Offline.** `slides-slide-themes.css` and its `name → background` map are generated at
   vendor time from the bundled theme CSS (`:root`/`.reveal` `--r-*` values) and shipped
   locally — zero external URLs.
+- **The deck must link the stylesheet.** `data-theme` only takes effect if the deck's `<head>`
+  links `slides-slide-themes.css`. The scaffold template links it; decks created *before*
+  per-slide theming are migrated by `slides upgrade` / `vendor`, which **injects the missing
+  `<link>`** (byte-stable otherwise). Without the link, only the managed `data-background-color`
+  shows — the symptom that flagged this.
 - **UI.** The theme picker gains a **Whole deck / This slide** scope toggle (the latter
   enabled when a slide is selected): a named-theme dropdown plus free-form color swatches
   (heading / text / link / background) and a **Clear override → inherit deck** action. Slides
@@ -109,18 +130,43 @@ them WYSIWYG and present/PDF match. Color (above) and the other types are one su
   "Set background…" item in the slide context menu ([04](04-canvas-interaction.md)), with a
   Clear action.
 
-## Text appearance (per-element color)
+## Text appearance (colour & inline formatting)
 
-- The inspector exposes a **text color** control for the selected text element
-  (heading / paragraph / list / leaf). It writes an **inline `style="color: …"`** on that
-  element — whole-element scope, not sub-string runs.
-- Inline `style` round-trips through the model like any other attribute (the node becomes
-  `dirty`, serializes canonically, one undo entry + one autosave) and survives validation.
-- Scope is deliberately small: this is the appearance escape hatch for "make this heading
-  red," not a rich-text editor. Sub-selection runs, font/size/weight controls, and palette
-  swatches are explicitly out of scope for now (a later pass may add a theme-palette picker).
-- Because it is the lone appearance property the editor writes, it stays a clear exception to
-  the layout-only ownership rule — everything else remains `custom.css` / classes.
+The editor writes a **narrow, explicit** set of text-appearance properties — the one place it
+touches styling rather than layout. Two scopes:
+
+- **Whole-element** — a **text colour** control for the selected text leaf
+  (heading / paragraph / list), writing inline `style="color: …"`; plus block-level
+  **text-align** and **list indent / outdent** ([04](04-canvas-interaction.md)).
+- **Inline run** — within an in-place edit, a selected **word or phrase** can be made
+  **bold / italic / underlined / struck-through**, **resized**, **coloured**, or **linked**, via
+  the allowlisted inline marks (`strong` / `em` / `u` / `s` / `span[style]` / `a`) of the inline
+  content model ([02](02-document-model.md)) and the floating formatting toolbar
+  ([04](04-canvas-interaction.md)).
+
+Inline `style` and marks round-trip through the model like any other content (the node becomes
+`dirty`, serializes canonically, one undo + one autosave) and survive validation + sanitization
+([12](12-principles-and-invariants.md)). This is still a *deliberately small* appearance
+surface — common emphasis, colour, size, alignment, and links, **not** arbitrary CSS —
+everything beyond it remains `custom.css` / classes. (Earlier specs scoped this to whole-element
+colour only; inline runs are the planned superset, not a contradiction.)
+
+## Slide numbers & footers
+
+Recurring chrome that appears across slides — page numbers and a footer line (text / logo) —
+without duplicating an element into every `<section>`.
+
+- **Slide numbers** use reveal's native **`slideNumber`** (set in the deck's reveal config): a
+  deck-level toggle with the usual formats (e.g. `c/t`). It shows in edit and present, and the
+  same setting drives the on-screen number in present mode
+  ([10](10-presenting-and-export.md)).
+- **Footer / header** is **CSS-based**, not a per-slide element: a deck-level footer string
+  (and optional logo) rendered as a fixed overlay via a **managed `custom.css`** rule, so it
+  lives in one place, stays byte-stable, and never churns every section. A slide can opt out
+  with `data-footer-hidden`. (reveal has no native footer; a CSS overlay is the offline,
+  source-clean way to get one.)
+- Both are declarative and offline; numbers are reveal config, the footer is `custom.css` the
+  user or Claude Code can also hand-edit.
 
 ## Editor chrome themes (workspace themes)
 
