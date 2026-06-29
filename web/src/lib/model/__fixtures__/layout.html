@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Layout Fixture</title>
+    <style>.reveal h2 { color: #0af; }</style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <div data-lay="stack" data-gap="24">
+            <h2>Stack heading</h2>
+            <p>Body text inside a stack.</p>
+          </div>
+          <div data-lay="row" data-gap="32" data-align="center">
+            <img src="chart.svg" alt="A chart" />
+            <ul>
+              <li>Item one</li>
+              <li>Item two</li>
+            </ul>
+          </div>
+          <div data-free data-x="100" data-y="200" data-w="300" data-h="80">
+            <p>Free-positioned text.</p>
+          </div>
+          <my-plugin data-custom="yes">Unknown custom element — passthrough.</my-plugin>
+          <aside class="notes">Speaker notes — passthrough.</aside>
+          <table>
+            <thead><tr><th>Col A</th><th>Col B</th></tr></thead>
+            <tbody><tr><td>1</td><td>2</td></tr></tbody>
+          </table>
+          <svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="10" height="10" />
+          </svg>
+          <iframe src="https://example.com" width="640" height="360"></iframe>
+        </section>
+      </div>
+    </div>
+    <script>Reveal.initialize({ hash: true });</script>
+  </body>
+</html>

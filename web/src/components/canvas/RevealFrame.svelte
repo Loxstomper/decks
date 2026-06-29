@@ -37,7 +37,12 @@
    *   because the iframe src IS /decks/{name}/deck.html.
    */
 
-  import { computeZoomTransform, LOGICAL_WIDTH, LOGICAL_HEIGHT } from '$lib/coords.ts';
+  import {
+    computeZoomTransform,
+    LOGICAL_WIDTH,
+    LOGICAL_HEIGHT,
+    type Transform,
+  } from '$lib/coords.ts';
 
   // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -68,6 +73,25 @@
      * This is NOT the same as reveal's present-scale (spec 05).
      */
     zoom?: number;
+
+    /**
+     * BINDABLE OUT — the current live <iframe> element (or null while empty /
+     * between reloads). The selection overlay (CanvasInteraction) needs the
+     * SAME element this component renders so it can reach the same-origin
+     * contentDocument; because the {#key} block recreates the iframe on every
+     * reload, we surface the current element reactively rather than letting the
+     * parent guess. Bind with `bind:iframeEl`.
+     */
+    iframeEl?: HTMLIFrameElement | null;
+
+    /**
+     * BINDABLE OUT — the logical→screen transform this component applies to the
+     * iframe. The overlay MUST use the identical transform or the box will be
+     * misaligned, so we publish it rather than have the parent recompute it from
+     * a second ResizeObserver (which could disagree by a sub-pixel). Bind with
+     * `bind:transform`.
+     */
+    transform?: Transform;
   }
 
   let {
@@ -75,6 +99,8 @@
     width = LOGICAL_WIDTH,
     height = LOGICAL_HEIGHT,
     zoom = 1,
+    iframeEl = $bindable(null),
+    transform = $bindable({ scale: 0, offsetX: 0, offsetY: 0 }),
   }: Props = $props();
 
   // ── State ─────────────────────────────────────────────────────────────────
@@ -113,9 +139,16 @@
    * available container space at the current zoom level.
    * coords.ts owns this math (spec 04 "Two zoom concepts").
    */
-  const transform = $derived(
+  const appliedTransform = $derived(
     computeZoomTransform(containerWidth, containerHeight, zoom, width, height),
   );
+
+  /**
+   * The live <iframe> element, bound via `bind:this` inside the {#key} block.
+   * Recreated on every reload — undefined for the micro-frame between destroy
+   * and recreate, and in the empty state.
+   */
+  let liveIframe = $state<HTMLIFrameElement>();
 
   /**
    * A composite key that changes whenever the effective iframe content should
@@ -145,6 +178,20 @@
 
     ro.observe(containerEl);
     return () => ro.disconnect();
+  });
+
+  /**
+   * Publish the applied transform and live iframe element to the bindable props
+   * so the sibling selection overlay stays pixel-aligned and can reach the
+   * current contentDocument. Writing in an effect (rather than binding a derived
+   * directly) keeps the {#key}-driven recreation of the iframe reflected: when
+   * liveIframe flips to undefined and back, the parent's `iframe` prop follows.
+   */
+  $effect(() => {
+    transform = appliedTransform;
+  });
+  $effect(() => {
+    iframeEl = liveIframe ?? null;
   });
 
   /**
@@ -251,6 +298,7 @@
         Absent intentionally: allow-forms, allow-top-navigation, allow-popups.
       -->
       <iframe
+        bind:this={liveIframe}
         src={deckUrl}
         title="Slide deck — {deckUrl}"
         sandbox="allow-scripts allow-same-origin"
@@ -259,7 +307,7 @@
         style:width="{width}px"
         style:height="{height}px"
         style:visibility={isLoading ? 'hidden' : 'visible'}
-        style:transform="translate({transform.offsetX}px, {transform.offsetY}px) scale({transform.scale})"
+        style:transform="translate({appliedTransform.offsetX}px, {appliedTransform.offsetY}px) scale({appliedTransform.scale})"
         onload={handleLoad}
       ></iframe>
     {/key}

@@ -31,6 +31,9 @@ export {
   appendChild,
 } from './edit';
 export { decodeEntities, encodeAttr, encodeText } from './entities';
+export { classify } from './classify';
+export { stampEids, nextEid } from './eid';
+export type { ElementClass } from './classify';
 export type {
   DeckModel,
   SlideNode,

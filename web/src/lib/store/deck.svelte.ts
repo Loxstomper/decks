@@ -1,5 +1,5 @@
 /**
- * deck.svelte.ts — Current-deck store (P1-3, P1-8, P1-9).
+ * deck.svelte.ts — Current-deck store (P1-3, P1-8, P1-9, P2-7, P2-8).
  *
  * WHY THIS EXISTS (specs 02, 11):
  * ================================
@@ -26,9 +26,27 @@
  * onExternalChange() re-reads the disk copy. If the user has no unsaved edits we
  * adopt it and re-render; if they DO have unsaved edits we surface the `external`
  * status instead of clobbering their work (no silent merge in v1).
+ *
+ * Undo/redo (P2-8, P2-7):
+ * ========================
+ * commitCommand() is the canonical way to record a "committed edit" — it pushes
+ * the current source into the undoStore snapshot stack and immediately persists
+ * to disk (bypassing the debounce).  undo() / redo() restore the adjacent
+ * snapshot and also persist immediately, so disk always reflects the current
+ * undo position.  The SSE echo of our own PUT is already filtered out by
+ * onExternalChange() (html === source → no-op), preventing feedback loops.
+ *
+ * What counts as a "command":
+ *   • Any structural model edit performed by Lane B (write-back panel): call
+ *     updateFromModel() to sync source, then commitCommand().
+ *   • Keystroke sequences in the SourcePane do NOT use commitCommand(); they use
+ *     the debounced updateFromSource() path which saves automatically but does
+ *     not produce individual undo entries (that would flood the stack).
  */
 
-import { parseDeck, serializeDeck, type DeckModel } from '$lib/model';
+import { parseDeck, serializeDeck, stampEids, type DeckModel } from '$lib/model';
+import { undoStore } from './undo.svelte';
+import { applyTextEditToModel } from '$lib/canvas/writeback';
 
 /** Debounce window for re-parse + autosave after a source edit (P1-8). */
 const SYNC_DEBOUNCE_MS = 400;
@@ -110,12 +128,133 @@ class DeckStore {
   /**
    * Adopt `html` as the new on-disk truth: reset source + saved snapshot, parse,
    * and request a canvas reload. Used by load() and by clean external changes.
+   *
+   * Also resets the undo history (P2-8): a fresh load or an adopted external
+   * change is the new ground state — the user cannot undo "past" it.
    */
   #adoptDisk(html: string): void {
+    // Disk truth is whatever bytes we just read.
     this.#savedSource = html;
-    this.source = html;
-    this.model = safeParse(html);
+
+    const model = safeParse(html);
+    this.model = model;
+
+    // P2-2: stamp a stable data-eid onto every managed element (container/leaf/
+    // free) so the canvas can resolve clicks → model nodes and write edits back.
+    // stampEids is IDEMPOTENT: a deck that is already fully stamped serializes
+    // byte-for-byte identically, so subsequent loads cause zero churn (the
+    // `stamped !== html` guard below stays false). The ONLY time this diverges
+    // from disk is the first load of an un-stamped deck (or one Claude Code
+    // wrote new un-stamped elements into) — we then persist that one-time
+    // normalization so the rendered server copy carries the eids.
+    let source = html;
+    if (model) {
+      stampEids(model);
+      const stamped = serializeDeck(model);
+      if (stamped !== html) source = stamped;
+    }
+    this.source = source;
     this.reloadNonce++;
+    // Seed the undo stack with the (possibly stamped) baseline so the user can
+    // neither undo past it nor undo the structural eid stamping itself.
+    undoStore.reset(source);
+
+    // Stamping added eids → in-memory source diverges from disk. Persist it once
+    // (bypassing the debounce) so the canvas, which renders the *server* copy,
+    // shows the stamped elements. save() bumps reloadNonce again on success.
+    if (source !== html) {
+      this.status = 'unsaved';
+      void this.save();
+    }
+  }
+
+  // ── Undo/redo public API (P2-8, P2-7) ────────────────────────────────────
+
+  /**
+   * Expose the undo store's reactive canUndo flag so consumers only need to
+   * import deckStore (not also undoStore).
+   */
+  get canUndo(): boolean {
+    return undoStore.canUndo;
+  }
+
+  /** Expose the undo store's reactive canRedo flag. */
+  get canRedo(): boolean {
+    return undoStore.canRedo;
+  }
+
+  /**
+   * P2-8 / P2-7: Record the current source as a committed command and persist
+   * immediately to disk (bypassing the keystroke debounce).
+   *
+   * Contract:
+   *   1. The caller has already mutated the model and called updateFromModel()
+   *      (or equivalent) so that `this.source` holds the post-command bytes.
+   *   2. commitCommand() pushes those bytes onto the undo stack and saves.
+   *   3. One call = one undo entry = one on-disk state.
+   *
+   * Typical Lane B pattern:
+   *   setAttribute(el, 'class', 'fragment');
+   *   deckStore.updateFromModel();
+   *   await deckStore.commitCommand();
+   */
+  async commitCommand(): Promise<void> {
+    // Push BEFORE saving so that if save() fails the snapshot is still recorded
+    // (the user can undo back to the pre-command state even without disk sync).
+    undoStore.push(this.source);
+    // Cancel any pending debounced sync — the commit takes over persistence.
+    if (this.#syncTimer) {
+      clearTimeout(this.#syncTimer);
+      this.#syncTimer = null;
+    }
+    await this.save();
+  }
+
+  /**
+   * P2-8 / P2-7: Restore the previous snapshot (undo).
+   * No-op when already at the beginning of history (canUndo === false).
+   * Persists the restored state so disk always matches the current undo position.
+   */
+  async undo(): Promise<void> {
+    const snapshot = undoStore.stepBack();
+    if (snapshot === undefined) return;
+    this.#applySnapshotLocally(snapshot);
+    await this.save();
+  }
+
+  /**
+   * P2-8 / P2-7: Reapply the next snapshot (redo).
+   * No-op when already at the tip of history (canRedo === false).
+   * Persists the reapplied state.
+   */
+  async redo(): Promise<void> {
+    const snapshot = undoStore.stepForward();
+    if (snapshot === undefined) return;
+    this.#applySnapshotLocally(snapshot);
+    await this.save();
+  }
+
+  /**
+   * Apply a snapshot into memory (source + model) without touching the saved
+   * baseline or the undo stack.  The caller must follow up with save() to
+   * persist and update #savedSource + reloadNonce.
+   *
+   * WHY NOT CALL save() HERE:
+   * The undo stack has already been updated (cursor moved) before this is called,
+   * so if save() fails we still have a consistent in-memory state and the user
+   * can retry.  Separating concerns also makes the save step mockable in tests.
+   */
+  #applySnapshotLocally(source: string): void {
+    // Cancel any in-flight debounced sync — the restored snapshot supersedes it.
+    if (this.#syncTimer) {
+      clearTimeout(this.#syncTimer);
+      this.#syncTimer = null;
+    }
+    this.source = source;
+    this.model = safeParse(source);
+    // Mark unsaved so save() knows it has real work to do (it checks
+    // source !== #savedSource).
+    this.status = 'unsaved';
   }
 
   /**
@@ -142,6 +281,32 @@ class DeckStore {
     this.source = next;
     this.status = 'unsaved';
     this.#scheduleSync();
+  }
+
+  /**
+   * P2-6: Canvas write-back of a committed in-place text edit.
+   *
+   * The CanvasInteraction controller calls this when a contenteditable session
+   * commits. We mutate ONLY the node carrying `eid` (writeback.ts → edit.ts), so
+   * just that subtree goes dirty and the rest of the deck round-trips byte-for-
+   * byte (spec 12 #4). We then funnel through the standard command path so the
+   * edit becomes one undo entry and is persisted immediately:
+   *   updateFromModel()  → reserialize model into source
+   *   commitCommand()    → push undo snapshot + save (bypassing the debounce)
+   *
+   * Returns false (and does nothing) if the eid is unknown — e.g. a stale
+   * selection after an external reload — so the caller can no-op safely.
+   */
+  applyTextEdit(eid: string, newLiteralText: string): boolean {
+    if (!this.model) return false;
+    const changed = applyTextEditToModel(this.model, eid, newLiteralText);
+    if (!changed) return false;
+    const next = serializeDeck(this.model);
+    // No-op edit (text identical) → don't churn source / undo stack.
+    if (next === this.source) return true;
+    this.updateFromModel();
+    void this.commitCommand();
+    return true;
   }
 
   #scheduleSync(): void {

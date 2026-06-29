@@ -71,14 +71,21 @@ dependencies are noted inline.
 ## Phase 2 — Text editing & write-back
 > Goal: select and edit content visually; changes persist. Specs: [02](specs/02-document-model.md), [04](specs/04-canvas-interaction.md).
 
-- [ ] **P2-1 — Element classification.** Tag each node container/leaf/free/passthrough on parse. _Done when:_ classification is queryable per node. (Spec 02)
-- [ ] **P2-2 — `data-eid` stamping.** Assign stable unique ids to managed elements; preserve across save/load. _Done when:_ ids survive a round-trip and are unique per deck. (Spec 02)
-- [ ] **P2-3 — Click selection (leaves).** Click an element → selected state. _Done when:_ clicking selects exactly one leaf.
-- [ ] **P2-4 — Selection overlay box.** Draw a bounding box over the selected element using the P0-14 transform. _Done when:_ box tracks the element at any zoom. (Spec 04)
-- [ ] **P2-5 — Contenteditable text editing.** Edit text leaves in place inside the iframe. _Done when:_ typed text appears and updates the model. (Spec 04)
-- [ ] **P2-6 — Canvas → source write-back.** Serialize on edit; source pane reflects canvas edits. _Done when:_ a canvas text edit appears in the source pane, passthrough intact. (Spec 02)
-- [ ] **P2-7 — Autosave per command.** Persist to disk after each committed edit. _Done when:_ edits survive a reload. (Spec 02, 11)
-- [ ] **P2-8 — Snapshot undo/redo.** Push serialized model per command; undo/redo restores. _Done when:_ undo reverts the last edit; redo reapplies. (Spec 04)
+- [x] **P2-1 — Element classification.** Tag each node container/leaf/free/passthrough on parse. _Done when:_ classification is queryable per node. (Spec 02)
+- [x] **P2-2 — `data-eid` stamping.** Assign stable unique ids to managed elements; preserve across save/load. _Done when:_ ids survive a round-trip and are unique per deck. (Spec 02)
+- [x] **P2-3 — Click selection (leaves).** Click an element → selected state. _Done when:_ clicking selects exactly one leaf.
+- [x] **P2-4 — Selection overlay box.** Draw a bounding box over the selected element using the P0-14 transform. _Done when:_ box tracks the element at any zoom. (Spec 04)
+- [x] **P2-5 — Contenteditable text editing.** Edit text leaves in place inside the iframe. _Done when:_ typed text appears and updates the model. (Spec 04)
+- [x] **P2-6 — Canvas → source write-back.** Serialize on edit; source pane reflects canvas edits. _Done when:_ a canvas text edit appears in the source pane, passthrough intact. (Spec 02)
+- [x] **P2-7 — Autosave per command.** Persist to disk after each committed edit. _Done when:_ edits survive a reload. (Spec 02, 11)
+- [x] **P2-8 — Snapshot undo/redo.** Push serialized model per command; undo/redo restores. _Done when:_ undo reverts the last edit; redo reapplies. (Spec 04)
+
+> **Phase 2 STATUS (done, tag 0.0.3):** P2-1..P2-8 complete. 3 lanes + Opus integration; verified (FE 204 vitest tests, svelte-check 0/0, Go green; E2E: stamped deck.html carries `data-eid` on managed elements, none on passthrough; idempotent on reload).
+> - **Model:** `classify(el)` → container/leaf/free/passthrough (`web/src/lib/model/classify.ts`); `stampEids(model)` idempotent/stable/scoped-dirty (`web/src/lib/model/eid.ts`). Stamping wired into `deckStore` on load (one-time normalization save if un-stamped).
+> - **Canvas interaction** (`web/src/lib/canvas/*`, `components/canvas/CanvasInteraction.svelte` + `SelectionOverlay.svelte`): click→nearest-leaf selection by `data-eid`; overlay box mapped via `coords.ts` (tracks zoom/resize/reflow); double-click contenteditable; write-back via `deckStore.applyTextEdit(eid, literalText)` (single entry point, no shims).
+> - **Undo/autosave:** snapshot undo/redo in store (1 command = 1 undo entry = 1 autosave); UI Cmd/Ctrl+Z / Shift / Ctrl+Y with editable-target guard so CodeMirror keeps its own undo; floating toolbar bound to canUndo/canRedo.
+> - **⚠️ Needs VISUAL/browser verification** (not confirmable headlessly): overlay pixel-alignment at non-1.0 zoom; dblclick→edit→Enter/Escape; reflow/resize tracking; one-edit→one-undo→one-save with SourcePane reflecting it loop-free; CodeMirror-local vs deck-level undo focus routing.
+> - **[opt] follow-up:** first-load stamping currently renders the un-stamped disk copy once before the normalization save (harmless wasted iframe render); could suppress the intermediate reloadNonce bump.
 
 ## Phase 3 — Structured layout & alignment (the pain-solver)
 > Goal: the five-primitive layout model with intent-based alignment. Spec: [03](specs/03-layout-vocabulary.md).
