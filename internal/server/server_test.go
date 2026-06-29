@@ -662,6 +662,24 @@ func TestThemeList_OK(t *testing.T) {
 	if !hasBlack {
 		t.Errorf("bundled themes list missing 'black': %v", themes)
 	}
+
+	// "solarized-dark" must be present as a distinct entry from "solarized" (P9-9).
+	hasSolDark := false
+	hasSolLight := false
+	for _, th := range themes {
+		if th == "solarized-dark" {
+			hasSolDark = true
+		}
+		if th == "solarized" {
+			hasSolLight = true
+		}
+	}
+	if !hasSolDark {
+		t.Errorf("bundled themes list missing 'solarized-dark': %v", themes)
+	}
+	if !hasSolLight {
+		t.Errorf("bundled themes list missing 'solarized' (light): %v", themes)
+	}
 }
 
 // ── Font localization endpoint tests (P6-13) ───────────────────────────────────

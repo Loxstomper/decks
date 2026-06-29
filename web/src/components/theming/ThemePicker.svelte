@@ -33,7 +33,7 @@
    * server is unreachable (e.g. running the SPA standalone in tests).
    */
   let themes = $state<string[]>([
-    'black', 'white', 'league', 'beige', 'night', 'moon', 'solarized', 'dracula', 'sky',
+    'black', 'white', 'league', 'beige', 'night', 'moon', 'solarized', 'solarized-dark', 'dracula', 'sky',
   ]);
 
   // Attempt to refresh the list from the server (non-critical).
@@ -49,6 +49,17 @@
       // Server unreachable — keep the static fallback list above.
     }
   });
+
+  /**
+   * Convert a theme slug to a human-readable label.
+   * "solarized-dark" → "Solarized Dark", "black" → "Black".
+   */
+  function themeLabel(name: string): string {
+    return name
+      .split('-')
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+  }
 
   function handleChange(e: Event): void {
     const sel = e.currentTarget as HTMLSelectElement;
@@ -66,11 +77,11 @@
     onchange={handleChange}
   >
     {#each themes as t (t)}
-      <option value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>
+      <option value={t}>{themeLabel(t)}</option>
     {/each}
     {#if currentTheme && !themes.includes(currentTheme)}
       <!-- Custom / unknown theme not in the bundled list. -->
-      <option value={currentTheme}>{currentTheme} (custom)</option>
+      <option value={currentTheme}>{themeLabel(currentTheme)} (custom)</option>
     {/if}
   </select>
 </div>
