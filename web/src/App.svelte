@@ -55,6 +55,8 @@
   import ConflictPrompt from './components/status/ConflictPrompt.svelte';
   import ValidationBanner from './components/status/ValidationBanner.svelte';
   import ChangeHighlightOverlay from './components/canvas/ChangeHighlightOverlay.svelte';
+  import CommandPalette from '$lib/commands/CommandPalette.svelte';
+  import ShortcutHelp from '$lib/commands/ShortcutHelp.svelte';
   import { createSseClient } from '$lib/sse';
   import { deckStore } from '$lib/store/deck.svelte.ts';
   import { customCssStore } from '$lib/store/customCss.svelte.ts';
@@ -99,6 +101,10 @@
 
   // Available deck names (from GET /api/decks).
   let decks = $state<string[]>([]);
+
+  // ── P17-12/13: command palette + shortcut help overlay state ─────────────────
+  let commandPaletteOpen = $state(false);
+  let shortcutHelpOpen = $state(false);
 
   // ── SSE: external (Claude Code) writes → reload model + canvas (P1-9) ───────
   const sse = createSseClient();
@@ -243,6 +249,27 @@
 
   function handleKeydown(e: KeyboardEvent): void {
     const mod = e.metaKey || e.ctrlKey;
+
+    // ── P17-12: Cmd/Ctrl+K → command palette ─────────────────────────────────
+    if (mod && e.key.toLowerCase() === 'k') {
+      if (!isEditableTarget(document.activeElement)) {
+        e.preventDefault();
+        commandPaletteOpen = true;
+      }
+      return;
+    }
+
+    // ── P17-13: ? → shortcut help overlay ────────────────────────────────────
+    // Triggered by Shift+/ (US keyboards) or any layout that produces '?'.
+    // Guard against text-editing contexts so '?' can still be typed normally.
+    if (!mod && e.key === '?') {
+      if (!isEditableTarget(document.activeElement)) {
+        e.preventDefault();
+        shortcutHelpOpen = true;
+      }
+      return;
+    }
+
     if (!mod) return;
     const key = e.key.toLowerCase();
 
@@ -821,6 +848,14 @@
 -->
 <ValidationBanner />
 <ConflictPrompt />
+
+<!--
+  P17-12/13: Command palette + shortcut help overlay.
+  Mounted once at the shell root; open/close driven by keyboard shortcuts
+  (Cmd/Ctrl+K and ?) wired in handleKeydown. Both render nothing when closed.
+-->
+<CommandPalette open={commandPaletteOpen} onclose={() => (commandPaletteOpen = false)} />
+<ShortcutHelp open={shortcutHelpOpen} onclose={() => (shortcutHelpOpen = false)} />
 
 <style>
   /*
