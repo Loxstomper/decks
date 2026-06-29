@@ -57,6 +57,11 @@ import {
   getSlideNotes,
   setSlideNotes as setSlideNotesOp,
   setInlineColor,
+  setInlineStyleProp,
+  isSafeHref,
+  linkLeaf,
+  unlinkLeaf,
+  indentList as indentListOp,
   setChartProps,
   diffModels,
   validateSource,
@@ -1200,6 +1205,71 @@ class DeckStore {
     const el = findByEid(this.model, eid);
     if (!el) return;
     setInlineColor(el, color);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P17-8: Set (or clear, when `align` is null) the whole-leaf text alignment as
+   * an inline `style="text-align: …"` on the text leaf `eid` — ONE undo entry +
+   * ONE autosave, byte-stable (mirrors {@link applyTextColor}). Only this leaf's
+   * style attribute goes dirty; every other element round-trips byte-for-byte.
+   * Unknown eid is a safe no-op (stale selection after an external reload).
+   */
+  async applyTextAlign(
+    eid: string,
+    align: 'left' | 'center' | 'right' | 'justify' | null,
+  ): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setInlineStyleProp(el, 'text-align', align);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P17-8: Re-nest a `<ul>`/`<ol>` list leaf one level deeper (`'in'`) or
+   * shallower (`'out'`) as ONE undo entry + ONE autosave, byte-stable. A no-op
+   * (no churn) when the leaf is not a list or outdent has nothing to lift.
+   */
+  async indentList(eid: string, dir: 'in' | 'out'): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    if (!indentListOp(el, dir)) return;
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P17-10: Wrap the ENTIRE text leaf `eid` in a single `<a href>` (context-menu
+   * "Add/Edit link…"). Rejects unsafe hrefs (`javascript:` etc.) via isSafeHref —
+   * an external http(s)/mailto/tel href is allowed (only external RESOURCE loads
+   * are forbidden, spec 12). ONE undo entry + ONE autosave, byte-stable. Returns
+   * false when the eid is unknown or the href is rejected.
+   */
+  async applyLinkToLeaf(eid: string, href: string): Promise<boolean> {
+    if (!this.model) return false;
+    if (!isSafeHref(href)) return false;
+    const el = findByEid(this.model, eid);
+    if (!el) return false;
+    linkLeaf(el, href.trim());
+    this.updateFromModel();
+    await this.commitCommand();
+    return true;
+  }
+
+  /**
+   * P17-10: Remove every `<a>` mark inside the text leaf `eid` (context-menu
+   * "Remove link"). ONE undo entry + ONE autosave; a no-op (no churn) when the
+   * leaf carries no anchor. Unknown eid is a safe no-op.
+   */
+  async removeLinkFromLeaf(eid: string): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    if (!unlinkLeaf(el)) return;
     this.updateFromModel();
     await this.commitCommand();
   }

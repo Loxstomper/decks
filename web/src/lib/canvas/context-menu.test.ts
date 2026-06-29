@@ -246,7 +246,7 @@ describe('menuItemsFor', () => {
 
   // ── text-leaf ──
   describe('text-leaf', () => {
-    it('adds Text color (with a colour submenu) on top of the base set + Make free', () => {
+    it('adds Text color + Link (with submenus) on top of the base set + Make free', () => {
       const items = menuItemsFor(single('t1'), constLookup('text-leaf'));
       expect(labelsOf(items)).toEqual([
         'Delete',
@@ -255,9 +255,15 @@ describe('menuItemsFor', () => {
         'Cut',
         'Paste',
         'Text color',
+        'Link',
         'Make free',
       ]);
       expect(byLabel(items, 'Text color')?.submenu?.length).toBeGreaterThan(0);
+      // P17-10: Link submenu offers Add/Edit + Remove.
+      expect(byLabel(items, 'Link')?.submenu?.map((i) => i.label)).toEqual([
+        'Add/Edit link…',
+        'Remove link',
+      ]);
     });
   });
 

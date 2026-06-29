@@ -56,7 +56,9 @@
     getAttribute,
     findByEid,
     isTextLeaf,
+    isListLeaf,
     getInlineColor,
+    getInlineStyleProp,
     getChartProps,
     hasAttribute,
     getAutoslide,
@@ -65,6 +67,7 @@
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
   import TextColorControl from './TextColorControl.svelte';
+  import BlockTextControl from './BlockTextControl.svelte';
   import AltTextControl from './AltTextControl.svelte';
   import ChartDataControl from './ChartDataControl.svelte';
   import SlideBackgroundControl from './SlideBackgroundControl.svelte';
@@ -175,6 +178,21 @@
 
   const textLeaf: ElementNode | null = $derived(deriveTextLeaf(selectedEid));
   const textColor: string | null = $derived(textLeaf ? getInlineColor(textLeaf) : null);
+  // P17-8: whole-leaf text alignment + list indent (block-level controls).
+  const textAlign: string | null = $derived(
+    textLeaf ? getInlineStyleProp(textLeaf, 'text-align') : null,
+  );
+  const textLeafIsList: boolean = $derived(textLeaf ? isListLeaf(textLeaf) : false);
+
+  function onTextAlignChange(value: 'left' | 'center' | 'right' | 'justify' | null): void {
+    if (!selectedEid) return;
+    void deckStore.applyTextAlign(selectedEid, value);
+  }
+
+  function onIndent(dir: 'in' | 'out'): void {
+    if (!selectedEid) return;
+    void deckStore.indentList(selectedEid, dir);
+  }
 
   // ── P17-15: chart-data editor (spec 03 "Chart" leaf) ───────────────────────
   //
@@ -275,6 +293,12 @@
   <!-- ── P9-8: text colour — shown whenever a TEXT leaf is selected ────────── -->
   {#if textLeaf}
     <TextColorControl color={textColor} onColorChange={onTextColorChange} />
+    <BlockTextControl
+      align={textAlign}
+      isList={textLeafIsList}
+      onAlign={onTextAlignChange}
+      {onIndent}
+    />
     <div class="separator"></div>
   {/if}
 

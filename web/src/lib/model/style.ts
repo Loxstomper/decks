@@ -44,34 +44,54 @@ function serializeStyle(decls: Decl[]): string {
 }
 
 /**
- * Read the inline `color` declaration on `el`, or null when there is no inline
- * style or no `color` property. Pure — used to seed the inspector control.
+ * Read a single inline style declaration (`prop`) on `el`, or null when there is
+ * no inline style or no such property. Pure — used to seed inspector controls.
  */
-export function getInlineColor(el: ElementNode): string | null {
+export function getInlineStyleProp(el: ElementNode, prop: string): string | null {
   const style = getAttribute(el, 'style');
   if (!style) return null;
-  const decl = parseStyle(style).find((d) => d.prop.toLowerCase() === 'color');
+  const lprop = prop.toLowerCase();
+  const decl = parseStyle(style).find((d) => d.prop.toLowerCase() === lprop);
   return decl ? decl.value : null;
 }
 
 /**
- * Set (or clear, when `color` is null/blank) the inline `color` declaration on
- * `el`, preserving every other declaration and the existing colour position.
+ * Set (or clear, when `value` is null/blank) one inline style declaration on
+ * `el`, preserving every other declaration and the existing property position.
  *
  * Removing the last declaration drops the now-empty `style` attribute entirely
- * so the element returns to its un-styled form (clean round-trip).
+ * so the element returns to its un-styled form (clean round-trip). Mutates via
+ * setAttribute/removeAttribute so the element is marked dirty and re-serializes
+ * canonically while every untouched element round-trips byte-for-byte (spec 12).
  */
-export function setInlineColor(el: ElementNode, color: string | null): void {
+export function setInlineStyleProp(el: ElementNode, prop: string, value: string | null): void {
+  const lprop = prop.toLowerCase();
   const style = getAttribute(el, 'style') ?? '';
   const decls = parseStyle(style);
-  const idx = decls.findIndex((d) => d.prop.toLowerCase() === 'color');
-  const next = color?.trim();
+  const idx = decls.findIndex((d) => d.prop.toLowerCase() === lprop);
+  const next = value?.trim();
   if (next) {
     if (idx >= 0) decls[idx] = { prop: decls[idx].prop, value: next };
-    else decls.push({ prop: 'color', value: next });
+    else decls.push({ prop, value: next });
   } else if (idx >= 0) {
     decls.splice(idx, 1);
   }
   if (decls.length === 0) removeAttribute(el, 'style');
   else setAttribute(el, 'style', serializeStyle(decls));
+}
+
+/**
+ * Read the inline `color` declaration on `el`, or null when none is set. Pure —
+ * used to seed the inspector control.
+ */
+export function getInlineColor(el: ElementNode): string | null {
+  return getInlineStyleProp(el, 'color');
+}
+
+/**
+ * Set (or clear, when `color` is null/blank) the inline `color` declaration on
+ * `el`, preserving every other declaration and the existing colour position.
+ */
+export function setInlineColor(el: ElementNode, color: string | null): void {
+  setInlineStyleProp(el, 'color', color);
 }
