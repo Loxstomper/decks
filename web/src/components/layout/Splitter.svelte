@@ -1,25 +1,28 @@
 <script lang="ts">
   /**
-   * Splitter.svelte — Lightweight drag handle for resizable panes.
+   * Splitter.svelte — Lightweight drag handle for resizable panes (P9-5).
    *
-   * Usage:
-   *   <Splitter direction="col" on:resize={(e) => (leftWidth = e.detail)} />
-   *   <Splitter direction="row" on:resize={(e) => (topHeight = e.detail)} />
+   * Usage (Svelte 5 callback props — no createEventDispatcher):
+   *   <Splitter direction="col" onresize={(delta) => (leftWidth += delta)} />
+   *   <Splitter direction="row" onresize={(delta) => (topHeight += delta)} />
    *
-   * The host pane passes a resize event with the *delta* in px so the parent
-   * can update its own sizing state.  Keeping delta-based (rather than
-   * absolute) means the splitter does not need to know the pane dimensions.
+   * The host pane receives the *delta* in px (this pointer position minus the
+   * last) so the parent updates its own sizing state. Keeping it delta-based
+   * (rather than absolute) means the splitter never needs to know pane sizes.
+   *
+   * `onresizeend` (optional) fires once on pointer-up so the parent can persist
+   * the final size without writing to storage on every pointer move.
    */
-
-  import { createEventDispatcher } from 'svelte';
 
   interface Props {
     direction?: 'col' | 'row';
+    /** Called with the px delta since the last move while dragging. */
+    onresize?: (delta: number) => void;
+    /** Called once when a drag gesture completes (pointer up). */
+    onresizeend?: () => void;
   }
 
-  let { direction = 'col' }: Props = $props();
-
-  const dispatch = createEventDispatcher<{ resize: number }>();
+  let { direction = 'col', onresize, onresizeend }: Props = $props();
 
   let dragging = $state(false);
   let lastPos  = $state(0);
@@ -35,12 +38,14 @@
     const current = direction === 'col' ? e.clientX : e.clientY;
     const delta   = current - lastPos;
     lastPos = current;
-    dispatch('resize', delta);
+    onresize?.(delta);
   }
 
   function onPointerUp(e: PointerEvent) {
+    if (!dragging) return;
     dragging = false;
     (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    onresizeend?.();
   }
 </script>
 
