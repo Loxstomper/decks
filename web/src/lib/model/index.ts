@@ -34,6 +34,7 @@ export { decodeEntities, encodeAttr, encodeText } from './entities';
 export { classify, isTextLeaf } from './classify';
 export { getInlineColor, setInlineColor } from './style';
 export { stampEids, nextEid } from './eid';
+export { cloneSubtreeStripEids } from './clone';
 export { setFree, toggleFree } from './free';
 export { getSlideNotes, setSlideNotes } from './notes';
 export type { LogicalRect } from './free';

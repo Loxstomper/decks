@@ -44,9 +44,15 @@
     expanded: Record<string, boolean>;
     /** Called with the eid to toggle expand / collapse. */
     onToggle: (eid: string) => void;
+    /**
+     * Right-click on a row (P13-4). Selects this node then asks the host to open
+     * the SAME cursor-positioned context menu used on the canvas, at the given
+     * viewport (client) coordinates.
+     */
+    onContextMenu?: (eid: string, clientX: number, clientY: number) => void;
   }
 
-  let { node, depth = 0, selection, expanded, onToggle }: Props = $props();
+  let { node, depth = 0, selection, expanded, onToggle, onContextMenu }: Props = $props();
 
   // ── Derived state ───────────────────────────────────────────────────────────
 
@@ -92,6 +98,16 @@
     if (node.eid && !isPassthrough) {
       selection.select(node.eid);
     }
+  }
+
+  function handleRowContextMenu(e: MouseEvent) {
+    // Passthrough rows are not selectable / actionable — no menu.
+    if (!node.eid || isPassthrough) return;
+    e.preventDefault();
+    // Select the right-clicked node first so the menu acts on it, then open the
+    // shared context menu at the cursor.
+    selection.select(node.eid);
+    onContextMenu?.(node.eid, e.clientX, e.clientY);
   }
 
   function handleToggleClick(e: MouseEvent | KeyboardEvent) {
@@ -154,6 +170,7 @@
     aria-expanded={hasChildren && !isPassthrough ? isExpanded : undefined}
     tabindex={isPassthrough ? -1 : 0}
     onclick={handleRowClick}
+    oncontextmenu={handleRowContextMenu}
     onkeydown={handleRowKeydown}
   >
 
@@ -270,6 +287,7 @@
           {selection}
           {expanded}
           {onToggle}
+          {onContextMenu}
         />
       {/each}
     </div>

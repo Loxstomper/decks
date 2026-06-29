@@ -38,6 +38,7 @@ import {
   createText,
   appendChild,
   walk,
+  cloneSubtreeStripEids,
   type DeckModel,
   type ElementNode,
   type SlideNode,
@@ -247,37 +248,6 @@ function findSectionAndParent(
   return null;
 }
 
-// ── Deep clone (for duplicate) ───────────────────────────────────────────────
-
-/**
- * Deep-clone a node subtree as freshly-authored, canonical nodes (raw='' +
- * dirty), stripping every `data-eid` so stampEids re-mints unique ids for the
- * copy. `data-id` and all other attributes are PRESERVED so reveal auto-animate
- * can still pair the original and the copy by data-id (spec 07).
- */
-function cloneStripEids(node: SlideNode): SlideNode {
-  if (node.type === 'element') {
-    return {
-      type: 'element',
-      tagName: node.tagName,
-      // Drop data-eid only; keep data-id (+ everything else) for auto-animate.
-      attributes: node.attributes
-        .filter((a) => a.name.toLowerCase() !== 'data-eid')
-        .map((a) => ({ name: a.name, value: a.value })),
-      children: node.children.map(cloneStripEids),
-      rawOpen: '',
-      rawClose: '',
-      selfClosing: node.selfClosing,
-      isVoid: node.isVoid,
-      rawText: node.rawText,
-      raw: '', // force canonical render
-      dirty: true,
-    };
-  }
-  // Text / comment / cdata / doctype: copy the value, force canonical render.
-  return { ...node, raw: '', dirty: true };
-}
-
 // ── Public operations ────────────────────────────────────────────────────────
 
 /**
@@ -316,7 +286,7 @@ export function addSlide(model: DeckModel, afterEid?: string): ElementNode | nul
 export function duplicateSlide(model: DeckModel, eid: string): ElementNode | null {
   const found = findSectionAndParent(model, eid);
   if (!found) return null;
-  const clone = cloneStripEids(found.section) as ElementNode;
+  const clone = cloneSubtreeStripEids(found.section) as ElementNode;
   insertSectionAfter(found.parent, found.section, clone);
   return clone;
 }

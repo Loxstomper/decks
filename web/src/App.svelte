@@ -24,6 +24,7 @@
   import MarqueeController from './components/canvas/MarqueeController.svelte';
   import AspectRepositionOffer from './components/canvas/AspectRepositionOffer.svelte';
   import FreeAlignBar from './components/canvas/FreeAlignBar.svelte';
+  import ContextMenu, { type MenuItem } from './components/canvas/ContextMenu.svelte';
   import SourcePane from './components/source/SourcePane.svelte';
   import InsertPalette from './components/insert/InsertPalette.svelte';
   import OutlinePanel from './components/outline/OutlinePanel.svelte';
@@ -71,6 +72,8 @@
     readLogicalSizeFromInit,
   } from '$lib/canvas/aspect-commands.ts';
   import { domRectToLogical } from '$lib/canvas/overlay-geometry.ts';
+  import { menuItemsFor, type MenuSelection } from '$lib/canvas/context-menu.ts';
+  import { isSlideHidden } from '$lib/slides';
   import {
     classify,
     findByEid,
@@ -293,6 +296,97 @@
   // Right-panel lower zone: tabbed between element Properties, Motion authoring,
   // and Theme/Styles. Outline (element tree) stays pinned above the tabs.
   let rightTab = $state<'properties' | 'motion' | 'theme' | 'notes' | 'export'>('properties');
+
+  // ── Right-click context menu (P13-2 / P13-4 / P13-8) ────────────────────────
+  // ONE menu instance, mounted in the canvas-stack, shared by the canvas
+  // (CanvasInteraction → element/slide menu) and the outline (OutlineTreeNode →
+  // element menu). It is purely a UI surface over existing deckStore commands
+  // (menuItemsFor builds the descriptors); App owns only open/close + placement.
+
+  // The position:relative box the menu is mounted in; its rect converts the
+  // outline panel's viewport-space cursor into canvas-stack-local pixels (the
+  // canvas path already supplies stack-local coords via the shared transform).
+  let canvasStackEl = $state<HTMLElement | undefined>();
+
+  let ctxMenu = $state<{ open: boolean; x: number; y: number; items: MenuItem[] }>({
+    open: false,
+    x: 0,
+    y: 0,
+    items: [],
+  });
+
+  // Selection signature + reload nonce captured at open-time, so the close
+  // effect fires on a SUBSEQUENT change (not on the selection mutation that
+  // opening the menu itself performs).
+  let ctxSelKey = '';
+  let ctxOpenNonce = 0;
+
+  function closeContextMenu(): void {
+    ctxMenu = { ...ctxMenu, open: false };
+  }
+
+  /**
+   * Slide-level actions (P13-8): shown when the right-click resolved to no
+   * element (empty slide background). Targets the current slide and routes
+   * through the existing slide ops (one undo entry + autosave each).
+   */
+  function slideMenuItems(): MenuItem[] {
+    const slideEid = currentSlideEid;
+    if (!slideEid || !deckStore.model) return [];
+    const section = findByEid(deckStore.model, slideEid);
+    const hidden = section ? isSlideHidden(section) : false;
+    return [
+      { label: 'Insert slide', run: () => void deckStore.addSlide(slideEid) },
+      { label: 'Duplicate slide', run: () => void deckStore.duplicateSlide(slideEid) },
+      {
+        label: hidden ? 'Show slide' : 'Hide slide',
+        run: () => void deckStore.setSlideHidden(slideEid, !hidden),
+      },
+      { label: '', separator: true },
+      { label: 'Delete slide', danger: true, run: () => void deckStore.deleteSlide(slideEid) },
+    ];
+  }
+
+  /**
+   * Open the shared menu at `x`/`y` (canvas-stack-local px). Reads the (already
+   * updated) selectionStore: a non-empty selection → element menu via
+   * menuItemsFor; empty → the slide-level menu.
+   */
+  function openContextMenuAt(x: number, y: number): void {
+    const eids = selectionStore.eids;
+    let items: MenuItem[];
+    if (eids.length === 0 || !selectionStore.primary) {
+      items = slideMenuItems();
+    } else if (deckStore.model) {
+      const sel: MenuSelection = { primary: selectionStore.primary, eids };
+      items = menuItemsFor(sel, deckStore.model, { hasClipboard: deckStore.hasClipboard });
+    } else {
+      items = [];
+    }
+    if (items.length === 0) return;
+    ctxSelKey = eids.join(',');
+    ctxOpenNonce = deckStore.reloadNonce;
+    ctxMenu = { open: true, x, y, items };
+  }
+
+  // Outline row right-click (P13-4): the row already selected its node; convert
+  // the viewport cursor to canvas-stack-local px, then open the same menu.
+  function openContextMenuFromOutline(_eid: string, clientX: number, clientY: number): void {
+    const rect = canvasStackEl?.getBoundingClientRect();
+    openContextMenuAt(
+      rect ? clientX - rect.left : clientX,
+      rect ? clientY - rect.top : clientY,
+    );
+  }
+
+  // Auto-dismiss: close when the selection changes or the deck reloads while the
+  // menu is open (Escape + click-outside are handled inside ContextMenu).
+  $effect(() => {
+    const key = selectionStore.eids.join(',');
+    const nonce = deckStore.reloadNonce;
+    if (!ctxMenu.open) return;
+    if (key !== ctxSelKey || nonce !== ctxOpenNonce) closeContextMenu();
+  });
 </script>
 
 <PaneLayout>
@@ -349,7 +443,7 @@
       wrapper — the exact box the iframe is scaled within — which is why passing
       RevealFrame's own transform lines the selection box up pixel-perfectly.
     -->
-    <div class="canvas-stack">
+    <div class="canvas-stack" bind:this={canvasStackEl}>
       <RevealFrame
         bind:this={frame}
         deckUrl={deckStore.deckUrl}
@@ -362,6 +456,7 @@
         iframe={canvasIframe}
         transform={canvasTransform}
         reloadNonce={deckStore.reloadNonce}
+        onContextMenu={({ x, y }) => openContextMenuAt(x, y)}
       />
 
       <!--
@@ -426,6 +521,22 @@
         transform={canvasTransform}
         reloadNonce={deckStore.reloadNonce}
       />
+
+      <!--
+        Right-click context menu (P13-1..P13-8): a single shared instance for
+        the canvas (element + slide menus) and the outline rows. Rendered only
+        while open; positioned at the cursor in canvas-stack-local pixels and
+        edge-flipped to stay in-pane. Items come from menuItemsFor / slide ops;
+        Escape + click-outside dismiss via onClose.
+      -->
+      {#if ctxMenu.open}
+        <ContextMenu
+          items={ctxMenu.items}
+          x={ctxMenu.x}
+          y={ctxMenu.y}
+          onClose={closeContextMenu}
+        />
+      {/if}
 
       <!--
         Aspect reposition offer (P4-7): renders nothing unless an aspect change is
@@ -563,7 +674,11 @@
     -->
     <div class="outline-zone flex flex-col h-full min-h-0">
       <div class="flex-1 min-h-0 overflow-hidden">
-        <OutlinePanel model={deckStore.model} selection={selectionStore} />
+        <OutlinePanel
+          model={deckStore.model}
+          selection={selectionStore}
+          onContextMenu={openContextMenuFromOutline}
+        />
       </div>
 
       <!--
