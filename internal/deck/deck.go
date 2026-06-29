@@ -75,6 +75,36 @@ var mathVendor embed.FS
 //go:embed vendor/notes
 var notesVendor embed.FS
 
+// chartVendor holds Chart.js + the slides-builder chart plugin (P17-14/15):
+//   - vendor/chart/chart.umd.js — Chart.js 4.x UMD bundle (exposes window.Chart)
+//   - vendor/chart/plugin.js    — thin reveal plugin reading data-chart-data JSON
+//
+// Loaded in the scaffold so <canvas data-chart> blocks render in the editor,
+// the present route, and PDF export — all offline (spec 12, zero CDN URLs).
+//
+//go:embed vendor/chart
+var chartVendor embed.FS
+
+// chalkboardVendor holds the reveal.js chalkboard/annotation plugin (P17-19):
+//   - vendor/chalkboard/plugin.js — drawing/annotation (window.RevealChalkboard)
+//   - vendor/chalkboard/style.css — toolbar/cursor styles
+//   - vendor/chalkboard/img/*.png — board/marker/chalk cursor images
+//
+// Vendored into each deck but enabled ONLY on the present route (server injects
+// the script + plugin registration so the editor stays clean and deck.html is
+// never mutated — present-mode annotations are ephemeral, spec 10).
+//
+//go:embed vendor/chalkboard
+var chalkboardVendor embed.FS
+
+// laserVendor holds the self-authored laser-pointer plugin (P17-19):
+//   - vendor/laser/plugin.js — press 'l' to toggle a red dot (window.RevealLaser)
+//
+// Like chalkboard: vendored per deck, enabled only on the present route.
+//
+//go:embed vendor/laser
+var laserVendor embed.FS
+
 // revealVersion is the pinned reveal.js version embedded in the binary.
 // Update this constant whenever vendor/ is refreshed.
 const revealVersion = "5.1.0"
@@ -131,6 +161,9 @@ const deckHTML = `<!doctype html>
   <script src="assets/vendor/math/plugin.js"></script>
   <!-- Notes plugin – press 'S' to open the speaker window (P7-2, offline-local) -->
   <script src="assets/vendor/notes/notes.js"></script>
+  <!-- Chart.js + chart plugin – <canvas data-chart> blocks (P17-15, offline) -->
+  <script src="assets/vendor/chart/chart.umd.js"></script>
+  <script src="assets/vendor/chart/plugin.js"></script>
   <script>
     Reveal.initialize({
       // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
@@ -153,7 +186,7 @@ const deckHTML = `<!doctype html>
       // The math plugin constructs URLs as: local + '/dist/katex.min.{css,js}'
       // and local + '/dist/contrib/auto-render.min.js'.
       katex: { local: 'assets/vendor/katex' },
-      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes ]
+      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes, RevealChart ]
     });
   </script>
 </body>
@@ -344,6 +377,24 @@ func Vendor(root, name string) error {
 		return fmt.Errorf("vendor: copy notes plugin: %w", err)
 	}
 	log.Printf("deck: vendored notes plugin → %s/notes", vendorDir)
+
+	// Chart.js + chart plugin → assets/vendor/chart/ (P17-15, in scaffold template)
+	if err := copyEmbeddedFS(chartVendor, "vendor/chart", filepath.Join(vendorDir, "chart")); err != nil {
+		return fmt.Errorf("vendor: copy chart plugin: %w", err)
+	}
+	log.Printf("deck: vendored chart plugin → %s/chart", vendorDir)
+
+	// Chalkboard plugin → assets/vendor/chalkboard/ (P17-19, present-route only)
+	if err := copyEmbeddedFS(chalkboardVendor, "vendor/chalkboard", filepath.Join(vendorDir, "chalkboard")); err != nil {
+		return fmt.Errorf("vendor: copy chalkboard plugin: %w", err)
+	}
+	log.Printf("deck: vendored chalkboard plugin → %s/chalkboard", vendorDir)
+
+	// Laser plugin → assets/vendor/laser/ (P17-19, present-route only)
+	if err := copyEmbeddedFS(laserVendor, "vendor/laser", filepath.Join(vendorDir, "laser")); err != nil {
+		return fmt.Errorf("vendor: copy laser plugin: %w", err)
+	}
+	log.Printf("deck: vendored laser plugin → %s/laser", vendorDir)
 
 	if err := EnsureSharedVendor(root); err != nil {
 		// Non-fatal: shared/ is a reference copy, not required for deck rendering.
