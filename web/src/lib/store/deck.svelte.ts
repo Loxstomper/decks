@@ -44,7 +44,16 @@
  *     not produce individual undo entries (that would flood the stack).
  */
 
-import { parseDeck, serializeDeck, stampEids, type DeckModel } from '$lib/model';
+import {
+  parseDeck,
+  serializeDeck,
+  stampEids,
+  findByEid,
+  setAttribute,
+  setLayoutProps,
+  type DeckModel,
+  type LayoutProps,
+} from '$lib/model';
 import { undoStore } from './undo.svelte';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 
@@ -307,6 +316,42 @@ class DeckStore {
     this.updateFromModel();
     void this.commitCommand();
     return true;
+  }
+
+  /**
+   * P3-4 (properties panel): apply a layout-prop delta to the container with
+   * `eid` as ONE undo entry + one autosave.
+   *
+   * The properties panel (Lane C) fires onApplyLayoutChange → this method. We
+   * mutate ONLY the targeted element's data-* attrs via setLayoutProps (which
+   * marks just that subtree dirty), reserialize, and commit. Untouched siblings
+   * round-trip byte-for-byte (spec 12 #4). Unknown eid is a safe no-op — a stale
+   * selection after an external reload must not throw into the UI.
+   */
+  async applyLayoutChange(eid: string, delta: Partial<LayoutProps>): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setLayoutProps(el, delta); // validates + marks the element dirty
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P3-4 "Equal columns/rows": set data-grow="1" on every element child of the
+   * container so a row/stack distributes free space evenly (spec 03 intent,
+   * no pixel arithmetic). One undo entry + one autosave. Unknown eid = no-op.
+   */
+  async applyEqualColumns(containerEid: string): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, containerEid);
+    if (!el) return;
+    for (const child of el.children) {
+      // Only element children carry layout intent; skip whitespace/text nodes.
+      if (child.type === 'element') setAttribute(child, 'data-grow', '1');
+    }
+    this.updateFromModel();
+    await this.commitCommand();
   }
 
   #scheduleSync(): void {

@@ -33,7 +33,22 @@ export {
 export { decodeEntities, encodeAttr, encodeText } from './entities';
 export { classify } from './classify';
 export { stampEids, nextEid } from './eid';
+export {
+  getContainerKind,
+  getLayoutProps,
+  setLayoutProps,
+  findParentOf,
+  resolveContainerForEid,
+  findNearestContainerAncestor,
+} from './layout';
 export type { ElementClass } from './classify';
+export type {
+  ContainerKind,
+  LayValue,
+  AlignValue,
+  JustifyValue,
+  LayoutProps,
+} from './layout';
 export type {
   DeckModel,
   SlideNode,

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Layout Primitives Demo</title>
+  <!-- slides-layout.css vendored locally (spec 12 – offline-first) -->
+  <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+
+      <!-- Slide 1: Stack primitive — vertical flex column, gap + padding.
+           Eyeball: title above body with 24 px gap, 32 px padding on the container. -->
+      <section data-eid="s1">
+        <div data-lay="stack" data-gap="24" data-pad="32" data-eid="lay1">
+          <h2 data-eid="h1" class="text-sky-300">Stack Layout</h2>
+          <p data-eid="p1">Items stack vertically with a 24 px gap.</p>
+          <p data-eid="p2">Padding is 32 px on all sides of the container.</p>
+        </div>
+      </section>
+
+      <!-- Slide 2: Row primitive — horizontal flex row with alignment.
+           Eyeball: left column + image side by side, both vertically centered. -->
+      <section data-eid="s2">
+        <div data-lay="row" data-gap="64" data-align="center" data-eid="lay2">
+          <div data-lay="stack" data-gap="16" data-grow="1" data-eid="lay3">
+            <h2 data-eid="h2">Row Layout</h2>
+            <p data-eid="p3">Left column grows to fill half the available width.</p>
+          </div>
+          <img data-eid="img1" src="assets/chart.svg" data-grow="1" alt="Chart" />
+        </div>
+      </section>
+
+      <!-- Slide 3: Grid primitive — 3-column grid with col span.
+           Eyeball: 5 cards in a 3-col grid; "Wide Card" spans 2 columns. -->
+      <section data-eid="s3">
+        <div data-lay="grid" data-cols="3" data-gap="32" data-eid="lay4">
+          <div data-lay="stack" data-eid="card1"><p data-eid="p4">Card 1</p></div>
+          <div data-lay="stack" data-eid="card2"><p data-eid="p5">Card 2</p></div>
+          <div data-lay="stack" data-eid="card3"><p data-eid="p6">Card 3</p></div>
+          <div data-lay="stack" data-span="2" data-eid="card4"><p data-eid="p7">Wide Card (span 2)</p></div>
+          <div data-lay="stack" data-eid="card5"><p data-eid="p8">Card 5</p></div>
+        </div>
+      </section>
+
+      <!-- Slide 4: Layers primitive — z-stack of background + text.
+           Eyeball: background image fills the cell; "Layers Layout" text overlays it. -->
+      <section data-eid="s4">
+        <div data-lay="layers" data-eid="lay5">
+          <img data-eid="img2" src="assets/bg.jpg" alt="Background" />
+          <div data-lay="stack" data-align="center" data-justify="center" data-eid="lay6">
+            <h2 data-eid="h3">Layers Layout</h2>
+            <p data-eid="p9">Text overlaid on the background image.</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Slide 5: Free primitive — absolute positioning escape hatch.
+           Eyeball: first box at top-left (100,200), second box rotated 15°. -->
+      <section data-eid="s5">
+        <div data-free data-x="100" data-y="200" data-w="400" data-h="80" data-eid="fr1">
+          <p data-eid="p10">Absolutely positioned at (100, 200), 400×80 logical px.</p>
+        </div>
+        <div data-free data-x="600" data-y="400" data-w="300" data-h="150" data-rot="15" data-eid="fr2">
+          <p data-eid="p11">Rotated 15° at (600, 400).</p>
+        </div>
+      </section>
+
+      <!-- Slide 6: Justify variants — main-axis distribution.
+           Eyeball: "between" slide has items spread to the edges; "around" has equal margins. -->
+      <section data-eid="s6">
+        <div data-lay="row" data-justify="between" data-eid="lay7">
+          <div data-lay="stack" data-eid="jb1"><p data-eid="p12">Left</p></div>
+          <div data-lay="stack" data-eid="jb2"><p data-eid="p13">Center</p></div>
+          <div data-lay="stack" data-eid="jb3"><p data-eid="p14">Right</p></div>
+        </div>
+        <div data-lay="row" data-justify="around" data-eid="lay8">
+          <div data-lay="stack" data-eid="ja1"><p data-eid="p15">A</p></div>
+          <div data-lay="stack" data-eid="ja2"><p data-eid="p16">B</p></div>
+          <div data-lay="stack" data-eid="ja3"><p data-eid="p17">C</p></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <!-- slides-layout-init.js must run before Reveal.initialize() -->
+  <script src="assets/vendor/slides-layout-init.js"></script>
+  <script src="assets/vendor/reveal/reveal.js"></script>
+  <script>
+    Reveal.initialize({ hash: true, controls: true, progress: true });
+  </script>
+</body>
+</html>

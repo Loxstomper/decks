@@ -17,9 +17,16 @@
   import PaneLayout from './components/layout/PaneLayout.svelte';
   import RevealFrame from './components/canvas/RevealFrame.svelte';
   import CanvasInteraction from './components/canvas/CanvasInteraction.svelte';
+  import DragController from './components/canvas/DragController.svelte';
+  import GridOverlay from './components/canvas/GridOverlay.svelte';
+  import NudgeController from './components/canvas/NudgeController.svelte';
   import SourcePane from './components/source/SourcePane.svelte';
+  import OutlinePanel from './components/outline/OutlinePanel.svelte';
+  import PropertiesPanel from './components/properties/PropertiesPanel.svelte';
   import { createSseClient } from '$lib/sse';
   import { deckStore, type DeckStatus } from '$lib/store/deck.svelte.ts';
+  import { selectionStore } from '$lib/canvas/selection.svelte.ts';
+  import { gridStore } from '$lib/canvas/grid.svelte.ts';
   import type { Transform } from '$lib/coords.ts';
 
   // RevealFrame instance (exposes reload()); bound via the canvas snippet.
@@ -184,8 +191,51 @@
         reloadNonce={deckStore.reloadNonce}
       />
 
+      <!--
+        Snap-grid overlay (P3-8): drawn beneath the drag overlay (z-index:1),
+        visible only while the grid is enabled. Shares the SAME transform so its
+        lines stay pixel-aligned with the slide at any zoom/pan.
+      -->
+      <GridOverlay
+        transform={canvasTransform}
+        gridSize={gridStore.size}
+        visible={gridStore.enabled && gridStore.showOverlay}
+      />
+
+      <!--
+        Drag controller (P3-6/7/8): reorder / reparent structured children and
+        free-move data-free elements. Like CanvasInteraction it does not own the
+        iframe — it attaches its own pointer listeners to the same-origin doc and
+        re-attaches after a reload (reloadNonce). Its overlay sits at z-index:2,
+        above the grid; both are pointer-events:none so they never block selection.
+      -->
+      <DragController
+        iframe={canvasIframe}
+        transform={canvasTransform}
+        reloadNonce={deckStore.reloadNonce}
+      />
+
       <!-- Undo / redo toolbar (bonus). Reflects canUndo/canRedo reactively. -->
       <div class="canvas-toolbar">
+        <!--
+          Snap-to-grid toggle (P3-8). Reflects gridStore.enabled; clicking flips
+          it. When on, drags/nudges snap to gridStore.size and the GridOverlay
+          becomes visible.
+        -->
+        <button
+          type="button"
+          class="canvas-toolbar-btn"
+          class:is-active={gridStore.enabled}
+          title="Toggle snap-to-grid"
+          aria-label="Toggle snap-to-grid"
+          aria-pressed={gridStore.enabled}
+          onclick={() => gridStore.toggle()}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <rect x="3" y="3" width="18" height="18" rx="1" />
+            <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+          </svg>
+        </button>
         <button
           type="button"
           class="canvas-toolbar-btn"
@@ -216,6 +266,28 @@
     </div>
   {/snippet}
 
+  {#snippet outline()}
+    <!--
+      Outline + Properties share the right panel's top zone (P3-3 / P3-4).
+      OutlinePanel (the element tree) scrolls and fills the upper portion;
+      PropertiesPanel (layout controls + alignment toolbar) sits below it.
+      Both read/drive the SAME selectionStore singleton the canvas uses, so
+      selection stays in sync three ways: canvas ↔ outline ↔ properties.
+    -->
+    <div class="outline-zone flex flex-col h-full min-h-0">
+      <div class="flex-1 min-h-0 overflow-hidden">
+        <OutlinePanel model={deckStore.model} selection={selectionStore} />
+      </div>
+      <div class="properties-zone overflow-y-auto border-t border-surface-overlay">
+        <PropertiesPanel
+          selectedEid={selectionStore.eid}
+          onApplyLayoutChange={(eid, delta) => deckStore.applyLayoutChange(eid, delta)}
+          onApplyEqualColumns={(eid) => deckStore.applyEqualColumns(eid)}
+        />
+      </div>
+    </div>
+  {/snippet}
+
   {#snippet source()}
     <SourcePane
       value={deckStore.source}
@@ -223,6 +295,13 @@
     />
   {/snippet}
 </PaneLayout>
+
+<!--
+  Keyboard nudge (P3-9): mounted once, renders nothing. Listens on window for
+  arrow keys, reads selectionStore + deckStore directly, and guards against
+  hijacking text-editing contexts (inputs / contenteditable / CodeMirror).
+-->
+<NudgeController />
 
 <style>
   /*
@@ -269,6 +348,12 @@
   .canvas-toolbar-btn:disabled {
     opacity: 0.3;
     cursor: default;
+  }
+
+  /* Active (pressed) state for the snap-grid toggle. */
+  .canvas-toolbar-btn.is-active {
+    background-color: rgba(74, 158, 255, 0.35);
+    color: #fff;
   }
 
   .canvas-toolbar-btn svg {

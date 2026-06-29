@@ -1,0 +1,95 @@
+/* slides-layout.css — Layout vocabulary for slides-builder (spec 03).
+ *
+ * Maps data-* attributes on layout containers to the corresponding flex/grid CSS.
+ * Shipped offline alongside reveal.js (spec 12 — zero external URLs).
+ *
+ * ATTRIBUTE CONTRACT (spec 03 §"The data-* contract"):
+ *
+ *   Container attributes on elements with data-lay:
+ *     data-lay      stack | row | grid | layers
+ *     data-align    cross-axis:  start | center | end | stretch
+ *     data-justify  main-axis:   start | center | end | between | around
+ *
+ *   Numeric / computed attributes (handled by slides-layout-init.js companion):
+ *     data-gap   logical px → gap
+ *     data-pad   logical px → padding
+ *     data-cols  integer or template → grid-template-columns
+ *     data-rows  integer or template → grid-template-rows
+ *
+ *   Child attributes (handled by slides-layout-init.js):
+ *     data-grow  flex-grow factor
+ *     data-basis flex-basis (logical px or %)
+ *     data-span  grid-column / grid-row span
+ *
+ *   Free-element attributes (data-free on the element):
+ *     data-x data-y data-w data-h data-rot  (logical units, set by init.js)
+ *
+ * WHY TWO FILES:
+ *   CSS attr() only supports string values in the `content` property in all
+ *   browsers. Numeric attributes (gap, pad, coords) require a companion script
+ *   (slides-layout-init.js) to write them as inline styles. Enum attributes are
+ *   handled here via attribute selectors — no script needed.
+ */
+
+/* ── Containers: the four structured primitives ───────────────────────────── */
+
+/* Stack — vertical flex column. Default for slide body, title-over-body. */
+[data-lay="stack"] {
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* Row — horizontal flex row. Use for two-column text|image layouts. */
+[data-lay="row"] {
+  display: flex;
+  flex-direction: row;
+  box-sizing: border-box;
+}
+
+/* Grid — CSS grid. Use for card walls, logo/image grids. */
+[data-lay="grid"] {
+  display: grid;
+  box-sizing: border-box;
+}
+
+/* Layers — z-stack. All direct children overlay each other in the same cell.
+   Equivalent to reveal.js r-stack; use for background + overlaid text and
+   auto-animate / fragment layer sequences. */
+[data-lay="layers"] {
+  display: grid;
+  grid-template-areas: "layer";
+  box-sizing: border-box;
+}
+[data-lay="layers"] > * {
+  /* Every direct child occupies the same named grid area, stacking in z-order. */
+  grid-area: layer;
+}
+
+/* ── Cross-axis alignment (data-align, stack + row) ──────────────────────── */
+/* "center horizontally" → data-align="center" (alignment-as-intent, spec 03). */
+
+[data-lay][data-align="start"]   { align-items: flex-start; }
+[data-lay][data-align="center"]  { align-items: center; }
+[data-lay][data-align="end"]     { align-items: flex-end; }
+[data-lay][data-align="stretch"] { align-items: stretch; }
+
+/* ── Main-axis justification (data-justify, stack + row) ─────────────────── */
+/* "space between" → data-justify="between" (alignment-as-intent, spec 03). */
+
+[data-lay][data-justify="start"]   { justify-content: flex-start; }
+[data-lay][data-justify="center"]  { justify-content: center; }
+[data-lay][data-justify="end"]     { justify-content: flex-end; }
+[data-lay][data-justify="between"] { justify-content: space-between; }
+[data-lay][data-justify="around"]  { justify-content: space-around; }
+
+/* ── Free element — absolute-positioning escape hatch ────────────────────── */
+/* Position and size (data-x/y/w/h/rot in logical coords) are applied by
+   slides-layout-init.js because CSS attr() cannot set numeric property values
+   portably. Only the base rule is needed here. */
+
+[data-free] {
+  position: absolute;
+  /* Box-sizing so data-w/data-h are inclusive of padding/border. */
+  box-sizing: border-box;
+}

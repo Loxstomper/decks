@@ -288,6 +288,120 @@ func TestEnsureSharedVendor(t *testing.T) {
 	}
 }
 
+// ── Layout CSS / P3-1 vendor tests ───────────────────────────────────────────
+
+// TestNew_LayoutCSSPresent verifies that slides new copies slides-layout.css
+// and slides-layout-init.js into assets/vendor/ (spec 03, spec 12 offline-first).
+func TestNew_LayoutCSSPresent(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "layout-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	vendorDir := filepath.Join(root, "decks", "layout-test", "assets", "vendor")
+	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+		p := filepath.Join(vendorDir, f)
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("layout vendor file missing: %s: %v", f, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("layout vendor file is empty: %s", f)
+		}
+	}
+}
+
+// TestNew_DeckHTMLLinksLayoutCSS asserts that the scaffolded deck.html references
+// slides-layout.css via a relative path (offline-first, spec 12).
+func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "layout-link"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "layout-link", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	// The deck must reference the layout CSS and init script via relative paths.
+	for _, want := range []string{
+		"assets/vendor/slides-layout.css",
+		"assets/vendor/slides-layout-init.js",
+	} {
+		if !bytes.Contains(html, []byte(want)) {
+			t.Errorf("deck.html missing expected relative path %q", want)
+		}
+	}
+
+	// The offline invariant still holds: no external http(s):// URLs.
+	re := regexp.MustCompile(`https?://`)
+	if re.Match(html) {
+		t.Errorf("deck.html contains an external URL after adding layout CSS — violates spec 12:\n%s",
+			findMatchContext(html, re))
+	}
+}
+
+// TestVendor_LayoutCSSRevendored verifies that Vendor() restores deleted layout
+// files in an existing deck (the `slides vendor <name>` use-case, P3-1).
+func TestVendor_LayoutCSSRevendored(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "layout-revendor"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Delete the layout files to simulate removal.
+	vendorDir := filepath.Join(root, "decks", "layout-revendor", "assets", "vendor")
+	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+		if err := os.Remove(filepath.Join(vendorDir, f)); err != nil {
+			t.Fatalf("remove %s: %v", f, err)
+		}
+	}
+
+	// Re-vendor.
+	if err := deck.Vendor(root, "layout-revendor"); err != nil {
+		t.Fatalf("Vendor: %v", err)
+	}
+
+	// Layout files must be restored.
+	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+		p := filepath.Join(vendorDir, f)
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("after Vendor(): layout file missing: %s: %v", f, err)
+		}
+	}
+}
+
+// TestLayoutCSS_NoExternalURLs is an invariant guard: the bundled layout CSS
+// must contain zero http(s):// URLs (spec 12 offline-first, X-1).
+func TestLayoutCSS_NoExternalURLs(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "layout-offline"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	vendorDir := filepath.Join(root, "decks", "layout-offline", "assets", "vendor")
+	re := regexp.MustCompile(`https?://\S+`)
+
+	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+		content, err := os.ReadFile(filepath.Join(vendorDir, f))
+		if err != nil {
+			t.Fatalf("read %s: %v", f, err)
+		}
+		if matches := re.FindAll(content, -1); len(matches) > 0 {
+			t.Errorf("%s contains external URL(s) — violates spec 12:", f)
+			for _, m := range matches {
+				t.Errorf("  %s", m)
+			}
+		}
+	}
+}
+
 // findMatchContext returns a short excerpt around the first regex match for
 // diagnostic purposes in test failure messages.
 func findMatchContext(data []byte, re *regexp.Regexp) []byte {

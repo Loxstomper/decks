@@ -90,15 +90,24 @@ dependencies are noted inline.
 ## Phase 3 — Structured layout & alignment (the pain-solver)
 > Goal: the five-primitive layout model with intent-based alignment. Spec: [03](specs/03-layout-vocabulary.md).
 
-- [ ] **P3-1 — Layout stylesheet.** Bundled CSS mapping `data-lay`/`data-gap`/`data-align`/`data-justify`/grid attrs to flex/grid. _Done when:_ a hand-written `data-lay` deck renders correctly. (Spec 03)
-- [ ] **P3-2 — Container recognition.** Model exposes container kind + layout props from `data-*`. _Done when:_ props are readable/writable per container. (Spec 03)
-- [ ] **P3-3 — Outline/layers panel.** Tree of section → containers → leaves. _Done when:_ the tree reflects the model and selecting a node selects it on canvas. (Spec 03, 04)
-- [ ] **P3-4 — Container properties panel.** Edit gap/align/justify/pad (and grid cols/rows). _Done when:_ changing a prop updates `data-*` and the canvas reflows. (Spec 03)
-- [ ] **P3-5 — Alignment-as-intent toolbar.** Align/justify/equal-columns buttons set container props (not coordinates). _Done when:_ "center" writes `data-align="center"`. (Spec 03)
-- [ ] **P3-6 — Reorder drag (within container).** Drag a child to a new index; container reflows. _Done when:_ order persists in source. (Spec 04)
-- [ ] **P3-7 — Reparent drag (across containers).** Drop a child into a different container/cell. _Done when:_ parent change persists. (Spec 04)
-- [ ] **P3-8 — Snap-to-grid.** Toggleable logical grid (default 8u). _Done when:_ grid toggles and snapping engages for applicable drags. (Spec 04)
-- [ ] **P3-9 — Keyboard nudge.** Arrows = 1u, Shift+arrows = 10u (logical). _Done when:_ nudging moves selection in logical units. (Spec 04)
+- [x] **P3-1 — Layout stylesheet.** Bundled CSS mapping `data-lay`/`data-gap`/`data-align`/`data-justify`/grid attrs to flex/grid. _Done when:_ a hand-written `data-lay` deck renders correctly. (Spec 03)
+- [x] **P3-2 — Container recognition.** Model exposes container kind + layout props from `data-*`. _Done when:_ props are readable/writable per container. (Spec 03)
+- [x] **P3-3 — Outline/layers panel.** Tree of section → containers → leaves. _Done when:_ the tree reflects the model and selecting a node selects it on canvas. (Spec 03, 04)
+- [x] **P3-4 — Container properties panel.** Edit gap/align/justify/pad (and grid cols/rows). _Done when:_ changing a prop updates `data-*` and the canvas reflows. (Spec 03)
+- [x] **P3-5 — Alignment-as-intent toolbar.** Align/justify/equal-columns buttons set container props (not coordinates). _Done when:_ "center" writes `data-align="center"`. (Spec 03)
+- [x] **P3-6 — Reorder drag (within container).** Drag a child to a new index; container reflows. _Done when:_ order persists in source. (Spec 04)
+- [x] **P3-7 — Reparent drag (across containers).** Drop a child into a different container/cell. _Done when:_ parent change persists. (Spec 04)
+- [x] **P3-8 — Snap-to-grid.** Toggleable logical grid (default 8u). _Done when:_ grid toggles and snapping engages for applicable drags. (Spec 04)
+- [x] **P3-9 — Keyboard nudge.** Arrows = 1u, Shift+arrows = 10u (logical). _Done when:_ nudging moves selection in logical units. (Spec 04)
+
+> **Phase 3 STATUS (done, tag 0.0.4 — completes milestone M1):** P3-1..P3-9 complete. 4 lanes + Opus integration; verified (FE 341 vitest tests, svelte-check 0/0, Go green; offline-first + byte-stability re-verified via curl/vite-node).
+> - **Layout CSS (P3-1):** `slides-layout.css` (enum data-* → flex/grid: stack/row/grid/layers, align, justify, free) + `slides-layout-init.js` (numeric attrs gap/pad/cols/rows/grow/basis/span + free x/y/w/h/rot, MutationObserver for reveal-injected content). Both embedded in the binary and copied into `decks/<name>/assets/vendor/` on `slides new`/`slides vendor`, linked relatively; zero external URLs.
+> - **Container model API (P3-2):** `web/src/lib/model/layout.ts` — `getContainerKind`, `getLayoutProps`/`setLayoutProps` (validated, scoped-dirty), `resolveContainerForEid`. **Tree-mutation ops `moveChild`/`reparentChild` consolidated into `web/src/lib/canvas/structure-ops.ts` (single source of truth; the duplicate model-layer copies were removed).**
+> - **UI:** OutlinePanel (`components/outline/`, passthrough nodes get an X-3 "source only" badge), PropertiesPanel + AlignmentToolbar (`components/properties/`), DragController/GridOverlay/NudgeController (`components/canvas/`). Two-way selection sync canvas↔outline↔properties via the selection store.
+> - **Store commands (one undo entry + one autosave each):** `applyLayoutChange(eid, delta)`, `applyEqualColumns(eid)`, move/reparent via `structure-commands.ts`, grid toggle (`grid.svelte.ts`), nudge (free → data-x/y; structured → reorder) with editing-context guards.
+> - **⚠️ Needs VISUAL/browser verification:** drag drop-indicator + reparent feel; snap-grid alignment/feel at zoom/pan; alignment toolbar reflowing live reveal; outline↔canvas selection sync/auto-scroll; nudge on free vs structured.
+> - **[arch follow-up]** `structure-ops.ts` is a pure model op but lives under `$lib/canvas`; consider relocating into `$lib/model` (e.g. `edit.ts`) so all tree mutations sit in one layer.
+> - **[perf, pre-existing]** Vite main chunk > 500 kB warning (no functional impact; CM6 + reveal). Code-split later.
 
 ## Phase 4 — Free positioning & geometry
 > Goal: the absolute-positioning escape hatch with smart guides. Specs: [03](specs/03-layout-vocabulary.md), [04](specs/04-canvas-interaction.md), [05](specs/05-scaling-and-resolution.md).

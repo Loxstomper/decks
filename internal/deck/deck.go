@@ -32,6 +32,15 @@ import (
 //go:embed vendor/reveal
 var revealVendor embed.FS
 
+// layoutVendor holds the slides-builder layout vocabulary files:
+//   - vendor/slides-layout.css     — CSS for enum data-* attributes (spec 03)
+//   - vendor/slides-layout-init.js — applies numeric data-* to inline styles
+//
+// These are shipped alongside reveal so decks render layout offline (spec 12).
+//
+//go:embed vendor/slides-layout.css vendor/slides-layout-init.js
+var layoutVendor embed.FS
+
 // revealVersion is the pinned reveal.js version embedded in the binary.
 // Update this constant whenever vendor/ is refreshed.
 const revealVersion = "5.1.0"
@@ -50,6 +59,8 @@ const deckHTML = `<!doctype html>
   <link rel="stylesheet" href="assets/vendor/reveal/reset.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/reveal.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/theme/black.css" />
+  <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec 03) -->
+  <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
   <link rel="stylesheet" href="custom.css" />
 </head>
 <body>
@@ -69,6 +80,8 @@ const deckHTML = `<!doctype html>
     </div>
   </div>
 
+  <!-- Numeric data-* → inline styles companion (data-gap, data-pad, free coords) -->
+  <script src="assets/vendor/slides-layout-init.js"></script>
   <script src="assets/vendor/reveal/reveal.js"></script>
   <script>
     Reveal.initialize({
@@ -197,20 +210,28 @@ func New(root, name string) error {
 	return nil
 }
 
-// Vendor copies the embedded reveal.js distribution into an existing deck at
-// decks/<name>/assets/vendor/reveal/, replacing any prior version.
-// It also refreshes the workspace-level reference at shared/vendor/reveal/.
+// Vendor copies the embedded reveal.js distribution and slides-builder layout
+// files into an existing deck at decks/<name>/assets/vendor/, replacing any
+// prior version.  It also refreshes the workspace-level reference.
 //
 // This is the backing implementation of the `slides vendor <name>` CLI command.
 func Vendor(root, name string) error {
 	if err := validateName(name); err != nil {
 		return err
 	}
-	destDir := filepath.Join(root, DecksDir, name, "assets", "vendor", "reveal")
-	if err := copyEmbeddedReveal(destDir); err != nil {
-		return fmt.Errorf("vendor: copy to deck: %w", err)
+	vendorDir := filepath.Join(root, DecksDir, name, "assets", "vendor")
+
+	// Reveal.js subtree → assets/vendor/reveal/
+	if err := copyEmbeddedReveal(filepath.Join(vendorDir, "reveal")); err != nil {
+		return fmt.Errorf("vendor: copy reveal to deck: %w", err)
 	}
-	log.Printf("deck: vendored reveal.js %s → %s", revealVersion, destDir)
+	log.Printf("deck: vendored reveal.js %s → %s/reveal", revealVersion, vendorDir)
+
+	// Layout vocabulary files → assets/vendor/slides-layout.{css,js}
+	if err := copyEmbeddedLayout(vendorDir); err != nil {
+		return fmt.Errorf("vendor: copy layout to deck: %w", err)
+	}
+	log.Printf("deck: vendored slides-layout → %s", vendorDir)
 
 	if err := EnsureSharedVendor(root); err != nil {
 		// Non-fatal: shared/ is a reference copy, not required for deck rendering.
@@ -219,15 +240,49 @@ func Vendor(root, name string) error {
 	return nil
 }
 
-// EnsureSharedVendor writes the embedded reveal.js files to
-// shared/vendor/reveal/ in the workspace.  This is a workspace-level
-// reference copy for human inspection; decks use their own private copy.
-func EnsureSharedVendor(root string) error {
-	dest := filepath.Join(root, sharedVendorDir)
-	if err := copyEmbeddedReveal(dest); err != nil {
-		return fmt.Errorf("shared vendor: %w", err)
+// copyEmbeddedLayout copies slides-layout.css and slides-layout-init.js from
+// the embedded layoutVendor FS into destDir (flat, no subdirectory).
+func copyEmbeddedLayout(destDir string) error {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("copyEmbeddedLayout: mkdir: %w", err)
 	}
-	log.Printf("deck: refreshed shared vendor at %s", dest)
+	for _, name := range []string{"slides-layout.css", "slides-layout-init.js"} {
+		src, err := layoutVendor.Open("vendor/" + name)
+		if err != nil {
+			return fmt.Errorf("copyEmbeddedLayout: open %s: %w", name, err)
+		}
+		dest := filepath.Join(destDir, name)
+		out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+		if err != nil {
+			src.Close()
+			return fmt.Errorf("copyEmbeddedLayout: create %s: %w", dest, err)
+		}
+		if _, err := io.Copy(out, src); err != nil {
+			src.Close()
+			out.Close()
+			return fmt.Errorf("copyEmbeddedLayout: copy %s: %w", name, err)
+		}
+		src.Close()
+		out.Close()
+	}
+	return nil
+}
+
+// EnsureSharedVendor writes the embedded reveal.js files and layout vocabulary
+// to shared/vendor/ in the workspace.  This is a workspace-level reference
+// copy for human inspection; decks use their own private copies.
+func EnsureSharedVendor(root string) error {
+	// reveal → shared/vendor/reveal/
+	revealDest := filepath.Join(root, sharedVendorDir)
+	if err := copyEmbeddedReveal(revealDest); err != nil {
+		return fmt.Errorf("shared vendor (reveal): %w", err)
+	}
+	// layout files → shared/vendor/ (flat, alongside the reveal/ subtree)
+	sharedLayoutDir := filepath.Dir(revealDest) // parent of shared/vendor/reveal/
+	if err := copyEmbeddedLayout(sharedLayoutDir); err != nil {
+		return fmt.Errorf("shared vendor (layout): %w", err)
+	}
+	log.Printf("deck: refreshed shared vendor at %s", filepath.Dir(revealDest))
 	return nil
 }
 
