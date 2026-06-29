@@ -1,6 +1,7 @@
 package server_test
 
 import (
+	"archive/zip"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -777,3 +778,329 @@ func TestFontLocalize_Offline503(t *testing.T) {
 	}
 }
 
+// ── Present route (P7-1) ──────────────────────────────────────────────────────
+
+// TestPresent_ServesExactDeckHTML verifies that GET /present/{name} returns the
+// same bytes as the on-disk deck.html — "present exactly the file" (spec 10).
+func TestPresent_ServesExactDeckHTML(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "pres-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	// Read the file directly from disk.
+	diskBytes, err := deck.Read(root, "pres-deck")
+	if err != nil {
+		t.Fatalf("deck.Read: %v", err)
+	}
+
+	// Fetch via /present/{name}.
+	req := httptest.NewRequest("GET", "/present/pres-deck", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("present: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// The response body must be byte-identical to the on-disk file.
+	if !bytes.Equal(diskBytes, rr.Body.Bytes()) {
+		t.Errorf("present: response not byte-identical to disk file (disk=%d bytes, http=%d bytes)",
+			len(diskBytes), rr.Body.Bytes())
+	}
+
+	// Must declare text/html content type.
+	ct := rr.Header().Get("Content-Type")
+	if !strings.Contains(ct, "text/html") {
+		t.Errorf("present: expected text/html content-type, got %q", ct)
+	}
+}
+
+// TestPresent_ServesAssets verifies that /present/{name}/{path} resolves sibling
+// assets (reveal.js, CSS, etc.) from the deck folder so relative hrefs work.
+func TestPresent_ServesAssets(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "pres-assets"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/present/pres-assets/assets/vendor/reveal/reveal.css", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("present asset: want 200, got %d", rr.Code)
+	}
+}
+
+// TestPresent_NotFound verifies 404 for unknown decks.
+func TestPresent_NotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+	req := httptest.NewRequest("GET", "/present/no-such-deck", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("present unknown deck: want 404, got %d", rr.Code)
+	}
+}
+
+// TestPresent_MatchesDeckStaticRoute confirms that /present/{name} and
+// /decks/{name}/deck.html serve identical bytes, proving the present route uses
+// the same file without transformation.
+func TestPresent_MatchesDeckStaticRoute(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "compare"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	get := func(path string) []byte {
+		t.Helper()
+		req := httptest.NewRequest("GET", path, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Fatalf("GET %s: want 200, got %d", path, rr.Code)
+		}
+		return rr.Body.Bytes()
+	}
+
+	presentBytes := get("/present/compare")
+	staticBytes := get("/decks/compare/deck.html")
+
+	if !bytes.Equal(presentBytes, staticBytes) {
+		t.Errorf("/present/ and /decks/.../deck.html returned different bytes (%d vs %d)",
+			len(presentBytes), len(staticBytes))
+	}
+}
+
+// ── Notes plugin (P7-2) ───────────────────────────────────────────────────────
+
+// TestNotesPlugin_VendoredAndEnabled ensures the notes plugin is copied into
+// new decks and referenced in deck.html — prerequisites for 'S'-key speaker view.
+func TestNotesPlugin_VendoredAndEnabled(t *testing.T) {
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "decks"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := deck.New(root, "notes-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	// 1. plugin.js must exist under assets/vendor/notes/.
+	pluginPath := filepath.Join(root, "decks", "notes-deck", "assets", "vendor", "notes", "plugin.js")
+	if _, err := os.Stat(pluginPath); err != nil {
+		t.Errorf("notes plugin.js not vendored into deck: %v", err)
+	}
+
+	// 2. speaker-view.html must be present (required by the popup speaker window).
+	speakerPath := filepath.Join(root, "decks", "notes-deck", "assets", "vendor", "notes", "speaker-view.html")
+	if _, err := os.Stat(speakerPath); err != nil {
+		t.Errorf("speaker-view.html not vendored into deck: %v", err)
+	}
+
+	// 3. deck.html must reference the plugin and include RevealNotes in the
+	//    plugins array — this is what enables the 'S' key.
+	htmlPath := filepath.Join(root, "decks", "notes-deck", "deck.html")
+	htmlBytes, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+	html := string(htmlBytes)
+
+	if !strings.Contains(html, "assets/vendor/notes/plugin.js") {
+		t.Error("deck.html does not load assets/vendor/notes/plugin.js")
+	}
+	if !strings.Contains(html, "RevealNotes") {
+		t.Error("deck.html does not include RevealNotes in plugins array")
+	}
+
+	// 4. Zero external URLs: the deck must be fully offline-capable (spec 12).
+	//    Scan both the HTML and the speaker-view.html for any http(s):// links.
+	for _, p := range []struct{ label, path string }{
+		{"deck.html", htmlPath},
+		{"speaker-view.html", speakerPath},
+	} {
+		data, err := os.ReadFile(p.path)
+		if err != nil {
+			t.Fatalf("read %s: %v", p.label, err)
+		}
+		// Allow "http" inside comments or in tests, but external https:// CDN
+		// URLs are a violation.  We specifically check for CDN/absolute URLs.
+		for _, forbidden := range []string{"https://cdn", "https://fonts.googleapis", "https://unpkg"} {
+			if strings.Contains(string(data), forbidden) {
+				t.Errorf("%s contains external URL %q — violates spec 12", p.label, forbidden)
+			}
+		}
+	}
+}
+
+// ── ZIP export (P7-4) ─────────────────────────────────────────────────────────
+
+// TestExportZIP_ContainsDeckAndAssets verifies that the zip archive contains
+// deck.html and at least one vendor asset, and is self-contained.
+func TestExportZIP_ContainsDeckAndAssets(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "zip-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/decks/zip-deck/export.zip", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("export.zip: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	ct := rr.Header().Get("Content-Type")
+	if !strings.Contains(ct, "application/zip") {
+		t.Errorf("export.zip: expected application/zip content-type, got %q", ct)
+	}
+
+	// Parse the zip to verify its contents.
+	body := rr.Body.Bytes()
+	zr, err := zip.NewReader(bytes.NewReader(body), int64(len(body)))
+	if err != nil {
+		t.Fatalf("parse zip: %v", err)
+	}
+
+	fileSet := make(map[string]bool)
+	for _, f := range zr.File {
+		fileSet[f.Name] = true
+	}
+
+	// Must contain deck.html under the deck name prefix.
+	if !fileSet["zip-deck/deck.html"] {
+		t.Errorf("zip missing zip-deck/deck.html; got: %v", fileSet)
+	}
+	// Must contain custom.css.
+	if !fileSet["zip-deck/custom.css"] {
+		t.Errorf("zip missing zip-deck/custom.css")
+	}
+	// Must contain at least one vendor file (self-contained check).
+	hasVendor := false
+	for name := range fileSet {
+		if strings.Contains(name, "assets/vendor/") {
+			hasVendor = true
+			break
+		}
+	}
+	if !hasVendor {
+		t.Error("zip missing assets/vendor/ — deck would not be self-contained")
+	}
+
+	// Traversal safety: no zip entry should escape the deck prefix.
+	for name := range fileSet {
+		if strings.Contains(name, "..") {
+			t.Errorf("zip contains path traversal: %q", name)
+		}
+		if !strings.HasPrefix(name, "zip-deck/") {
+			t.Errorf("zip entry outside deck prefix: %q", name)
+		}
+	}
+}
+
+// TestExportZIP_NotFound verifies 404 for unknown decks.
+func TestExportZIP_NotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+	req := httptest.NewRequest("GET", "/api/decks/no-such/export.zip", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("export.zip unknown deck: want 404, got %d", rr.Code)
+	}
+}
+
+// ── PDF export (P7-3) ─────────────────────────────────────────────────────────
+
+// TestExportPDF_NoChromeReturns503 verifies graceful 503 when Chrome is absent.
+// This test temporarily clears CHROME_BIN and relies on Chrome not being in the
+// test environment PATH to trigger the graceful error path.
+func TestExportPDF_NoChromeReturns503(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "pdf-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	// Override CHROME_BIN to a non-existent path and PATH to empty so no Chrome
+	// binary is found, exercising the graceful degradation path.
+	origCHROME := os.Getenv("CHROME_BIN")
+	origPATH := os.Getenv("PATH")
+	os.Setenv("CHROME_BIN", "/nonexistent/chrome")
+	os.Setenv("PATH", "") // clear PATH so LookPath finds nothing
+	defer func() {
+		os.Setenv("CHROME_BIN", origCHROME)
+		os.Setenv("PATH", origPATH)
+	}()
+
+	req := httptest.NewRequest("GET", "/api/decks/pdf-deck/export.pdf", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("export.pdf no chrome: want 503, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Response must be JSON with an "error" field.
+	var resp map[string]any
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Errorf("export.pdf 503 body not JSON: %s", rr.Body.String())
+	} else if _, ok := resp["error"]; !ok {
+		t.Errorf("export.pdf 503 JSON missing 'error' field: %v", resp)
+	}
+}
+
+// TestExportPDF_WithChrome runs the PDF export end-to-end if Chrome is detected.
+// The test is skipped when no Chrome binary is available so CI without a display
+// does not fail.
+func TestExportPDF_WithChrome(t *testing.T) {
+	// Use the same detection logic as the server to decide whether to skip.
+	chromeBin, ok := server.FindChrome()
+	if !ok {
+		t.Skip("no Chrome/Chromium found; skipping live PDF test")
+	}
+	t.Logf("using Chrome at %s", chromeBin)
+
+	// The PDF handler drives Chrome against /present/{name}?print-pdf on the
+	// running server.  We need a real HTTP server (not httptest.NewRecorder) so
+	// Chrome can reach it.
+	root := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(root, "decks"), 0o755); err != nil {
+		t.Fatalf("mkdir: %v", err)
+	}
+	if err := deck.New(root, "chrome-pdf"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	httpSrv := httptest.NewServer(server.New(root, nil, nil))
+	defer httpSrv.Close()
+
+	resp, err := http.Get(httpSrv.URL + "/api/decks/chrome-pdf/export.pdf")
+	if err != nil {
+		t.Fatalf("GET export.pdf: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		t.Fatalf("export.pdf: want 200, got %d: %s", resp.StatusCode, body)
+	}
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.Contains(ct, "application/pdf") {
+		t.Errorf("export.pdf: expected application/pdf, got %q", ct)
+	}
+
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		t.Fatalf("read pdf body: %v", err)
+	}
+	// A valid PDF starts with the %PDF- magic bytes.
+	if len(body) < 5 || !bytes.Equal(body[:5], []byte("%PDF-")) {
+		preview := body
+		if len(preview) > 10 {
+			preview = preview[:10]
+		}
+		t.Errorf("export.pdf: response does not start with %%PDF- magic (got %q)", preview)
+	}
+}

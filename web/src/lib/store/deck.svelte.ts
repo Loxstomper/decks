@@ -54,6 +54,8 @@ import {
   setLayoutProps,
   toggleFree,
   findParentOf,
+  getSlideNotes,
+  setSlideNotes as setSlideNotesOp,
   type DeckModel,
   type ElementNode,
   type LayoutProps,
@@ -824,6 +826,48 @@ class DeckStore {
     this.updateFromModel();
     await this.commitCommand();
     return true;
+  }
+
+  // ── Speaker notes (P7-2 / spec 10) ──────────────────────────────────────────
+  //
+  // Notes are stored as <aside class="notes"> inside each slide <section>.
+  // The reveal speaker window (S key on the present route) reads them. We expose
+  // a reactive getter and a store command so the NotesPanel component can stay
+  // store-agnostic.
+
+  /**
+   * P7-2: Return the decoded speaker notes text for the slide with `slideEid`.
+   *
+   * Returns `''` when the eid is unknown, when no deck is open, or when the
+   * slide has no `<aside class="notes">` child. This is a pure derived read
+   * (no mutation, no dirty marking) — callers can call it in `$derived` blocks.
+   */
+  getSlideNotesText(slideEid: string | null): string {
+    if (!slideEid || !this.model) return '';
+    const el = findByEid(this.model, slideEid);
+    if (!el) return '';
+    return getSlideNotes(el);
+  }
+
+  /**
+   * P7-2: Set the speaker notes for the slide with `slideEid` as ONE undo
+   * entry + ONE autosave.
+   *
+   * Behaviour mirrors setSlideNotesOp (model/notes.ts):
+   *   • Non-empty text → create or update the `<aside class="notes">`.
+   *   • Empty string   → remove the aside if present (no-op if absent).
+   *
+   * Only the affected aside (or the section when the aside is removed) is
+   * marked dirty — all other elements round-trip byte-for-byte (spec 12 #4).
+   * Unknown `slideEid` is a safe no-op (stale selection after external reload).
+   */
+  async setSlideNotes(slideEid: string, text: string): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, slideEid);
+    if (!el) return;
+    setSlideNotesOp(el, text);
+    this.updateFromModel();
+    await this.commitCommand();
   }
 
   #scheduleSync(): void {

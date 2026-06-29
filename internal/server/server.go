@@ -10,6 +10,8 @@
 //	GET  /api/decks/{name}/custom.css         → read custom.css (P6-11)
 //	PUT  /api/decks/{name}/custom.css         → write custom.css atomically (P6-11)
 //	POST /api/decks/{name}/fonts              → localize a Google Font offline (P6-13)
+//	GET  /api/decks/{name}/export.pdf         → PDF via headless Chrome ?print-pdf (P7-3)
+//	GET  /api/decks/{name}/export.zip         → ZIP of the entire deck folder (P7-4)
 //	GET  /api/themes                          → list bundled reveal.js themes (P6-10)
 //	GET  /api/shared                          → list shared/ library entries
 //	POST /api/shared/{filename}/copy          → copy shared file into a deck (?deck=)
@@ -17,6 +19,7 @@
 //	GET  /api/providers/{name}/search         → search a provider (?q=&page=)
 //	POST /api/providers/{name}/fetch          → fetch & localize into deck (body JSON)
 //	GET  /api/capabilities                    → feature-detection flags (e.g. ffmpeg)
+//	GET  /present/{name}                      → pure deck.html for presentation (P7-1)
 //	GET  /decks/{name}/...                    → static deck files (for the iframe)
 //	GET  /shared/...                          → static shared/ library files (previews)
 //	GET  /events                              → SSE stream of watcher events
@@ -24,6 +27,7 @@
 package server
 
 import (
+	"archive/zip"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +36,7 @@ import (
 	"mime"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -99,6 +104,12 @@ func (s *Server) routes(staticFS fs.FS) {
 	// Font localization (P6-13): download a Google Font into assets/fonts/.
 	s.mux.HandleFunc("POST /api/decks/{name}/fonts", s.handleFontLocalize)
 
+	// PDF export (P7-3): headless Chrome renders the deck with ?print-pdf.
+	s.mux.HandleFunc("GET /api/decks/{name}/export.pdf", s.handleExportPDF)
+
+	// ZIP export (P7-4): streams the full deck folder as a self-contained zip.
+	s.mux.HandleFunc("GET /api/decks/{name}/export.zip", s.handleExportZIP)
+
 	// Bundled theme list (P6-10): static list of themes shipped in the binary.
 	s.mux.HandleFunc("GET /api/themes", s.handleThemeList)
 
@@ -113,6 +124,11 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Capability flags
 	s.mux.HandleFunc("GET /api/capabilities", s.handleCapabilities)
+
+	// Present route (P7-1): serves the pure deck.html for fullscreen presentation.
+	// Registered before /decks/ so /present/ is a distinct path namespace.
+	s.mux.HandleFunc("GET /present/{name}", s.handlePresent)
+	s.mux.HandleFunc("GET /present/{name}/{path...}", s.handlePresent)
 
 	// Iframe static serving
 	s.mux.HandleFunc("GET /decks/{name}/{path...}", s.handleDeckStatic)
@@ -757,6 +773,263 @@ func (s *Server) handleFontLocalize(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleThemeList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(deck.BundledThemes)
+}
+
+// ── Present route (P7-1) ─────────────────────────────────────────────────────
+
+// handlePresent serves the deck for fullscreen presentation — no editor chrome.
+//
+//	GET /present/{name}             → deck.html (the entry document)
+//	GET /present/{name}/{path...}   → sibling assets (vendor/, custom.css, …)
+//
+// WHY a separate /present/ namespace (not just /decks/{name}/):
+// /decks/{name}/deck.html is already accessible and is the iframe src in edit
+// mode.  /present/ gives the presenter a stable, bookmarkable URL that is
+// clearly distinct from the editing entry point.  Internally it uses the same
+// os.DirFS mechanism as handleDeckStatic so the bytes served are IDENTICAL to
+// the on-disk file (spec 10: "present exactly the file").
+//
+// Asset resolution: relative hrefs in deck.html (assets/vendor/reveal/…,
+// custom.css, etc.) resolve against /present/{name}/ because the browser sets
+// the base URL to the URL of the parent document.  Sub-path requests
+// (GET /present/{name}/assets/vendor/reveal/reveal.js) are handled by the same
+// handler and served from the deck folder, so all relative URLs resolve
+// correctly with zero additional config.
+func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	// Determine the file to serve within the deck folder.
+	rel := r.PathValue("path")
+	if rel == "" {
+		rel = "deck.html" // /present/{name} → deck entry document
+	}
+	if !fs.ValidPath(rel) {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	// os.DirFS confines access to deckDir; identical security model to
+	// handleDeckStatic.  ServeFileFS sets correct Content-Type and handles
+	// conditional / range requests.
+	http.ServeFileFS(w, r, os.DirFS(deckDir), rel)
+}
+
+// ── PDF export (P7-3) ─────────────────────────────────────────────────────────
+
+// chromeCandidates is the ordered list of Chrome/Chromium binary names probed
+// on PATH.  CHROME_BIN env var is checked first so CI / power users can pin a
+// specific binary without mutating PATH.
+var chromeCandidates = []string{
+	"google-chrome",
+	"google-chrome-stable",
+	"chromium",
+	"chromium-browser",
+	"chrome",
+}
+
+// FindChrome returns the absolute path of a usable Chrome/Chromium binary.
+//
+// Detection order:
+//  1. $CHROME_BIN environment variable (explicit override, highest priority).
+//  2. Each name in chromeCandidates probed with exec.LookPath.
+//
+// Returns ("", false) when no binary is found so the caller can return a
+// graceful 503 instead of crashing (P7-3 requirement: no hard dependency).
+// Exported so tests can call it to skip when Chrome is absent.
+func FindChrome() (string, bool) {
+	if bin := os.Getenv("CHROME_BIN"); bin != "" {
+		if _, err := os.Stat(bin); err == nil {
+			return bin, true
+		}
+	}
+	for _, name := range chromeCandidates {
+		if path, err := exec.LookPath(name); err == nil {
+			return path, true
+		}
+	}
+	return "", false
+}
+
+// handleExportPDF drives headless Chrome against the deck's present URL with
+// reveal's ?print-pdf query parameter and streams the resulting PDF back.
+//
+//	GET /api/decks/{name}/export.pdf
+//
+// Chrome is located via findChrome (see above).  If absent the handler returns
+// 503 with a JSON error body — no crash, no hard build dependency on Chrome.
+//
+// WHY --headless --print-to-pdf (not chromedp):
+// chromedp would add a large indirect dependency.  os/exec is sufficient: we
+// launch Chrome, wait for it to finish writing the PDF to a temp file, then
+// stream that file.  The deck is served by the running server on localhost so
+// Chrome can reach it without any networking.
+func (s *Server) handleExportPDF(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	chromeBin, ok := FindChrome()
+	if !ok {
+		// Graceful degradation: 503 with actionable JSON error so the frontend
+		// can surface "install Chrome to export PDF" instead of a generic error.
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusServiceUnavailable)
+		fmt.Fprintf(w, `{"error":"chrome not found","detail":"install google-chrome, chromium, or set CHROME_BIN","candidates":%q}`,
+			strings.Join(chromeCandidates, ","))
+		return
+	}
+
+	// We need Chrome to reach the deck over HTTP.  Detect the server's address
+	// from the incoming request Host header so the URL works for any port.
+	//
+	// WHY use the HTTP server (not file://): reveal.js's print-pdf mode makes
+	// relative requests for CSS/JS assets; file:// can have CORS/path issues.
+	// Serving over the already-running HTTP server avoids both problems.
+	host := r.Host
+	if host == "" {
+		host = "localhost:3000"
+	}
+	deckURL := fmt.Sprintf("http://%s/present/%s?print-pdf", host, name)
+
+	// Write the PDF to a temp file; Chrome writes the complete file before we
+	// read it, avoiding partial-read races.
+	tmp, err := os.CreateTemp("", "slides-export-*.pdf")
+	if err != nil {
+		http.Error(w, "pdf export: create temp: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	tmpPath := tmp.Name()
+	tmp.Close()
+	defer os.Remove(tmpPath)
+
+	// --headless: no GUI.
+	// --disable-gpu: required in most headless Linux environments.
+	// --no-sandbox: required when running as root (e.g. inside Docker/CI).
+	// --print-to-pdf: write a PDF to the given path and exit.
+	// --print-to-pdf-no-header: suppress Chrome's default date/URL header/footer.
+	// --run-all-compositor-stages-before-draw: ensures full render before capture.
+	cmd := exec.CommandContext(r.Context(), chromeBin,
+		"--headless",
+		"--disable-gpu",
+		"--no-sandbox",
+		"--run-all-compositor-stages-before-draw",
+		"--print-to-pdf-no-header",
+		"--print-to-pdf="+tmpPath,
+		deckURL,
+	)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		log.Printf("pdf export: chrome error for %s: %v\n%s", name, err, out)
+		http.Error(w, "pdf export: chrome failed: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	pdfData, err := os.ReadFile(tmpPath)
+	if err != nil {
+		http.Error(w, "pdf export: read result: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("pdf export: generated %d bytes for deck %s", len(pdfData), name)
+	w.Header().Set("Content-Type", "application/pdf")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.pdf"`, name))
+	w.Header().Set("Content-Length", strconv.Itoa(len(pdfData)))
+	w.Write(pdfData)
+}
+
+// ── ZIP export (P7-4) ─────────────────────────────────────────────────────────
+
+// handleExportZIP streams a zip archive of the entire deck folder so it can be
+// opened and presented as a standalone, self-contained offline deck.
+//
+//	GET /api/decks/{name}/export.zip
+//
+// The zip contains all files under decks/<name>/ with the deck folder name as
+// the top-level directory, e.g.:
+//
+//	my-talk/deck.html
+//	my-talk/custom.css
+//	my-talk/assets/vendor/reveal/reveal.js
+//	…
+//
+// WHY include the full assets/vendor/ tree: every deck is self-contained
+// (spec 12 offline-first).  The zip must open in any browser without a server.
+//
+// Traversal safety: we walk the deck directory with os.DirFS and only include
+// paths that pass fs.ValidPath; the deck name itself is validated by
+// deck.ValidName before we open any file.
+func (s *Server) handleExportZIP(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/zip")
+	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s.zip"`, name))
+
+	zw := zip.NewWriter(w)
+	defer zw.Close()
+
+	// Walk the deck directory and add every file to the zip.
+	// os.DirFS ensures we stay inside deckDir; WalkDir yields only relative paths.
+	deckFS := os.DirFS(deckDir)
+	err := fs.WalkDir(deckFS, ".", func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil // directories are implicit in zip
+		}
+		// path is already relative to deckDir (e.g. "deck.html", "assets/vendor/...").
+		// Prefix with the deck name to create a self-contained top-level folder.
+		zipPath := name + "/" + path
+
+		f, err := deckFS.Open(path)
+		if err != nil {
+			return fmt.Errorf("zip export: open %s: %w", path, err)
+		}
+		defer f.Close()
+
+		zf, err := zw.Create(zipPath)
+		if err != nil {
+			return fmt.Errorf("zip export: create zip entry %s: %w", zipPath, err)
+		}
+		if _, err := io.Copy(zf, f); err != nil {
+			return fmt.Errorf("zip export: write %s: %w", zipPath, err)
+		}
+		return nil
+	})
+	if err != nil {
+		// Headers already sent; log and bail — the partial zip will signal
+		// corruption to the client rather than silently truncating.
+		log.Printf("zip export: walk error for deck %s: %v", name, err)
+	} else {
+		log.Printf("zip export: streamed deck %s", name)
+	}
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

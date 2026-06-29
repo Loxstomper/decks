@@ -180,10 +180,16 @@ dependencies are noted inline.
 ## Phase 7 — Presenting & export
 > Goal: present and export. Spec: [10](specs/10-presenting-and-export.md).
 
-- [ ] **P7-1 — Present route.** `/present/<deck>` serves the pure `deck.html` via reveal, no editor. _Done when:_ presenting matches the saved file exactly. (Spec 10)
-- [ ] **P7-2 — Speaker view.** Verify reveal's S-key speaker window works off the present route; notes field per slide writes `<aside class="notes">`. _Done when:_ speaker window shows notes/next/timer. (Spec 10)
-- [ ] **P7-3 — PDF export.** Go drives headless Chrome with `?print-pdf`. _Done when:_ a correct PDF downloads. (Spec 10)
-- [ ] **P7-4 — HTML bundle export.** Zip the deck folder. _Done when:_ the zip opens and presents standalone offline. (Spec 10, 12)
+- [x] **P7-1 — Present route.** `/present/<deck>` serves the pure `deck.html` via reveal, no editor. _Done when:_ presenting matches the saved file exactly. (Spec 10)
+- [x] **P7-2 — Speaker view.** Verify reveal's S-key speaker window works off the present route; notes field per slide writes `<aside class="notes">`. _Done when:_ speaker window shows notes/next/timer. (Spec 10)
+- [x] **P7-3 — PDF export.** Go drives headless Chrome with `?print-pdf`. _Done when:_ a correct PDF downloads. (Spec 10)
+- [x] **P7-4 — HTML bundle export.** Zip the deck folder. _Done when:_ the zip opens and presents standalone offline. (Spec 10, 12)
+
+> **Phase 7 STATUS (done, tag 0.0.8 — completes milestone M3):** P7-1..P7-4 complete. 2 lanes + Opus integration; verified (FE 961 vitest tests, svelte-check 0/0, Go green; present route byte-identical, valid zip bundle, PDF 503-graceful w/o Chrome, zero external URLs).
+> - **Go:** `GET /present/{name}` (+ `/{path...}` for assets) serves deck.html byte-identical to disk; reveal **Notes** plugin vendored into binary + decks + enabled in template (S key → speaker window, offline); `GET /api/decks/{name}/export.pdf` drives headless Chrome via `FindChrome()` (`$CHROME_BIN` → google-chrome/chromium/... ; **503 JSON graceful when absent**); `GET /api/decks/{name}/export.zip` streams a traversal-safe self-contained deck bundle.
+> - **FE:** `PresentButton` (opens `/present/{name}`), `NotesPanel` (per-slide `<aside class="notes">` via `deckStore.setSlideNotes`, undoable+autosaved, byte-stable), `ExportPanel` (PDF w/ friendly Chrome-absent message + ZIP download). New right-panel Notes + Export tabs.
+> - **⚠️ Needs:** Chrome to exercise PDF (only 503 path verified here — `server_test.go` has a conditional Chrome test); browser to confirm speaker window + present visual + new tabs.
+> - **[opt]** add a `chrome` flag to `/api/capabilities` so ExportPanel can disable the PDF button proactively (instead of HEAD-probe). **[perf]** FE bundle ~698 kB (>500 kB warning) — code-split candidate.
 
 ## Phase 8 — Claude Code integration
 > Goal: the AI authoring layer + safe handoff. Spec: [11](specs/11-claude-code-integration.md).

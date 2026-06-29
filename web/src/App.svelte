@@ -37,6 +37,13 @@
   import TransitionPanel from './components/motion/TransitionPanel.svelte';
   import AutoAnimatePanel from './components/motion/AutoAnimatePanel.svelte';
   import ThemingPanel from './components/theming/ThemingPanel.svelte';
+  // Phase 7 surfaces (present + speaker notes + export):
+  //   PresentButton — opens /present/{name} (pure reveal, press S for speaker view).
+  //   NotesPanel    — per-slide speaker-notes editor (<aside class="notes">).
+  //   ExportPanel   — PDF (headless Chrome) + self-contained HTML-bundle zip.
+  import PresentButton from './components/presenting/PresentButton.svelte';
+  import NotesPanel from './components/presenting/NotesPanel.svelte';
+  import ExportPanel from './components/presenting/ExportPanel.svelte';
   import { createSseClient } from '$lib/sse';
   import { deckStore, type DeckStatus } from '$lib/store/deck.svelte.ts';
   import { customCssStore } from '$lib/store/customCss.svelte.ts';
@@ -272,7 +279,7 @@
 
   // Right-panel lower zone: tabbed between element Properties, Motion authoring,
   // and Theme/Styles. Outline (element tree) stays pinned above the tabs.
-  let rightTab = $state<'properties' | 'motion' | 'theme'>('properties');
+  let rightTab = $state<'properties' | 'motion' | 'theme' | 'notes' | 'export'>('properties');
 </script>
 
 <PaneLayout>
@@ -512,6 +519,13 @@
             <path d="M20 9H9a5 5 0 0 0 0 10h1" />
           </svg>
         </button>
+
+        <!--
+          Present (P7-1): opens /present/{name} in a new tab — pure reveal, no
+          editor chrome. Press S there for the speaker window (notes + timer).
+          Inherits .canvas-toolbar-btn styling.
+        -->
+        <PresentButton deckName={deckStore.name} />
       </div>
     </div>
   {/snippet}
@@ -550,6 +564,14 @@
             type="button" role="tab" class="right-tab" class:active={rightTab === 'theme'}
             aria-selected={rightTab === 'theme'} onclick={() => (rightTab = 'theme')}
           >Theme</button>
+          <button
+            type="button" role="tab" class="right-tab" class:active={rightTab === 'notes'}
+            aria-selected={rightTab === 'notes'} onclick={() => (rightTab = 'notes')}
+          >Notes</button>
+          <button
+            type="button" role="tab" class="right-tab" class:active={rightTab === 'export'}
+            aria-selected={rightTab === 'export'} onclick={() => (rightTab = 'export')}
+          >Export</button>
         </div>
 
         <div class="right-tab-content flex-1 min-h-0 overflow-y-auto">
@@ -579,8 +601,24 @@
                 onDisableAutoAnimate={(eid) => deckStore.disableAutoAnimate(eid)}
               />
             </div>
-          {:else}
+          {:else if rightTab === 'theme'}
             <ThemingPanel />
+          {:else if rightTab === 'notes'}
+            <!--
+              Speaker notes (P7-2): editor for the current slide's
+              <aside class="notes">. Routes through deckStore.setSlideNotes →
+              one undo entry + autosave; reveal's speaker window reads it.
+            -->
+            <NotesPanel
+              slideEid={currentSlideEid}
+              onSetNotes={(eid, text) => deckStore.setSlideNotes(eid, text)}
+            />
+          {:else}
+            <!--
+              Export (P7-3/P7-4): PDF (headless Chrome, graceful 503 when absent)
+              and self-contained HTML-bundle zip. Operates on the open deck.
+            -->
+            <ExportPanel deckName={deckStore.name} />
           {/if}
         </div>
       </div>

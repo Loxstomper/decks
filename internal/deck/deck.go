@@ -62,6 +62,18 @@ var highlightVendor embed.FS
 //go:embed vendor/math vendor/katex
 var mathVendor embed.FS
 
+// notesVendor holds the reveal.js speaker-notes plugin (P7-2):
+//   - vendor/notes/plugin.js       — UMD bundle that exports RevealNotes
+//   - vendor/notes/notes.js        — core notes logic (loaded by plugin.js)
+//   - vendor/notes/speaker-view.html — the popup speaker window document
+//
+// Pressing 'S' during a presentation opens the speaker window with notes,
+// next-slide preview, and a timer.  All assets are local (zero external URLs,
+// spec 12 offline-first).
+//
+//go:embed vendor/notes
+var notesVendor embed.FS
+
 // revealVersion is the pinned reveal.js version embedded in the binary.
 // Update this constant whenever vendor/ is refreshed.
 const revealVersion = "5.1.0"
@@ -114,6 +126,8 @@ const deckHTML = `<!doctype html>
   <script src="assets/vendor/highlight/plugin.js"></script>
   <!-- Math/KaTeX plugin – renders LaTeX inside $ … $ and $$ … $$ (P5-10) -->
   <script src="assets/vendor/math/plugin.js"></script>
+  <!-- Notes plugin – press 'S' to open the speaker window (P7-2, offline-local) -->
+  <script src="assets/vendor/notes/plugin.js"></script>
   <script>
     Reveal.initialize({
       // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
@@ -130,7 +144,7 @@ const deckHTML = `<!doctype html>
       // The math plugin constructs URLs as: local + '/dist/katex.min.{css,js}'
       // and local + '/dist/contrib/auto-render.min.js'.
       katex: { local: 'assets/vendor/katex' },
-      plugins: [ RevealHighlight, RevealMath.KaTeX ]
+      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes ]
     });
   </script>
 </body>
@@ -304,6 +318,14 @@ func Vendor(root, name string) error {
 		return fmt.Errorf("vendor: copy katex: %w", err)
 	}
 	log.Printf("deck: vendored math/KaTeX → %s/math, %s/katex", vendorDir, vendorDir)
+
+	// Notes plugin → assets/vendor/notes/ (P7-2, speaker view via 'S' key)
+	// Includes plugin.js (RevealNotes UMD), notes.js (core), speaker-view.html
+	// (popup window). All local so speaker view works offline (spec 12).
+	if err := copyEmbeddedFS(notesVendor, "vendor/notes", filepath.Join(vendorDir, "notes")); err != nil {
+		return fmt.Errorf("vendor: copy notes plugin: %w", err)
+	}
+	log.Printf("deck: vendored notes plugin → %s/notes", vendorDir)
 
 	if err := EnsureSharedVendor(root); err != nil {
 		// Non-fatal: shared/ is a reference copy, not required for deck rendering.
