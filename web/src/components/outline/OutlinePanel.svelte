@@ -73,9 +73,14 @@
      * The panel reads `.eid` for highlight + calls `.select()` on click.
      */
     selection: ISelectionStore;
+    /**
+     * Right-click on a row (P13-4). Forwarded to the host (App.svelte) so the
+     * shared cursor-positioned context menu opens for the right-clicked node.
+     */
+    onContextMenu?: (eid: string, clientX: number, clientY: number) => void;
   }
 
-  let { model, selection }: Props = $props();
+  let { model, selection, onContextMenu }: Props = $props();
 
   // ── View-tree ─────────────────────────────────────────────────────────────
 
@@ -222,6 +227,7 @@
           {selection}
           {expanded}
           onToggle={toggleExpand}
+          {onContextMenu}
         />
       {/each}
     {/if}

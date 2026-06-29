@@ -60,6 +60,8 @@ import {
   diffModels,
   validateSource,
   normalizeRemote,
+  cloneSubtreeStripEids,
+  getContainerKind,
   type DeckModel,
   type ElementNode,
   type LayoutProps,
@@ -86,7 +88,12 @@ import { undoStore } from './undo.svelte';
 import { highlightStore } from './highlight.svelte';
 import { decideExternalChange, lineDiff, type DiffLine } from './conflict';
 import { selectionStore } from '$lib/canvas/selection.svelte';
-import { deleteElement as deleteElementOp } from '$lib/canvas/structure-ops';
+import {
+  deleteElement as deleteElementOp,
+  findChildAndParent,
+  elementChildren,
+  moveChild,
+} from '$lib/canvas/structure-ops';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
 import {
@@ -104,6 +111,17 @@ import {
 
 /** Debounce window for re-parse + autosave after a source edit (P1-8). */
 const SYNC_DEBOUNCE_MS = 400;
+
+/**
+ * P13-7: SESSION-scoped element clipboard — a module-level, in-memory buffer of
+ * cloned subtrees. Deliberately NOT persisted (no disk, no localStorage) and
+ * fully offline: it lives only for the lifetime of the page session, mirroring a
+ * native app's in-process clipboard. We store already-eid-stripped clones so the
+ * buffer is fully independent of later model edits (cut can delete the originals
+ * safely); each paste clones AGAIN so repeated pastes yield independent copies
+ * that stampEids re-mints with fresh unique eids.
+ */
+let elementClipboard: ElementNode[] = [];
 
 /**
  * Status surfaced to the UI (spec 11 §5 "synced / external change / unsaved").
@@ -828,6 +846,177 @@ class DeckStore {
     selectionStore.clear();
     await this.#commitStructure();
     return true;
+  }
+
+  // ── Element duplicate / z-order / clipboard (P13-5/6/7, spec 04) ───────────
+  //
+  // All follow the one-command = one-undo + one-autosave pattern: mutate the
+  // model (marking only the affected subtree dirty so untouched siblings round-
+  // trip byte-for-byte, spec 12 #4) → updateFromModel() → commitCommand(). They
+  // reuse the existing insert seam (#commitInsert) and structure-ops (moveChild).
+
+  /**
+   * P13-5: Duplicate the element with `eid`, inserting the copy immediately after
+   * the original (the insertAfter / #commitInsert seam) and selecting the clone.
+   *
+   * The clone is a deep, eid-stripped copy (cloneSubtreeStripEids): stampEids
+   * re-mints fresh unique data-eids on insert while `data-id` is preserved for
+   * auto-animate pairing (spec 07). The clone is `dirty` so it serializes
+   * canonically and is byte-stable; undo removes it.
+   *
+   * Refuses a `<section>` (returns null): whole-slide duplication lives in the
+   * navigator (duplicateSlide). Unknown eid is a safe no-op (returns null).
+   * Returns the clone's new data-eid.
+   */
+  async duplicateElement(eid: string): Promise<string | null> {
+    if (!this.model) return null;
+    const el = findByEid(this.model, eid);
+    if (!el) return null;
+    // Whole-slide duplication is the navigator's job, not the element path.
+    if (el.tagName.toLowerCase() === 'section') return null;
+    const clone = cloneSubtreeStripEids(el) as ElementNode;
+    return await this.insertAfter(eid, clone);
+  }
+
+  /**
+   * P13-6: Bring the free element with `eid` to the front (last among its
+   * siblings, so it paints on top in a `data-lay="layers"` stack). One undo +
+   * one save. No-op when the eid is unknown or it is already last.
+   */
+  async bringToFront(eid: string): Promise<boolean> {
+    return await this.#reorderSibling(eid, 'front');
+  }
+
+  /**
+   * P13-6: Send the free element with `eid` to the back (first among its
+   * siblings, so it paints beneath the others). One undo + one save. No-op when
+   * the eid is unknown or it is already first.
+   */
+  async sendToBack(eid: string): Promise<boolean> {
+    return await this.#reorderSibling(eid, 'back');
+  }
+
+  /**
+   * Shared z-order tail: reorder the element to the last ('front') or first
+   * ('back') position among its parent's element children via structure-ops
+   * moveChild (which marks only the moved element dirty — byte-stable per spec
+   * 12 #4). Pre-checks the current position so an already-extremal element is a
+   * no-op (no churn, no undo entry). One undo entry + one autosave on success.
+   */
+  async #reorderSibling(eid: string, where: 'front' | 'back'): Promise<boolean> {
+    if (!this.model) return false;
+    const found = findChildAndParent(this.model, eid);
+    if (!found) return false;
+    const { child, parent } = found;
+    const els = elementChildren(parent);
+    const idx = els.indexOf(child);
+    const lastIdx = els.length - 1;
+    // Already at the requested extreme → nothing to do (avoid needless churn).
+    if (where === 'front' && idx === lastIdx) return false;
+    if (where === 'back' && idx === 0) return false;
+    // moveChild's target index is among element children EXCLUDING the moved
+    // child; after detach there are (length-1) elements, so front = length-1.
+    const target = where === 'front' ? lastIdx : 0;
+    if (!moveChild(parent, child, target)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P13-7: Copy the elements with `eids` into the session clipboard.
+   *
+   * Stores deep, eid-stripped clones (independent of the live model), so a
+   * following cut/delete or further edits cannot corrupt the buffer. `<section>`
+   * eids and unknown eids are skipped (the element clipboard does not carry whole
+   * slides). Eids are copied in the order given. Returns true when at least one
+   * element was copied (the buffer is replaced only then; an all-empty copy
+   * leaves the previous buffer intact).
+   */
+  copyElements(eids: string[]): boolean {
+    if (!this.model) return false;
+    const clones: ElementNode[] = [];
+    for (const eid of eids) {
+      const el = findByEid(this.model, eid);
+      if (!el) continue;
+      if (el.tagName.toLowerCase() === 'section') continue; // not a slide clipboard
+      clones.push(cloneSubtreeStripEids(el) as ElementNode);
+    }
+    if (clones.length === 0) return false;
+    elementClipboard = clones;
+    return true;
+  }
+
+  /**
+   * P13-7: Cut = copy + delete. Copies the elements into the clipboard, then
+   * removes the originals via deleteElements (one undo entry + one autosave for
+   * the removal). Returns true when something was cut. The clones are taken
+   * BEFORE deletion, so the buffer holds independent copies.
+   */
+  async cutElements(eids: string[]): Promise<boolean> {
+    if (!this.copyElements(eids)) return false;
+    return await this.deleteElements(eids);
+  }
+
+  /** True when the session element clipboard holds at least one subtree. */
+  get hasClipboard(): boolean {
+    return elementClipboard.length > 0;
+  }
+
+  /**
+   * P13-7: Paste the session clipboard, working ACROSS slides.
+   *
+   * Placement (target defaults to the current selection):
+   *   • target is a CONTAINER → paste as its LAST children.
+   *   • target is any other element → paste immediately AFTER it (as siblings).
+   *   • no usable target → no-op (returns null).
+   *
+   * Each buffered subtree is cloned again (independent copies) and inserted as
+   * one command: stampEids re-mints fresh unique data-eids, the first pasted
+   * clone is selected, and the whole paste is a single undo entry + autosave.
+   * Returns the first clone's data-eid, or null when the buffer is empty / there
+   * is no usable target.
+   */
+  async pasteClipboard(targetEid?: string): Promise<string | null> {
+    if (!this.model) return null;
+    if (elementClipboard.length === 0) return null;
+    const target = targetEid ?? selectionStore.eid ?? null;
+    if (!target) return null;
+    const anchor = findByEid(this.model, target);
+    if (!anchor) return null;
+
+    // Fresh, independent clones for this paste (buffer stays reusable).
+    const clones = elementClipboard.map((n) => cloneSubtreeStripEids(n) as ElementNode);
+    for (const c of clones) c.dirty = true;
+
+    if (getContainerKind(anchor)) {
+      // Paste as the last children of the selected container.
+      anchor.children.push(...clones);
+    } else {
+      // Paste immediately after the selected (non-container) element.
+      const parent = findParentOf(this.model, target);
+      if (!parent) return null;
+      const i = parent.children.findIndex(
+        (c) => c.type === 'element' && getAttribute(c, 'data-eid') === target,
+      );
+      if (i < 0) return null;
+      parent.children.splice(i + 1, 0, ...clones);
+    }
+    return await this.#commitInsertMany(clones);
+  }
+
+  /**
+   * Multi-node variant of #commitInsert: stamp eids for every freshly inserted
+   * subtree (idempotent for already-stamped nodes), reserialize, persist as ONE
+   * command, and select the FIRST inserted block. Returns its eid.
+   */
+  async #commitInsertMany(nodes: ElementNode[]): Promise<string | null> {
+    if (!this.model || nodes.length === 0) return null;
+    stampEids(this.model);
+    const eid = getAttribute(nodes[0], 'data-eid');
+    this.updateFromModel();
+    await this.commitCommand();
+    if (eid) selectionStore.select(eid);
+    return eid;
   }
 
   /**

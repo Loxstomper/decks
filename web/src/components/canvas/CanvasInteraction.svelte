@@ -31,7 +31,7 @@
    *     iframe document.
    */
 
-  import type { Transform } from '$lib/coords.ts';
+  import { logicalToScreen, type Transform } from '$lib/coords.ts';
   import { deckStore } from '$lib/store/deck.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
   import { resolveSelectable, type ElementLike } from '$lib/canvas/eid.ts';
@@ -73,6 +73,16 @@
      * for tests / alternative wiring.
      */
     onTextCommit?: (eid: string, literalText: string) => void;
+
+    /**
+     * Right-click (P13-2). Fired after we have resolved + selected the element
+     * under the cursor (or cleared the selection on empty-space). The position
+     * is in canvas-stack-local pixels (the same overlay coordinate space the
+     * selection box uses), ready to hand to the cursor-positioned ContextMenu.
+     * The parent decides which menu to show by reading the (now-updated)
+     * selectionStore — a non-empty selection → element menu, empty → slide menu.
+     */
+    onContextMenu?: (detail: { x: number; y: number }) => void;
   }
 
   let {
@@ -80,6 +90,7 @@
     transform,
     reloadNonce = 0,
     onTextCommit = (eid, text) => deckStore.applyTextEdit(eid, text),
+    onContextMenu,
   }: Props = $props();
 
   // ── Reactive geometry ───────────────────────────────────────────────────────
@@ -188,6 +199,34 @@
     }
   }
 
+  // ── Right-click → context menu (P13-2) ──────────────────────────────────────
+
+  function handleContextMenu(e: MouseEvent): void {
+    // Suppress the browser's native menu — we render our own.
+    e.preventDefault();
+
+    const sel = resolveSelectable(e.target as unknown as ElementLike | null);
+    if (sel) {
+      // Right-clicking an element that is NOT already part of the current
+      // (possibly multi-) selection makes it the sole selection, so the menu
+      // acts on what was clicked. Right-clicking inside an existing
+      // multi-selection preserves it (so "Delete all" etc. stay meaningful).
+      if (!selectionStore.eids.includes(sel.eid)) {
+        selectionStore.select(sel.eid);
+      }
+    } else {
+      // Empty slide background → no element selection; the parent opens the
+      // slide-level menu (P13-8).
+      selectionStore.clear();
+    }
+
+    // Map the in-iframe (logical) cursor point to overlay/canvas-stack-local
+    // pixels via the SAME transform the overlays use, so the menu opens exactly
+    // under the cursor at any zoom/pan.
+    const pt = logicalToScreen({ x: e.clientX, y: e.clientY }, transform);
+    onContextMenu?.({ x: pt.x, y: pt.y });
+  }
+
   // ── Double-click → edit (P2-5) ──────────────────────────────────────────────
 
   function handleDblClick(e: MouseEvent): void {
@@ -279,11 +318,13 @@
     // Capture phase so we see the click before reveal's own handlers can stop it.
     doc.addEventListener('click', handleClick, true);
     doc.addEventListener('dblclick', handleDblClick, true);
+    doc.addEventListener('contextmenu', handleContextMenu, true);
   }
 
   function detachDoc(doc: Document): void {
     doc.removeEventListener('click', handleClick, true);
     doc.removeEventListener('dblclick', handleDblClick, true);
+    doc.removeEventListener('contextmenu', handleContextMenu, true);
   }
 
   // ── Effects ─────────────────────────────────────────────────────────────────
