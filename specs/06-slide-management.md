@@ -34,6 +34,9 @@ structure. All operations are DOM operations on `<section>` elements.
 | Reorder | Move the `<section>` in document order |
 | Add vertical | Nest a `<section>` under a top-level `<section>` |
 | Hide | `data-visibility="hidden"` (kept in source, skipped when presenting) |
+| Theme override | `data-theme` (+ managed `data-background-color`) on the `<section>`; inherits the deck theme when absent (see [09](09-theming-and-styles.md)) |
+
+Slides that override the deck theme show a small **theme badge** in the navigator/thumbnail.
 
 ## Thumbnails
 

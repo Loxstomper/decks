@@ -250,6 +250,34 @@ dependencies are noted inline.
 > - **⚠️ Needs VISUAL/browser confirmation:** pane collapse/restore feel + persisted sizes across reload; source-jump scroll on select; delete from outline vs canvas; text-color picker live on the iframe; workspace-theme chrome restyle; Solarized Dark slide render. (e2e covers app-alive, offline, and create-deck; the rest have unit/component coverage.)
 > - **[follow-up]** Add feature e2e specs for delete, pane collapse/resize, source-jump, and theme switching (harness + a create-deck example are in place; `web/e2e/<feature>.spec.ts` convention documented in smoke.spec.ts).
 
+## Phase 10 — Per-slide theme override
+> Goal: a global deck theme with declarative per-slide overrides (named bundle + free-form
+> tweaks), resolved by CSS cascade — no runtime JS, byte-stable, identical in editor/present/PDF.
+> Specs: [09](specs/09-theming-and-styles.md), [06](specs/06-slide-management.md).
+>
+> Mechanism (locked): `data-theme="<bundled>"` on a `<section>` → scoped `--r-*` bundle from a
+> generated `slides-slide-themes.css`; free-form tweaks → inline `--r-*` vars; backgrounds →
+> reveal-native `data-background-color`. Cascade resolves layers (inline > bundle > global);
+> verticals inherit, overridable. Built via worktree lanes + subagents (per PROMPT_BUILD).
+
+### Foundation
+- [ ] **P10-1 — Generate scoped slide-theme stylesheet.** At vendor time, extract each bundled theme's `:root`/`.reveal` `--r-*` values + background-color from `internal/deck/vendor/reveal/theme/*.css`; emit `slides-slide-themes.css` (a `.reveal section[data-theme="<name>"] { --r-*: … }` block per theme) + a `name → background` map; embed in the binary, copy into decks like `slides-layout.css`, and link it in the scaffold template. _Done when:_ a freshly scaffolded deck links the stylesheet, loads zero external URLs, and a `<section data-theme="solarized-dark">` restyles its text/heading/link vars. (Spec 09, 12)
+
+### Model & contract
+- [ ] **P10-2 — Recognize `data-theme` in model + validate.** `web/src/lib/model/` and `internal/validate/validate.go` accept `data-theme` on `<section>` (value must name a bundled theme; not a layout primitive, no reflow semantics). Keep the allowed-set in sync with the bundled-theme list. _Done when:_ `validate` passes a deck with a valid `data-theme` and flags an unknown theme name. (Spec 09, 03, 12)
+
+### Apply commands (one undo + one autosave each, byte-stable)
+- [ ] **P10-3 — Named per-slide theme command.** `deckStore` op to set/clear a section's `data-theme` **and** its managed `data-background-color` (from the P10-1 map). _Done when:_ applying a named theme to the selected slide writes both attributes and the canvas reflects it; clearing removes both. (Spec 09)
+- [ ] **P10-4 — Free-form per-slide color tweaks.** `deckStore` op to set/clear inline `--r-*` custom properties (heading / text / link) + `data-background-color` on a section, layered over any named bundle. _Done when:_ picking colors writes inline vars that override the bundle, byte-stable, undoable. (Spec 09)
+
+### UI
+- [ ] **P10-5 — Theme picker scope toggle (Whole deck / This slide).** Whole-deck = existing `applyTheme`; This-slide (enabled only when a slide is selected) exposes a named-theme dropdown + free-form color swatches + a **Clear override → inherit deck** action, wired to P10-3/P10-4. _Done when:_ the toggle targets the deck `<link>` vs the selected `<section>` correctly. (Spec 09)
+- [ ] **P10-6 — Override badge in navigator/thumbnail.** Slides carrying a per-slide override (named or free-form) show a small theme badge; cleared slides lose it. _Done when:_ an overridden slide is marked and an inherited slide is not. (Spec 06)
+
+### Cascade & fidelity
+- [ ] **P10-7 — Vertical cascade.** Verify `data-theme` on a vertical-stack `<section>` cascades to its verticals (vars inherit; ensure `data-background-color` propagates — add propagation if reveal doesn't) and an inner `data-theme` overrides. _Done when:_ a themed stack restyles its verticals and an inner override wins. (Spec 09, 06)
+- [ ] **P10-8 — Present/PDF fidelity + e2e.** Confirm per-slide overrides render in the present route and in PDF export (scoped vars + native background both print). Add a Playwright spec: a deck with an overridden slide shows different computed styles on that slide vs an inherited one, and the offline-guard still passes. _Done when:_ e2e asserts the override is visible and offline; PDF export shows it. (Spec 09, 10, 12)
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
@@ -265,3 +293,5 @@ dependencies are noted inline.
 - **M4 (AI-native):** Phase 8 — Claude Code skill + safe handoff.
 - **M5 (polished):** Phase 9 — adjustable/collapsible chrome, element delete + text color,
   more themes, browser-side deck creation, end-to-end test coverage.
+- **M6 (per-slide theming):** Phase 10 — global deck theme + declarative per-slide overrides
+  (named bundle + free-form), cascading to verticals, consistent across present/PDF.
