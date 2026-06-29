@@ -314,7 +314,7 @@
 
       <!-- Deck list -->
       {#if decks.length === 0}
-        <p class="text-xs text-white/30 text-center flex-shrink-0">No decks yet</p>
+        <p class="text-xs text-fg/30 text-center flex-shrink-0">No decks yet</p>
       {:else}
         <ul class="flex flex-col gap-0.5 flex-shrink-0">
           {#each decks as name (name)}
@@ -323,8 +323,8 @@
                 type="button"
                 class="w-full text-left px-2 py-1 rounded text-xs truncate transition-colors
                        {name === deckStore.name
-                         ? 'bg-accent/20 text-white'
-                         : 'text-white/60 hover:bg-white/5 hover:text-white'}"
+                         ? 'bg-accent/20 text-fg'
+                         : 'text-fg/60 hover:bg-white/5 hover:text-fg'}"
                 onclick={() => openDeck(name)}
               >
                 {name}

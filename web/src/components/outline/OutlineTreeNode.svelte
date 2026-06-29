@@ -120,9 +120,9 @@
     container: 'text-sky-400',
     leaf:      'text-emerald-400',
     free:      'text-amber-400',
-    passthrough: 'text-white/25',
+    passthrough: 'text-fg/25',
   };
-  const iconColor = $derived(iconColorClass[node.klass] ?? 'text-white/50');
+  const iconColor = $derived(iconColorClass[node.klass] ?? 'text-fg/50');
 </script>
 
 <!--
@@ -236,9 +236,9 @@
          A template-literal class value avoids the issue entirely. -->
     <span
       class="node-label flex-1 truncate font-mono {isPassthrough
-        ? 'text-white/25'
+        ? 'text-fg/25'
         : !isSelected
-          ? 'text-white/60'
+          ? 'text-fg/60'
           : ''}"
     >
       {node.label}
@@ -250,7 +250,7 @@
     -->
     {#if isPassthrough}
       <span
-        class="flex-shrink-0 ml-1 px-1 py-px text-[9px] font-semibold uppercase tracking-wide rounded bg-white/10 text-white/30"
+        class="flex-shrink-0 ml-1 px-1 py-px text-[9px] font-semibold uppercase tracking-wide rounded bg-white/10 text-fg/30"
         title="Source-only — the editor never modifies this element; it round-trips byte-identically (spec 12 #4)"
         aria-label="source only"
       >

@@ -27,15 +27,21 @@
   --surface-overlay: 15 52 96;   /* #0f3460 */
   --accent:          233 69 96;   /* #e94560 */
   --accent-muted:    83 52 131;   /* #533483 */
+  --text:            237 237 245; /* #edede5 near-white */
+  --text-muted:      160 160 180; /* #a0a0b4 */
+  --border:          72 72 108;   /* #48486c */
 }
 
 /* ── Light ──────────────────────────────────────────────────────────────────── */
 .theme-light {
-  --surface:         38 38 58;    /* #26263a — still legible with white text */
-  --surface-raised:  48 48 72;    /* #303048 */
-  --surface-overlay: 72 72 108;   /* #48486c */
-  --accent:          99 167 255;  /* #63a7ff */
-  --accent-muted:    139 115 219; /* #8b73db */
+  --surface:         244 244 247; /* #f4f4f7 */
+  --surface-raised:  255 255 255; /* #ffffff */
+  --surface-overlay: 226 226 234; /* #e2e2ea */
+  --accent:          59 130 246;  /* #3b82f6 blue-500 */
+  --accent-muted:    219 234 254; /* #dbeafe blue-100 */
+  --text:            26 26 46;    /* #1a1a2e dark navy */
+  --text-muted:      100 100 120; /* #646478 */
+  --border:          209 209 219; /* #d1d1db */
 }
 
 /* ── Solarized (editor chrome using Solarized dark palette) ─────────────────── */
@@ -45,6 +51,9 @@
   --surface-overlay: 88 110 117;  /* #586e75 base01 */
   --accent:          38 139 210;  /* #268bd2 blue */
   --accent-muted:    108 113 196; /* #6c71c4 violet */
+  --text:            131 148 150; /* #839496 base0 */
+  --text-muted:      88 110 117;  /* #586e75 base01 */
+  --border:          88 110 117;  /* #586e75 base01 */
 }
 
 /* Editor chrome base styles */
@@ -54,7 +63,7 @@
   #app {
     @apply h-full w-full overflow-hidden;
     background-color: theme('colors.surface.DEFAULT');
-    color: theme('colors.white');
+    color: rgb(var(--text));
   }
 
   * {

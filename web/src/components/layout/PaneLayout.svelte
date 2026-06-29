@@ -108,13 +108,13 @@
   }
 </script>
 
-<div class="editor-shell flex h-full w-full overflow-hidden bg-surface text-white">
+<div class="editor-shell flex h-full w-full overflow-hidden bg-surface text-fg">
 
   <!-- ── Navigator pane ────────────────────────────────────────────────── -->
   {#if navCollapsed}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <button
-      class="pane-rail flex flex-col items-center gap-2 border-r border-surface-overlay bg-surface-raised py-2 text-white/50 hover:text-white"
+      class="pane-rail flex flex-col items-center gap-2 border-r border-surface-overlay bg-surface-raised py-2 text-fg/50 hover:text-fg"
       style="width: {RAIL_WIDTH}px;"
       title="Expand navigator"
       aria-label="Expand navigator"
@@ -130,10 +130,10 @@
       class="navigator flex flex-col border-r border-surface-overlay bg-surface-raised overflow-hidden"
       style="width: {navWidth}px; min-width: {PANE_BOUNDS.navWidth.min}px; max-width: {PANE_BOUNDS.navWidth.max}px;"
     >
-      <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50">
+      <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-fg/50">
         <span>Navigator</span>
         <button
-          class="text-white/40 hover:text-white"
+          class="text-fg/40 hover:text-fg"
           title="Collapse navigator"
           aria-label="Collapse navigator"
           onclick={toggleNav}
@@ -147,7 +147,7 @@
         {#if navigator}
           {@render navigator()}
         {:else}
-          <p class="text-xs text-white/30 mt-4 text-center">No slides yet</p>
+          <p class="text-xs text-fg/30 mt-4 text-center">No slides yet</p>
         {/if}
       </div>
     </aside>
@@ -157,12 +157,12 @@
 
   <!-- ── Canvas pane ────────────────────────────────────────────────────── -->
   <main class="canvas-pane flex-1 flex flex-col overflow-hidden bg-black/30 relative">
-    <header class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50 border-b border-surface-overlay flex items-center gap-2">
+    <header class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-fg/50 border-b border-surface-overlay flex items-center gap-2">
       <span>Canvas</span>
       {#if canvasHeader}
         {@render canvasHeader()}
       {:else}
-        <span class="ml-auto text-white/30">100%</span>
+        <span class="ml-auto text-fg/30">100%</span>
       {/if}
     </header>
 
@@ -170,7 +170,7 @@
       {#if canvas}
         {@render canvas()}
       {:else}
-        <div class="canvas-placeholder flex flex-col items-center gap-2 text-white/20 select-none">
+        <div class="canvas-placeholder flex flex-col items-center gap-2 text-fg/20 select-none">
           <div class="w-16 h-16 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
@@ -188,7 +188,7 @@
   {#if rightCollapsed}
     <!-- svelte-ignore a11y_no_static_element_interactions -->
     <button
-      class="pane-rail flex flex-col items-center gap-2 border-l border-surface-overlay bg-surface-raised py-2 text-white/50 hover:text-white"
+      class="pane-rail flex flex-col items-center gap-2 border-l border-surface-overlay bg-surface-raised py-2 text-fg/50 hover:text-fg"
       style="width: {RAIL_WIDTH}px;"
       title="Expand panel"
       aria-label="Expand right panel"
@@ -213,10 +213,10 @@
         class:flex-1={sourceCollapsed}
         style={sourceCollapsed ? '' : `height: ${rightTopHeight}px; min-height: ${PANE_BOUNDS.rightTopHeight.min}px;`}
       >
-        <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50 border-b border-surface-overlay">
+        <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-fg/50 border-b border-surface-overlay">
           <span>Outline / Properties</span>
           <button
-            class="text-white/40 hover:text-white"
+            class="text-fg/40 hover:text-fg"
             title="Collapse panel"
             aria-label="Collapse right panel"
             onclick={toggleRight}
@@ -230,7 +230,7 @@
           {#if outline}
             {@render outline()}
           {:else}
-            <p class="text-xs text-white/30 mt-4 text-center">Select an element</p>
+            <p class="text-xs text-fg/30 mt-4 text-center">Select an element</p>
           {/if}
         </div>
       </div>
@@ -244,10 +244,10 @@
         class="source-pane flex flex-col overflow-hidden"
         class:flex-1={!sourceCollapsed}
       >
-        <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50 border-b border-surface-overlay">
+        <header class="flex items-center justify-between px-3 py-2 text-xs font-semibold uppercase tracking-wider text-fg/50 border-b border-surface-overlay">
           <span>Source</span>
           <button
-            class="text-white/40 hover:text-white"
+            class="text-fg/40 hover:text-fg"
             title={sourceCollapsed ? 'Expand source' : 'Collapse source'}
             aria-label={sourceCollapsed ? 'Expand source pane' : 'Collapse source pane'}
             aria-expanded={!sourceCollapsed}
@@ -268,7 +268,7 @@
               {@render source()}
             </div>
           {:else}
-            <div class="flex-1 overflow-auto px-2 py-1 font-mono text-xs text-white/30">
+            <div class="flex-1 overflow-auto px-2 py-1 font-mono text-xs text-fg/30">
               <pre class="whitespace-pre-wrap">No deck open.</pre>
             </div>
           {/if}

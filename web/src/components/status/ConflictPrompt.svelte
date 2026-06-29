@@ -45,10 +45,10 @@
       class="w-full max-w-2xl rounded-lg border border-surface-overlay bg-surface-raised shadow-xl"
     >
       <div class="p-4 border-b border-surface-overlay">
-        <h2 id="conflict-title" class="text-sm font-semibold text-white">
+        <h2 id="conflict-title" class="text-sm font-semibold text-fg">
           This deck changed on disk
         </h2>
-        <p class="mt-1 text-xs text-white/60">
+        <p class="mt-1 text-xs text-fg/60">
           Claude Code (or another tool) edited <code class="text-accent">{deckStore.name}</code>
           while you have unsaved changes. Choose which version to keep — your work
           will not be overwritten until you decide.
@@ -66,11 +66,11 @@
             {:else if line.tag === 'add'}
               <div class="text-emerald-400 whitespace-pre-wrap">+ {line.text}</div>
             {:else}
-              <div class="text-white/40 whitespace-pre-wrap">&nbsp; {line.text}</div>
+              <div class="text-fg/40 whitespace-pre-wrap">&nbsp; {line.text}</div>
             {/if}
           {/each}
           {#if diff.length === 0}
-            <div class="text-white/40">No textual differences.</div>
+            <div class="text-fg/40">No textual differences.</div>
           {/if}
         </div>
       {/if}
@@ -78,7 +78,7 @@
       <div class="flex items-center justify-between gap-2 p-4">
         <button
           type="button"
-          class="px-3 py-1.5 rounded text-xs text-white/70 hover:bg-white/5"
+          class="px-3 py-1.5 rounded text-xs text-fg/70 hover:bg-white/5"
           onclick={() => (showDiff = !showDiff)}
         >
           {showDiff ? 'Hide diff' : 'View diff'}
@@ -86,7 +86,7 @@
         <div class="flex items-center gap-2">
           <button
             type="button"
-            class="px-3 py-1.5 rounded text-xs text-white/80 border border-surface-overlay hover:bg-white/5"
+            class="px-3 py-1.5 rounded text-xs text-fg/80 border border-surface-overlay hover:bg-white/5"
             onclick={takeTheirs}
           >
             Take theirs

@@ -38,7 +38,7 @@
     }
     switch (deckStore.status) {
       case 'empty':
-        return { label: 'No deck', class: 'text-white/30' };
+        return { label: 'No deck', class: 'text-fg/30' };
       case 'synced':
         return { label: 'Synced', class: 'text-emerald-400/80' };
       case 'unsaved':

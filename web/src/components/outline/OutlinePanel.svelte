@@ -165,13 +165,13 @@
   {#if tree.length > 0}
     <div class="flex items-center gap-1 px-2 py-1 border-b border-white/10 flex-shrink-0">
       <!-- Slide / element counts -->
-      <span class="text-[10px] text-white/40 flex-1 truncate">
+      <span class="text-[10px] text-fg/40 flex-1 truncate">
         {slideCount} slide{slideCount !== 1 ? 's' : ''} · {managedCount} elements
       </span>
 
       <!-- Expand all -->
       <button
-        class="px-1.5 py-0.5 text-[10px] text-white/40 hover:text-white/70 hover:bg-white/5 rounded transition-colors"
+        class="px-1.5 py-0.5 text-[10px] text-fg/40 hover:text-fg/70 hover:bg-white/5 rounded transition-colors"
         onclick={expandAll}
         title="Expand all"
         type="button"
@@ -181,7 +181,7 @@
 
       <!-- Collapse all -->
       <button
-        class="px-1.5 py-0.5 text-[10px] text-white/40 hover:text-white/70 hover:bg-white/5 rounded transition-colors"
+        class="px-1.5 py-0.5 text-[10px] text-fg/40 hover:text-fg/70 hover:bg-white/5 rounded transition-colors"
         onclick={collapseAll}
         title="Collapse all"
         type="button"
@@ -202,7 +202,7 @@
         Empty state: shown when no deck is open (model === null) or when the
         deck has no .slides content (malformed deck).
       -->
-      <p class="text-[11px] text-white/30 text-center mt-4 px-2">
+      <p class="text-[11px] text-fg/30 text-center mt-4 px-2">
         {#if model === null}
           No deck open
         {:else}

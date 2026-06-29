@@ -131,6 +131,12 @@ shell itself** — navigator, panels, toolbars, source pane chrome.
 - Backed by **CSS custom properties** on the app root (the hardcoded Tailwind chrome tokens —
   `surface`, `surface-raised`, `surface-overlay`, `accent` — become variables a theme sets),
   so switching is a single root-class/variable swap with no per-component changes.
+- **A foreground token is required, not optional.** The variable set must include a text colour
+  (`--text` / a tailwind `fg` token), and chrome components must use it rather than a hardcoded
+  `text-white`. Without it a "light" theme is *unexpressible* — light surfaces with hardcoded
+  white text are unreadable. **Light = genuinely light surfaces + dark text**, not a
+  lighter-dark variant; the palette must not drift toward an accent hue (the first cut shipped a
+  dark-purple "Light", which was the bug this rule prevents recurring).
 - The choice is an **editor preference**, persisted (config / localStorage), workspace-wide —
   it does not touch any deck's files and never appears in saved decks or exports.
 
