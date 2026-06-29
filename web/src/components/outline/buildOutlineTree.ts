@@ -163,9 +163,11 @@ export function buildOutlineNode(el: ElementNode): OutlineNode {
   const tag = el.tagName.toLowerCase();
   const label = computeLabel(el, klass);
 
-  // Descend into element children only.
+  // Descend into element children only. Inline marks (strong/em/a/span/br …,
+  // P17) are managed rich-text content WITHIN a leaf, not structural rows — they
+  // are folded into the leaf's label snippet, so they never appear in the tree.
   const children: OutlineNode[] = el.children
-    .filter((c): c is ElementNode => c.type === 'element')
+    .filter((c): c is ElementNode => c.type === 'element' && classify(c) !== 'inline')
     .map(buildOutlineNode);
 
   return { eid, tag, klass, label, children };

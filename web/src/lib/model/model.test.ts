@@ -39,7 +39,15 @@ import {
   appendChild,
 } from './index';
 
-const FIXTURES = ['minimal.html', 'multi-slide.html', 'kitchen-sink.html'] as const;
+const FIXTURES = [
+  'minimal.html',
+  'multi-slide.html',
+  'kitchen-sink.html',
+  // P17-5: inline marks (strong/em/u/s/a[href,target,rel]/span[style]/br, nested)
+  // inside <p>/<li>/<h1> — pins that allowlisted inline content round-trips
+  // byte-identically via passthrough (it is preserved verbatim, never destroyed).
+  'inline-marks.html',
+] as const;
 
 function loadFixture(name: string): string {
   return readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8');

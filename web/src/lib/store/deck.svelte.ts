@@ -97,7 +97,7 @@ import {
   elementChildren,
   moveChild,
 } from '$lib/canvas/structure-ops';
-import { applyTextEditToModel } from '$lib/canvas/writeback';
+import { applyRichTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
 import {
   toggleFragment as toggleFragmentOp,
@@ -489,22 +489,24 @@ class DeckStore {
   }
 
   /**
-   * P2-6: Canvas write-back of a committed in-place text edit.
+   * P2-6 / P17-3: Canvas write-back of a committed in-place RICH-text edit.
    *
    * The CanvasInteraction controller calls this when a contenteditable session
-   * commits. We mutate ONLY the node carrying `eid` (writeback.ts → edit.ts), so
-   * just that subtree goes dirty and the rest of the deck round-trips byte-for-
-   * byte (spec 12 #4). We then funnel through the standard command path so the
-   * edit becomes one undo entry and is persisted immediately:
+   * commits, passing the leaf's `innerHTML`. We sanitise + canonicalise it to the
+   * inline allowlist and replace ONLY the leaf carrying `eid` (writeback.ts →
+   * inline.ts), so just that leaf's child subtree goes dirty and the rest of the
+   * deck round-trips byte-for-byte (spec 12 #4). We then funnel through the
+   * standard command path so the edit becomes one undo entry and is persisted
+   * immediately:
    *   updateFromModel()  → reserialize model into source
    *   commitCommand()    → push undo snapshot + save (bypassing the debounce)
    *
    * Returns false (and does nothing) if the eid is unknown — e.g. a stale
    * selection after an external reload — so the caller can no-op safely.
    */
-  applyTextEdit(eid: string, newLiteralText: string): boolean {
+  applyRichTextEdit(eid: string, html: string): boolean {
     if (!this.model) return false;
-    const changed = applyTextEditToModel(this.model, eid, newLiteralText);
+    const changed = applyRichTextEditToModel(this.model, eid, html);
     if (!changed) return false;
     const next = serializeDeck(this.model);
     // No-op edit (text identical) → don't churn source / undo stack.

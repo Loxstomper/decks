@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Inline Marks Deck</title>
+    <link rel="stylesheet" href="dist/reveal.css" />
+    <link rel="stylesheet" href="dist/theme/black.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section data-eid="s1">
+          <h1 data-eid="h1">A <strong>bold</strong> &amp; <em>italic</em> title</h1>
+          <p data-eid="p1">
+            Text with <u>underline</u>, <s>strike</s>, a
+            <a href="https://example.com" target="_blank" rel="noopener">link</a>,
+            an in-page <a href="#section-2">jump</a>, and
+            <span style="color: #e53e3e; font-size: 1.2em">colored, sized</span> runs.
+          </p>
+          <p data-eid="p2">Nested marks: <strong>bold with <em>italic</em> inside</strong>.<br />Second line.</p>
+          <ul data-eid="ul1">
+            <li data-eid="li1">A <strong>strong</strong> point</li>
+            <li data-eid="li2">An <a href="mailto:hi@example.com">email</a> link</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+    <script src="dist/reveal.js"></script>
+    <script>
+      Reveal.initialize({ hash: true });
+    </script>
+  </body>
+</html>
