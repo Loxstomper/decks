@@ -43,7 +43,20 @@
     logicalRectToScreen,
     type Rect,
   } from '$lib/canvas/overlay-geometry.ts';
+  import {
+    toggleMark,
+    applySpanStyle,
+    setRangeLink,
+    unlinkRange,
+    coveringMark,
+    rangeToOffsets,
+    offsetsToRange,
+    type SelOffsets,
+  } from '$lib/canvas/inline-marks.ts';
+  import { linkEditorStore } from '$lib/canvas/link-editor.svelte.ts';
   import SelectionOverlay from './SelectionOverlay.svelte';
+  import SelectionToolbar from './SelectionToolbar.svelte';
+  import LinkPopover from './LinkPopover.svelte';
 
   // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -75,8 +88,10 @@
      * html)` contract, which sanitises + canonicalises the HTML to the inline
      * allowlist and replaces only the edited leaf's children (just that subtree
      * goes dirty) before re-serializing. Overridable for tests / alt wiring.
+     * Returns whether the model changed (false ⇒ unknown eid / no-op) so the
+     * controller knows whether a save+reload — and thus a re-entry — is coming.
      */
-    onRichTextCommit?: (eid: string, html: string) => void;
+    onRichTextCommit?: (eid: string, html: string) => boolean | void;
 
     /**
      * Right-click (P13-2). Fired after we have resolved + selected the element
@@ -111,15 +126,36 @@
     logicalRect ? logicalRectToScreen(logicalRect, transform) : null,
   );
 
+  /**
+   * P17-7: the current text selection's rect in LOGICAL space, set while editing.
+   * Like {@link logicalRect} it is transform-invariant, so the floating toolbar
+   * follows zoom/pan by re-deriving its screen rect from the cached logical one.
+   */
+  let toolbarLogicalRect = $state<Rect | null>(null);
+  const toolbarScreenRect = $derived<Rect | null>(
+    toolbarLogicalRect ? logicalRectToScreen(toolbarLogicalRect, transform) : null,
+  );
+
   // ── Non-reactive controller state ───────────────────────────────────────────
   // (plain refs — these are imperative DOM bookkeeping, not render inputs)
 
   /** Element currently in a contenteditable session, or null. */
   let editingEl: HTMLElement | null = null;
+  /**
+   * The eid being edited. Unlike {@link editingEl} (a live DOM node lost on a
+   * save→reload) this survives the reload so a toolbar mark can commit, let the
+   * iframe reload, then RE-ENTER the same leaf and restore the selection (P17-6).
+   */
+  let editingEid: string | null = null;
   /** innerHTML captured at edit start, for Escape-to-cancel restore. */
   let editOriginalHtml = '';
   /** Set by Escape so the blur-driven commit is skipped. */
   let skipCommit = false;
+  /**
+   * Text-only selection offsets to restore after a toolbar mark commits + the
+   * iframe reloads (P17-6 "restore the selection so the user can chain formats").
+   */
+  let pendingReselect: SelOffsets | null = null;
   /** Watches the selected element for reflow so the box follows size changes. */
   let elementRO: ResizeObserver | null = null;
 
@@ -243,16 +279,7 @@
   function startEdit(eid: string): void {
     const el = findEl(eid);
     if (!el) return;
-    editingEl = el;
-    editOriginalHtml = el.innerHTML;
-    skipCommit = false;
-
-    el.setAttribute('contenteditable', 'true');
-    el.addEventListener('blur', handleEditBlur);
-    el.addEventListener('keydown', handleEditKeydown);
-    el.addEventListener('paste', handleEditPaste);
-    selectionStore.setEditing(true);
-
+    beginEditSession(el, eid);
     el.focus();
     // Select all contents so the first keystroke replaces — common edit UX.
     try {
@@ -270,11 +297,221 @@
     }
   }
 
+  /**
+   * Attach the contenteditable session to `el` (shared by the double-click entry
+   * {@link startEdit} and the post-reload re-entry {@link reenterEdit}). Also
+   * starts P17-7 selection tracking so the floating toolbar follows the caret.
+   */
+  function beginEditSession(el: HTMLElement, eid: string): void {
+    editingEl = el;
+    editingEid = eid;
+    editOriginalHtml = el.innerHTML;
+    skipCommit = false;
+
+    el.setAttribute('contenteditable', 'true');
+    el.addEventListener('blur', handleEditBlur);
+    el.addEventListener('keydown', handleEditKeydown);
+    el.addEventListener('paste', handleEditPaste);
+    attachSelectionTracking();
+    selectionStore.setEditing(true);
+  }
+
+  /** Detach the contenteditable session from the live element (no commit). */
+  function detachEditEl(): void {
+    const el = editingEl;
+    if (!el) return;
+    detachSelectionTracking();
+    el.removeEventListener('blur', handleEditBlur);
+    el.removeEventListener('keydown', handleEditKeydown);
+    el.removeEventListener('paste', handleEditPaste);
+    el.removeAttribute('contenteditable');
+    editingEl = null;
+  }
+
+  // ── P17-7 selection tracking (floating toolbar) ─────────────────────────────
+
+  function attachSelectionTracking(): void {
+    const doc = getDoc();
+    doc?.addEventListener('selectionchange', handleSelectionChange);
+  }
+
+  function detachSelectionTracking(): void {
+    const doc = getDoc();
+    doc?.removeEventListener('selectionchange', handleSelectionChange);
+  }
+
+  function handleSelectionChange(): void {
+    updateToolbar();
+  }
+
+  /** The live, non-collapsed selection range within the editing leaf, or null. */
+  function currentEditRange(): Range | null {
+    if (!editingEl) return null;
+    const sel = iframe?.contentWindow?.getSelection?.();
+    if (!sel || sel.rangeCount === 0) return null;
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return null;
+    if (!editingEl.contains(range.commonAncestorContainer)) return null;
+    return range;
+  }
+
+  /** Recompute the toolbar's logical rect from the current selection. */
+  function updateToolbar(): void {
+    const range = currentEditRange();
+    if (!range) {
+      toolbarLogicalRect = null;
+      return;
+    }
+    const r = range.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) {
+      toolbarLogicalRect = null;
+      return;
+    }
+    // Inside the iframe, getBoundingClientRect is already LOGICAL (see
+    // overlay-geometry.ts); cache it so the toolbar tracks zoom/pan.
+    toolbarLogicalRect = domRectToLogical(r);
+  }
+
+  // ── P17-6 range marks: apply to the live DOM, then commit + re-enter ────────
+
+  /** Apply `mutate` to the live selection range, then commit as one undo entry. */
+  function withSelectionRange(mutate: (range: Range, root: HTMLElement) => void): void {
+    const el = editingEl;
+    const eid = editingEid;
+    if (!el || !eid) return;
+    const range = currentEditRange();
+    if (!range) return;
+    const off = rangeToOffsets(el, range);
+    mutate(range, el);
+    commitInlineEdit(eid, off);
+  }
+
+  function applyMark(tag: 'strong' | 'em' | 'u' | 's'): void {
+    withSelectionRange((range, root) => toggleMark(range, tag, root));
+  }
+
+  function applyColor(hex: string): void {
+    withSelectionRange((range, root) => applySpanStyle(range, root, 'color', hex));
+  }
+
+  function applyFontSize(size: string): void {
+    withSelectionRange((range, root) => applySpanStyle(range, root, 'font-size', size));
+  }
+
+  /**
+   * Commit a live-DOM mark edit through the single sanitizer path (P17-3), then
+   * arrange re-entry: the leaf's innerHTML is canonicalised → model → saved →
+   * iframe reloaded; on reload we re-enter the same leaf and restore `off` so the
+   * user can chain formats. One toolbar action = one undo entry + one autosave.
+   */
+  function commitInlineEdit(eid: string, off: SelOffsets): void {
+    if (!editingEl) return;
+    const html = editingEl.innerHTML;
+    pendingReselect = off;
+    editingEid = eid; // keep editing identity across the reload
+    detachEditEl(); // drop the stale session (no blur-commit); stays "editing"
+    const before = deckStore.source;
+    const ok = onRichTextCommit(eid, html);
+    // When the commit caused no save (unknown eid / no-op), no reload is coming —
+    // re-enter on the current document immediately so editing continues.
+    if (ok === false || deckStore.source === before) {
+      const doc = getDoc();
+      if (doc) reenterEdit(doc);
+    }
+  }
+
+  /**
+   * Re-enter the contenteditable session on the freshly-reloaded document and
+   * restore the saved selection offsets (P17-6). No-op unless a toolbar mark left
+   * a `pendingReselect`.
+   */
+  function reenterEdit(doc: Document): void {
+    if (!pendingReselect || !editingEid) return;
+    const eid = editingEid;
+    const off = pendingReselect;
+    pendingReselect = null;
+    const el = doc.querySelector<HTMLElement>(eidSelector(eid));
+    if (!el) {
+      editingEid = null;
+      toolbarLogicalRect = null;
+      selectionStore.setEditing(false);
+      return;
+    }
+    beginEditSession(el, eid);
+    el.focus();
+    try {
+      const winSel = iframe?.contentWindow?.getSelection?.();
+      if (winSel) {
+        const range = offsetsToRange(el, off);
+        winSel.removeAllRanges();
+        winSel.addRange(range);
+      }
+    } catch {
+      /* best-effort selection restore */
+    }
+    updateToolbar();
+  }
+
+  // ── P17-9/10 link (toolbar entry) ───────────────────────────────────────────
+
+  /**
+   * Open the link popover for the current selection. The selection offsets + eid
+   * are captured now (before the popover steals focus and the editor blurs); on
+   * submit the link is applied to that text range via the offsets, so it works
+   * even though the edit session has ended. External hrefs are allowed; the
+   * popover gates unsafe schemes via isSafeHref.
+   */
+  function onLink(): void {
+    const el = editingEl;
+    const eid = editingEid;
+    if (!el || !eid) return;
+    const range = currentEditRange();
+    if (!range) return;
+    const off = rangeToOffsets(el, range);
+    const existing = coveringMark(range, 'a', el)?.getAttribute('href') ?? '';
+    linkEditorStore.openCustom({
+      href: existing,
+      submit: (href) => applyRangeLink(eid, off, href),
+      remove: existing ? () => applyRangeUnlink(eid, off) : null,
+    });
+  }
+
+  /** Apply (or edit) a link over a saved text range, then commit (one undo). */
+  function applyRangeLink(eid: string, off: SelOffsets, href: string): void {
+    const doc = getDoc();
+    if (!doc) return;
+    const el = doc.querySelector<HTMLElement>(eidSelector(eid));
+    if (!el) return;
+    const range = offsetsToRange(el, off);
+    setRangeLink(range, el, href);
+    onRichTextCommit(eid, el.innerHTML);
+  }
+
+  /** Remove a link over a saved text range, then commit (one undo). */
+  function applyRangeUnlink(eid: string, off: SelOffsets): void {
+    const doc = getDoc();
+    if (!doc) return;
+    const el = doc.querySelector<HTMLElement>(eidSelector(eid));
+    if (!el) return;
+    const range = offsetsToRange(el, off);
+    unlinkRange(range, el);
+    onRichTextCommit(eid, el.innerHTML);
+  }
+
   function handleEditBlur(): void {
     commitEdit();
   }
 
   function handleEditKeydown(e: KeyboardEvent): void {
+    // P17-7: Cmd/Ctrl+B/I/U toggle bold/italic/underline over the selection.
+    if ((e.metaKey || e.ctrlKey) && !e.altKey) {
+      const k = e.key.toLowerCase();
+      if (k === 'b' || k === 'i' || k === 'u') {
+        e.preventDefault();
+        applyMark(k === 'b' ? 'strong' : k === 'i' ? 'em' : 'u');
+        return;
+      }
+    }
     // Enter commits (Shift+Enter inserts a newline — let it through).
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -348,23 +585,23 @@
   function commitEdit(): void {
     const el = editingEl;
     if (!el) return;
-    editingEl = null;
 
-    el.removeEventListener('blur', handleEditBlur);
-    el.removeEventListener('keydown', handleEditKeydown);
-    el.removeEventListener('paste', handleEditPaste);
-    el.removeAttribute('contenteditable');
+    const html = el.innerHTML;
+    const eid = el.getAttribute('data-eid');
+    const cancelled = skipCommit;
+
+    detachEditEl(); // removes listeners + contenteditable, editingEl = null
+    editingEid = null;
+    pendingReselect = null;
+    toolbarLogicalRect = null;
     selectionStore.setEditing(false);
 
-    if (!skipCommit) {
-      const eid = el.getAttribute('data-eid');
-      if (eid) {
-        // contenteditable gives us the leaf's full innerHTML (inline marks
-        // intact). The model's rich-text path (P17-3) sanitises + canonicalises
-        // it to the inline allowlist, so `<strong>` survives and hostile markup
-        // is stripped before it reaches the source.
-        onRichTextCommit(eid, el.innerHTML);
-      }
+    if (!cancelled && eid) {
+      // contenteditable gives us the leaf's full innerHTML (inline marks intact).
+      // The model's rich-text path (P17-3) sanitises + canonicalises it to the
+      // inline allowlist, so `<strong>` survives and hostile markup is stripped
+      // before it reaches the source.
+      onRichTextCommit(eid, html);
     }
     skipCommit = false;
 
@@ -409,6 +646,9 @@
         attachDoc(doc);
         attached = doc;
         measure(); // re-acquire the selection box in the (possibly new) document
+        // P17-6: a toolbar mark committed → saved → reloaded this document; re-enter
+        // the same leaf and restore the selection so the user can chain formats.
+        if (pendingReselect) reenterEdit(doc);
       }
     };
 
@@ -423,11 +663,11 @@
     return () => {
       frame.removeEventListener('load', onLoad);
       if (attached) detachDoc(attached);
-      // Leaving the frame: drop any half-finished edit session and observers.
-      editingEl?.removeEventListener('blur', handleEditBlur);
-      editingEl?.removeEventListener('keydown', handleEditKeydown);
-      editingEl?.removeEventListener('paste', handleEditPaste);
-      editingEl = null;
+      // The iframe ELEMENT is recreated on every reload (RevealFrame's {#key}),
+      // so this cleanup runs on each save→reload. Detach the old session's
+      // listeners, but KEEP editingEid + pendingReselect so a toolbar-mark
+      // re-entry survives the swap and resumes on the new document's load.
+      detachEditEl();
       elementRO?.disconnect();
     };
   });
@@ -460,11 +700,36 @@
   <SelectionOverlay rect={screenRect} editing={selectionStore.editing} />
 </div>
 
+<!--
+  P17-7/10 UI layer: floating format toolbar + link popover. Kept OUTSIDE the
+  clipped overlay above so a toolbar near the canvas top edge (and the centered
+  popover) are not cropped. pointer-events:none on the layer; each interactive
+  child re-enables them on itself.
+-->
+<div class="canvas-interaction-ui">
+  {#if toolbarScreenRect && selectionStore.editing}
+    <SelectionToolbar
+      rect={toolbarScreenRect}
+      onToggle={applyMark}
+      onFontSize={applyFontSize}
+      onColor={applyColor}
+      onLink={onLink}
+    />
+  {/if}
+  <LinkPopover />
+</div>
+
 <style>
   .canvas-interaction-overlay {
     position: absolute;
     inset: 0;
     overflow: hidden; /* clip the box to the canvas, matching the iframe clip */
+    pointer-events: none;
+  }
+
+  .canvas-interaction-ui {
+    position: absolute;
+    inset: 0;
     pointer-events: none;
   }
 </style>

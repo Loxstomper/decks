@@ -15,8 +15,10 @@
   "devDependencies": {
     "@playwright/test": "^1.61.1",
     "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@types/jsdom": "^28.0.3",
     "@types/node": "^22.20.0",
     "autoprefixer": "^10.4.20",
+    "jsdom": "^29.1.1",
     "postcss": "^8.4.49",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",

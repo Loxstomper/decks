@@ -40,7 +40,14 @@ export {
   isSafeHref,
   INLINE_MARK_TAGS,
 } from './inline';
-export { getInlineColor, setInlineColor } from './style';
+export {
+  getInlineColor,
+  setInlineColor,
+  getInlineStyleProp,
+  setInlineStyleProp,
+} from './style';
+// P17 Lane B/C: whole-leaf link wrap/unwrap + list re-nest (context menu / inspector).
+export { linkLeaf, unlinkLeaf, indentList, isListLeaf } from './leaf-ops';
 export { stampEids, nextEid } from './eid';
 export { cloneSubtreeStripEids } from './clone';
 export { setFree, toggleFree } from './free';

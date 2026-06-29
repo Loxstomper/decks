@@ -23,8 +23,9 @@
  */
 
 import type { DeckModel } from '$lib/model';
-import { classify, isTextLeaf, findByEid } from '$lib/model';
+import { classify, isTextLeaf, findByEid, isListLeaf } from '$lib/model';
 import { deckStore } from '$lib/store/deck.svelte';
+import { linkEditorStore } from '$lib/canvas/link-editor.svelte';
 // Type-only import (erased at runtime — the menu component owns the descriptor
 // shape; we import it so the registry and the renderer can never drift).
 import type { MenuItem } from '../../components/canvas/ContextMenu.svelte';
@@ -240,6 +241,39 @@ function textColorItem(eid: string): MenuItem {
   };
 }
 
+/**
+ * Link actions for a text leaf (P17-10). "Add/Edit link…" opens the shared href
+ * popover (prefilled when the leaf already carries a link); "Remove link" unwraps
+ * any anchors. Both route to existing whole-leaf deck commands — the offline
+ * guard is unaffected by an external href (only external RESOURCE loads are
+ * forbidden, spec 12).
+ */
+function linkItem(eid: string): MenuItem {
+  return {
+    label: 'Link',
+    submenu: [
+      { label: 'Add/Edit link…', run: () => linkEditorStore.openForLeaf(eid) },
+      { label: 'Remove link', run: () => void deckStore.removeLinkFromLeaf(eid) },
+    ],
+  };
+}
+
+/**
+ * Indent / outdent actions for a LIST leaf (P17-8) — only emitted when the model
+ * lookup confirms the leaf is a `<ul>`/`<ol>` (a function lookup, used by unit
+ * tests, never claims list-ness, so the generic text-leaf menu stays stable).
+ */
+function listIndentItems(lookup: KindLookup, eid: string): MenuItem[] {
+  if (typeof lookup === 'function') return [];
+  const el = findByEid(lookup, eid);
+  if (!el || !isListLeaf(el)) return [];
+  return [
+    separator(),
+    { label: 'Indent list', run: () => void deckStore.indentList(eid, 'in') },
+    { label: 'Outdent list', run: () => void deckStore.indentList(eid, 'out') },
+  ];
+}
+
 function equalColumnsItem(eid: string): MenuItem {
   return { label: 'Equal columns', run: () => void deckStore.applyEqualColumns(eid) };
 }
@@ -328,7 +362,12 @@ export function menuItemsFor(
   ];
 
   if (kind === 'text-leaf') {
-    items.push(separator(), textColorItem(primary));
+    items.push(
+      separator(),
+      textColorItem(primary),
+      linkItem(primary),
+      ...listIndentItems(lookup, primary),
+    );
   }
 
   if (kind === 'container') {
