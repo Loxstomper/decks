@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Editor chrome base styles */
+@layer base {
+  html,
+  body,
+  #app {
+    @apply h-full w-full overflow-hidden;
+    background-color: theme('colors.surface.DEFAULT');
+    color: theme('colors.white');
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+}
+
+@layer components {
+  /* Splitter drag handle */
+  .splitter {
+    @apply flex-shrink-0 bg-surface-overlay cursor-col-resize select-none;
+    width: 4px;
+    transition: background-color 0.15s;
+  }
+
+  .splitter:hover,
+  .splitter.dragging {
+    @apply bg-accent;
+  }
+
+  .splitter-row {
+    @apply cursor-row-resize;
+    width: auto;
+    height: 4px;
+  }
+}

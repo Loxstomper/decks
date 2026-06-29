@@ -19,26 +19,32 @@ dependencies are noted inline.
 
 ## Phase 0 — Foundations
 > Goal: a running Go+Svelte skeleton and the load-bearing coordinate spike. Specs: [01](specs/01-architecture.md), [13](specs/13-project-structure.md).
+>
+> **STATUS (done, tag 0.0.1):** Phase 0 complete + P1-1. Go backend (`cmd/slides`, `internal/{config,deck,server,watch}`, `web/embed.go`) and Svelte 5 + TS + Vite + Tailwind frontend (`web/`) build and test green. Default port **3000** (Go `internal/config`; Vite proxy matches). Embed contract: Vite outputs to `web/dist/`, served at root via `fs.Sub(distEmbed,"dist")`. P0-14 coords transform in `web/src/lib/coords.ts` (78 vitest tests). Routes: `GET /health`, `GET/PUT /api/decks[/{name}]`, `GET /events` (SSE). Atomic deck writes via temp+rename (byte-identical round-trip verified).
+>
+> **Follow-ups discovered (not blocking Phase 0):**
+> - **[offline-first] `slides new` deck template uses CDN reveal.js (jsDelivr 5.1.0).** Violates spec 12 / principle #2. Must vendor reveal.js + theme into the deck (or `shared/`) and reference locally before M1. Ties into X-1 (offline guard) and P6-13 (font localization). _Owner: a near-term task._
+> - **[cleanup] `Splitter.svelte` uses `createEventDispatcher`** (Svelte 4 compat). Migrate to Svelte 5 callback props during Phase 2/3 canvas work.
 
-- [ ] **P0-1 — Init Go module.** `go mod init`, repo layout (`cmd/`, `internal/`). _Done when:_ `go build ./...` succeeds on an empty `main`.
-- [ ] **P0-2 — Init frontend toolchain.** Svelte 5 + TypeScript + Vite + Tailwind in `web/`. _Done when:_ `npm run dev` serves a blank app with Tailwind working.
-- [ ] **P0-3 — Static server.** Go HTTP server serving a hello route. _Done when:_ `curl localhost:PORT` returns 200.
-- [ ] **P0-4 — `go:embed` the frontend.** Embed `web/dist` and serve it from Go. _Done when:_ `go build` produces one binary that serves the built Svelte app. (Spec 01)
-- [ ] **P0-5 — Dev proxy.** Vite proxies `/api` and `/events` to the Go process in dev. _Done when:_ frontend dev server reaches a Go API route. (Spec 01)
-- [ ] **P0-6 — Config loader.** Read `config.toml` (defaults: port, aspect, grid size, enabled providers); secrets from env only. _Done when:_ config values are readable in Go; missing file uses defaults. (Spec 13)
-- [ ] **P0-7 — Workspace scaffolding helper.** Create `decks/ templates/ shared/ themes/` if absent. _Done when:_ running the binary in an empty dir creates the tree. (Spec 13)
-- [ ] **P0-8 — `slides new <name>` CLI.** Scaffold `decks/<name>/{deck.html,custom.css,assets/}` with a minimal valid reveal deck. _Done when:_ command creates a deck that opens in a browser via reveal. (Spec 11, 13)
-- [ ] **P0-9 — Deck list API.** `GET /api/decks` lists deck folders. _Done when:_ returns the scaffolded deck.
-- [ ] **P0-10 — Deck read API.** `GET /api/decks/{name}` returns `deck.html`. _Done when:_ returns file contents.
-- [ ] **P0-11 — Deck write API.** `PUT /api/decks/{name}` writes `deck.html` atomically (temp+rename). _Done when:_ a round-trip read→write→read is byte-identical.
-- [ ] **P0-12 — File watcher.** `fsnotify` watches each deck folder. _Done when:_ an external file edit logs a change event server-side. (Spec 01, 11)
-- [ ] **P0-13 — SSE endpoint.** `GET /events` streams `{deck, type:"changed"}` on watcher events. _Done when:_ a browser `EventSource` receives an event when a file is edited externally. (Spec 11)
-- [ ] **P0-14 — Coordinate/scale transform (spike).** Pure functions `screenToLogical` / `logicalToScreen` given scale+offset, with unit tests. _Done when:_ tests cover fit-scale, custom zoom, and round-trip identity. (Spec 04, 05 — load-bearing, do before any overlay work)
+- [x] **P0-1 — Init Go module.** `go mod init`, repo layout (`cmd/`, `internal/`). _Done when:_ `go build ./...` succeeds on an empty `main`.
+- [x] **P0-2 — Init frontend toolchain.** Svelte 5 + TypeScript + Vite + Tailwind in `web/`. _Done when:_ `npm run dev` serves a blank app with Tailwind working.
+- [x] **P0-3 — Static server.** Go HTTP server serving a hello route. _Done when:_ `curl localhost:PORT` returns 200.
+- [x] **P0-4 — `go:embed` the frontend.** Embed `web/dist` and serve it from Go. _Done when:_ `go build` produces one binary that serves the built Svelte app. (Spec 01)
+- [x] **P0-5 — Dev proxy.** Vite proxies `/api` and `/events` to the Go process in dev. _Done when:_ frontend dev server reaches a Go API route. (Spec 01)
+- [x] **P0-6 — Config loader.** Read `config.toml` (defaults: port, aspect, grid size, enabled providers); secrets from env only. _Done when:_ config values are readable in Go; missing file uses defaults. (Spec 13)
+- [x] **P0-7 — Workspace scaffolding helper.** Create `decks/ templates/ shared/ themes/` if absent. _Done when:_ running the binary in an empty dir creates the tree. (Spec 13)
+- [x] **P0-8 — `slides new <name>` CLI.** Scaffold `decks/<name>/{deck.html,custom.css,assets/}` with a minimal valid reveal deck. _Done when:_ command creates a deck that opens in a browser via reveal. (Spec 11, 13)
+- [x] **P0-9 — Deck list API.** `GET /api/decks` lists deck folders. _Done when:_ returns the scaffolded deck.
+- [x] **P0-10 — Deck read API.** `GET /api/decks/{name}` returns `deck.html`. _Done when:_ returns file contents.
+- [x] **P0-11 — Deck write API.** `PUT /api/decks/{name}` writes `deck.html` atomically (temp+rename). _Done when:_ a round-trip read→write→read is byte-identical.
+- [x] **P0-12 — File watcher.** `fsnotify` watches each deck folder. _Done when:_ an external file edit logs a change event server-side. (Spec 01, 11)
+- [x] **P0-13 — SSE endpoint.** `GET /events` streams `{deck, type:"changed"}` on watcher events. _Done when:_ a browser `EventSource` receives an event when a file is edited externally. (Spec 11)
+- [x] **P0-14 — Coordinate/scale transform (spike).** Pure functions `screenToLogical` / `logicalToScreen` given scale+offset, with unit tests. _Done when:_ tests cover fit-scale, custom zoom, and round-trip identity. (Spec 04, 05 — load-bearing, do before any overlay work)
 
 ## Phase 1 — Live editor shell
 > Goal: open a deck, see it rendered, edit source, hot-reload. Specs: [02](specs/02-document-model.md), [04](specs/04-canvas-interaction.md).
 
-- [ ] **P1-1 — Pane layout shell.** Navigator | Canvas | Outline+Properties/Source zones (static). _Done when:_ resizable panes render. (Spec 04)
+- [x] **P1-1 — Pane layout shell.** Navigator | Canvas | Outline+Properties/Source zones (static). _Done when:_ resizable panes render. (Spec 04)
 - [ ] **P1-2 — Sandboxed iframe renderer.** Mount reveal.js in a sandboxed iframe at logical 1920×1080. _Done when:_ a deck renders inside the iframe. (Spec 04, 05)
 - [ ] **P1-3 — Load deck into iframe.** Fetch `deck.html` and render it. _Done when:_ the scaffolded deck displays.
 - [ ] **P1-4 — DOM-as-model parse.** `DOMParser` → detached document held as the model. _Done when:_ model round-trips to identical HTML via the serializer (P1-5). (Spec 02)
