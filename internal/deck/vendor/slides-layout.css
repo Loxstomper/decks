@@ -31,6 +31,31 @@
  *   handled here via attribute selectors — no script needed.
  */
 
+/* ── Slide canvas: full 1920x1080 containing block at origin (spec 05) ─────── */
+/* With reveal configured center:false + margin:0 (Phase 15), each slide section
+ * is the full logical canvas anchored at the top-left. Reveal already gives
+ * `.reveal .slides > section` position:absolute + width:100%; we pin it to the
+ * origin and force full height so it is a positioned containing block spanning
+ * the whole 1920x1080 space. Absolutely-positioned [data-free] children then
+ * resolve against true canvas coords: data-x=0,data-y=0 → canvas top-left, and
+ * coordinates are an identity match with the editor's free-transform overlay.
+ * The structured primitives below are unaffected (they are normal-flow children
+ * of the section); reveal's own section transition/stack rules still apply. */
+.reveal .slides > section {
+  top: 0;
+  left: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* A single top-level structured container fills the canvas so its data-justify /
+ * data-align take effect over the full height (e.g. data-justify="center" gives
+ * the vertical centering reveal's center:true used to provide — now expressed in
+ * the layout vocabulary, not reveal config). */
+.reveal .slides > section > [data-lay] {
+  min-height: 100%;
+}
+
 /* ── Containers: the four structured primitives ───────────────────────────── */
 
 /* Stack — vertical flex column. Default for slide body, title-over-body. */

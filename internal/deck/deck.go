@@ -17,6 +17,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -135,6 +136,12 @@ const deckHTML = `<!doctype html>
       // deck share one coordinate system (WYSIWYG). Aspect changes rewrite these.
       width: 1920,
       height: 1080,
+      // Full logical canvas at origin: free coords are identity (spec 05, Phase 15).
+      // center:false + margin:0 stop reveal from inset-offsetting the slide, so a
+      // [data-free] element at data-x=0,data-y=0 lands at the true canvas top-left.
+      // Structured 'stack' slides still center via data-justify in slides-layout.css.
+      center: false,
+      margin: 0,
       hash: true,
       controls: true,
       progress: true,
@@ -331,6 +338,107 @@ func Vendor(root, name string) error {
 	if err := EnsureSharedVendor(root); err != nil {
 		// Non-fatal: shared/ is a reference copy, not required for deck rendering.
 		log.Printf("deck: warning: could not refresh shared vendor: %v", err)
+	}
+	return nil
+}
+
+// initKeyRE matches a property key inside the Reveal.initialize({…}) object,
+// e.g. `center:` or `margin:` at the start of a line (after indentation). Used
+// by Upgrade to test whether a config key is already present so the rewrite is
+// idempotent and byte-stable.
+func initKeyRE(key string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)^\s*` + regexp.QuoteMeta(key) + `\s*:`)
+}
+
+// upgradeInitialize inserts `center: false,` and `margin: 0,` into the first
+// Reveal.initialize({…}) call if those keys are absent (Phase 15: full logical
+// canvas at origin so free coords are identity, spec 05). It is a pure function
+// for testability. Returns the (possibly rewritten) HTML and whether it changed.
+//
+// Guarantees:
+//   - Idempotent / byte-stable: if both keys are already present (any value),
+//     the input is returned unchanged. Re-running makes no further diff.
+//   - Minimal diff: only the missing key lines (plus one WHY comment) are
+//     inserted; nothing else is touched.
+//   - Indentation is copied from the line following the `{` so the insertion
+//     matches the surrounding style.
+func upgradeInitialize(html string) (string, bool) {
+	const marker = "Reveal.initialize({"
+	i := strings.Index(html, marker)
+	if i < 0 {
+		return html, false
+	}
+
+	needCenter := !initKeyRE("center").MatchString(html)
+	needMargin := !initKeyRE("margin").MatchString(html)
+	if !needCenter && !needMargin {
+		return html, false
+	}
+
+	// Insertion point: start of the line after the marker's line.
+	after := i + len(marker)
+	nl := strings.IndexByte(html[after:], '\n')
+	if nl < 0 {
+		return html, false
+	}
+	insertAt := after + nl + 1
+
+	// Copy indentation from the line at the insertion point.
+	indent := ""
+	for _, r := range html[insertAt:] {
+		if r == ' ' || r == '\t' {
+			indent += string(r)
+			continue
+		}
+		break
+	}
+
+	var b strings.Builder
+	b.WriteString(html[:insertAt])
+	b.WriteString(indent + "// Full logical canvas at origin: free coords are identity (spec 05, Phase 15).\n")
+	if needCenter {
+		b.WriteString(indent + "center: false,\n")
+	}
+	if needMargin {
+		b.WriteString(indent + "margin: 0,\n")
+	}
+	b.WriteString(html[insertAt:])
+	return b.String(), true
+}
+
+// Upgrade migrates an existing deck to the current vendored assets and the
+// Phase 15 coordinate-identity reveal config. It:
+//
+//  1. Re-vendors via Vendor() so the deck picks up updated CSS/JS (notably the
+//     slides-layout.css canvas/containing-block rules).
+//  2. Rewrites deck.html's Reveal.initialize to add center:false + margin:0 when
+//     absent. The rewrite is byte-stable when those keys already exist (a deck
+//     scaffolded by the current template is left untouched) and idempotent.
+//
+// Only deck.html and vendored assets change; deck authoring content is preserved.
+func Upgrade(root, name string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+
+	// (a) Refresh vendored assets (CSS/JS/plugins) for this deck.
+	if err := Vendor(root, name); err != nil {
+		return fmt.Errorf("upgrade: vendor: %w", err)
+	}
+
+	// (b) Rewrite the reveal config if needed (byte-stable otherwise).
+	html, err := Read(root, name)
+	if err != nil {
+		return fmt.Errorf("upgrade: read deck.html: %w", err)
+	}
+	updated, changed := upgradeInitialize(string(html))
+	if changed {
+		if err := Write(root, name, []byte(updated)); err != nil {
+			return fmt.Errorf("upgrade: write deck.html: %w", err)
+		}
+		log.Printf("deck: upgraded reveal config in %s", filepath.Join(root, DecksDir, name, "deck.html"))
+	} else {
+		log.Printf("deck: reveal config already current in %s (no change)", name)
 	}
 	return nil
 }

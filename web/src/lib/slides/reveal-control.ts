@@ -90,13 +90,23 @@ function whenRevealReady(
  * Jump the canvas to slide (h, v). Waits for reveal readiness so a click fired
  * immediately after a reload still lands. Returns a disposer for the pending
  * wait (harmless to ignore once navigation has occurred).
+ *
+ * @param onArrive  Optional callback invoked synchronously right after
+ *   `reveal.slide(h, v)` executes. Used by RevealFrame (P11-2) to flip
+ *   `isLoading = false` only once the restored slide has actually been
+ *   commanded — preventing a flash to slide 1 on same-deck reload.
+ *   Existing callers that pass no `onArrive` are unaffected.
  */
 export function navigateToSlide(
   iframe: HTMLIFrameElement | null | undefined,
   h: number,
   v = 0,
+  onArrive?: () => void,
 ): () => void {
-  return whenRevealReady(iframe, (reveal) => reveal.slide(h, v));
+  return whenRevealReady(iframe, (reveal) => {
+    reveal.slide(h, v);
+    onArrive?.();
+  });
 }
 
 /** Current (h, v) indices reveal is showing, or null when reveal is not ready. */

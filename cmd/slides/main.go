@@ -5,6 +5,7 @@
 //	slides [serve]           start the HTTP server (default action)
 //	slides new <name>        scaffold a new deck
 //	slides vendor <name>     (re)vendor reveal.js into an existing deck
+//	slides upgrade <name>    re-vendor + migrate reveal config (Phase 15)
 //	slides add-slide <deck>  append a starter <section> to a deck (P8-1)
 //	slides validate <deck>   check a deck against the spec rules (P8-2)
 package main
@@ -45,6 +46,11 @@ func main() {
 			fatalf("usage: slides vendor <name>")
 		}
 		runVendor(args[1])
+	case len(args) >= 1 && args[0] == "upgrade":
+		if len(args) < 2 || args[1] == "" {
+			fatalf("usage: slides upgrade <name>")
+		}
+		runUpgrade(args[1])
 	case len(args) >= 1 && args[0] == "add-slide":
 		if len(args) < 2 || args[1] == "" {
 			fatalf("usage: slides add-slide <deck>")
@@ -56,7 +62,7 @@ func main() {
 		}
 		runValidate(args[1])
 	default:
-		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>\n  slides vendor <name>\n  slides add-slide <deck>\n  slides validate <deck>", args[0])
+		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>\n  slides vendor <name>\n  slides upgrade <name>\n  slides add-slide <deck>\n  slides validate <deck>", args[0])
 	}
 }
 
@@ -146,6 +152,28 @@ func runVendor(name string) {
 	}
 	fmt.Printf("Vendored reveal.js into deck %q at %s\n", name,
 		filepath.Join(deckDir, "assets", "vendor", "reveal"))
+}
+
+// runUpgrade migrates an existing deck to the current vendored assets and the
+// Phase 15 coordinate-identity reveal config: it re-vendors (updated CSS/JS) and
+// rewrites deck.html's Reveal.initialize to add center:false + margin:0 if
+// absent.  The rewrite is byte-stable / idempotent when the keys already exist.
+func runUpgrade(name string) {
+	root := workspaceRoot()
+
+	if err := scaffoldWorkspace(root); err != nil {
+		log.Fatalf("workspace: %v", err)
+	}
+
+	deckDir := deck.DeckPath(root, name)
+	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
+		fatalf("deck %q not found at %s", name, deckDir)
+	}
+
+	if err := deck.Upgrade(root, name); err != nil {
+		log.Fatalf("upgrade: %v", err)
+	}
+	fmt.Printf("Upgraded deck %q at %s\n", name, filepath.Join(deckDir, "deck.html"))
 }
 
 // runAddSlide appends a starter <section> to an existing deck (P8-1, spec 11).

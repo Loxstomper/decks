@@ -43,6 +43,7 @@
     LOGICAL_HEIGHT,
     type Transform,
   } from '$lib/coords.ts';
+  import { getCurrentIndices, navigateToSlide } from '$lib/slides/reveal-control.ts';
 
   // ── Props ─────────────────────────────────────────────────────────────────
 
@@ -121,6 +122,21 @@
    * recreate the iframe (picks up disk changes for the same URL).
    */
   let reloadKey = $state(0);
+
+  /**
+   * Slide position captured just before a same-deck reload so that
+   * handleLoad() can restore it instead of landing on slide 0 (P11-1/P11-2).
+   *
+   * WHY non-reactive ($state): this is transient glue state that exists only
+   * during the gap between reload() and handleLoad(). Making it reactive would
+   * trigger unnecessary Svelte dependency tracking on a value nobody reads in
+   * the template — a plain field is the right choice here.
+   *
+   * WHY only set by reload() and never on deckUrl change: a deck switch must
+   * always start at slide 0 (fresh deck, unknown structure). Only a same-deck
+   * reload — triggered by an SSE file-changed event — should preserve position.
+   */
+  let pendingRestore: { h: number; v: number } | null = null;
 
   /**
    * True while the iframe is navigating to a new URL.
@@ -222,6 +238,12 @@
    */
   export function reload(): void {
     if (!deckUrl) return;
+    // Capture current slide BEFORE bumping the key so the {#key} block hasn't
+    // yet destroyed the iframe (liveIframe is still the live element here).
+    // If reveal isn't ready yet (e.g. reload was called mid-load), idx is null
+    // and we fall through to the normal slide-0 behaviour (P11-1).
+    const idx = getCurrentIndices(liveIframe);
+    if (idx) pendingRestore = idx;
     isLoading = true;
     reloadKey++;
   }
@@ -233,7 +255,28 @@
     // There may still be a brief flash as reveal initialises its scaling
     // transform, but hiding the iframe until this point already catches the
     // most jarring unstyled flicker.
-    isLoading = false;
+
+    if (pendingRestore) {
+      // P11-2: same-deck reload — keep the iframe hidden (isLoading stays true)
+      // while we command reveal to restore the previous slide position. Only
+      // reveal the iframe in the onArrive callback, AFTER reveal.slide() has
+      // been called, so the user never sees a flash to slide 1.
+      //
+      // WHY keep isLoading=true here: the iframe is visibility:hidden while
+      // isLoading is true (see template style:visibility). If we set it false
+      // now, the user would see slide 1 for one frame before navigateToSlide
+      // fires — the whole point of P11-2 is to avoid that flash.
+      const { h, v } = pendingRestore;
+      pendingRestore = null;
+      navigateToSlide(liveIframe, h, v, () => {
+        // Reveal has accepted the slide() command — safe to show the canvas.
+        isLoading = false;
+      });
+    } else {
+      // Normal load (deck switch or first open) — reveal starts at slide 0,
+      // which is the desired behaviour. Reveal the canvas immediately.
+      isLoading = false;
+    }
   }
 </script>
 
