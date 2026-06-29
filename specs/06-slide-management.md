@@ -40,8 +40,25 @@ Slides that override the deck theme show a small **theme badge** in the navigato
 
 ## Thumbnails
 
-Rendered from the live model (scaled-down reveal render or a cached snapshot). Update on edit.
+Rendered from the live model and updated on edit. Each thumbnail is a **static, script-free
+`srcdoc` iframe** (`sandbox=""`, offline) that links the deck's stylesheets and lays one
+`<section>` out at the logical canvas, scaled down — deliberately lightweight (no reveal.js
+instance per slide). Because it runs no JS, it must close the gaps where reveal's runtime would
+otherwise do the work, so the thumbnail is **faithful to the actual slide**:
+
+- **Actual theme, not a fixed one.** The thumbnail links the deck's *current* theme (and, once
+  per-slide overrides exist, the slide's `data-theme` — see [09](09-theming-and-styles.md)),
+  never a hardcoded default. Switching the deck theme restyles the thumbnails.
+- **Numeric layout applied.** The numeric layout vocabulary (`data-gap`/`data-pad`/`data-cols`/
+  `data-rows`/`data-grow`/`data-basis`/`data-span`, and free `data-x/y/w/h/rot`) is normally
+  applied by `slides-layout-init.js` at runtime; with no JS the thumbnail builder emits the
+  equivalent **inline styles** so grids, spacing, and free-positioned elements match.
+- **Fragments show their final state** (forced visible), rather than vanishing under reveal's
+  `opacity:0` default.
+- **Backgrounds honored** — a section's `data-background-color` is rendered as its background.
+- **Accepted approximation:** code highlighting and KaTeX math (reveal plugins, JS-driven) are
+  not run, so they render plain. This is the one acknowledged fidelity gap, not a bug.
 
 ## Related
 
-[02](02-document-model.md) · [04](04-canvas-interaction.md) · [07](07-motion-and-transitions.md)
+[02](02-document-model.md) · [04](04-canvas-interaction.md) · [07](07-motion-and-transitions.md) · [09](09-theming-and-styles.md)

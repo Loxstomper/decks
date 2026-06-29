@@ -292,6 +292,28 @@ dependencies are noted inline.
 - [ ] **P11-2 — No first-slide flash.** Keep the iframe hidden (extend the existing `isLoading` gate) until the P11-1 restore navigation has completed, so the intermediate slide-0 render is never visible. _Done when:_ a reload after an edit shows no flash to slide 1. (Spec 04)
 - [ ] **P11-3 — (Deferred) Skip reload on pure text commits.** Evaluate persisting in-place text edits without a full iframe reload (the contenteditable already mutated the live DOM), reserving reloads for structural/external changes. Gate on a guarantee the canvas cannot drift from on-disk bytes. _Done when:_ decided + (if adopted) text commits no longer reload. (Spec 04, 02 — deferred)
 
+## Phase 12 — Thumbnail fidelity
+> Goal: navigator thumbnails faithfully represent the actual slide. They are static,
+> script-free `srcdoc` iframes (`web/src/lib/slides/thumbnail.ts` + `SlideThumbnail.svelte`),
+> so where reveal's runtime would do the work, the builder must reproduce it statically.
+> Spec: [06](specs/06-slide-management.md) "Thumbnails".
+>
+> Root causes of divergence: (1) the theme is hardcoded to `black.css` (`thumbnail.ts:101`)
+> regardless of the deck's actual theme; (2) numeric layout (`data-gap/pad/cols/rows/grow/
+> basis/span`, free `data-x/y/w/h/rot`) is applied by `slides-layout-init.js` at runtime and
+> never runs in the thumbnail; (3) fragments are hidden by reveal's `opacity:0` default;
+> (4) `data-background-*` is painted in a separate JS-driven layer. Cheap wins first.
+
+- [ ] **P12-1 — Use the deck's actual theme.** Thread the current theme name (parsed from the deck source, as `applyTheme` does) into `buildThumbnailSrcdoc` and link that theme instead of the hardcoded `black.css`. _Done when:_ switching the deck theme restyles the thumbnails; a non-black deck no longer renders black thumbnails. (Spec 06, 09)
+- [ ] **P12-2 — Show fragments' final state.** Override CSS forces `.fragment { opacity:1; visibility:visible }` in the thumbnail so fragmented content is visible. _Done when:_ a slide with fragments shows all fragment content in its thumbnail. (Spec 06, 07)
+- [ ] **P12-3 — Honor section background.** Render a section's `data-background-color` as the thumbnail section background. _Done when:_ a slide with `data-background-color` shows that background in its thumbnail. (Spec 06)
+- [ ] **P12-4 — Apply numeric layout statically.** A pure function ports the `slides-layout-init.js` numeric vocabulary to **inline styles** on the serialized section at thumbnail-build time (`data-gap`→`gap`, `data-pad`→`padding`, `data-cols/rows`→`grid-template-*`, `data-grow/basis/span`→flex/grid item props, free `data-x/y/w/h/rot`→absolute geometry). Single source of truth — derive from the same numeric rules the runtime init uses; do not fork the values. _Done when:_ grids, gaps, and free-positioned elements in a thumbnail match the live canvas. (Spec 06, 03)
+- [ ] **P12-5 — Per-slide theme in thumbnails (after Phase 10).** Once per-slide `data-theme` exists, the thumbnail links/scopes the slide's override theme too. _Done when:_ a slide with `data-theme` renders its override in the thumbnail. (Spec 06, 09 — depends on Phase 10)
+
+> **Accepted limitation (not a task):** code highlighting (highlight.js) and KaTeX math are
+> JS-driven reveal plugins and are not run in the script-free thumbnail; they render plain.
+> Documented in spec 06 as the one acknowledged fidelity gap.
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
