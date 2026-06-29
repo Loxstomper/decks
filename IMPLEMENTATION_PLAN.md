@@ -157,19 +157,25 @@ dependencies are noted inline.
 ## Phase 6 — Slides, motion, theming
 > Goal: deck organization, animation authoring, theming. Specs: [06](specs/06-slide-management.md), [07](specs/07-motion-and-transitions.md), [09](specs/09-theming-and-styles.md).
 
-- [ ] **P6-1 — Slide navigator filmstrip.** List slides; click to jump. _Done when:_ navigator reflects sections and navigates. (Spec 06)
-- [ ] **P6-2 — Slide thumbnails.** Scaled render/snapshot per slide, updated on edit. _Done when:_ thumbnails match content. (Spec 06)
-- [ ] **P6-3 — Add/duplicate/delete slide.** Duplicate regenerates `data-eid` but preserves `data-id` pairing potential. _Done when:_ each op updates source correctly. (Spec 06)
-- [ ] **P6-4 — Reorder slides.** Drag in the filmstrip. _Done when:_ document order changes persist. (Spec 06)
-- [ ] **P6-5 — Vertical slides (2D navigator).** Nest/promote/demote verticals. _Done when:_ nested sections render and navigate down. (Spec 06)
-- [ ] **P6-6 — Hide slide.** `data-visibility="hidden"`; skipped when presenting. _Done when:_ hidden slide stays in source, absent from present. (Spec 06)
-- [ ] **P6-7 — Fragments UI.** Mark element to appear at step N; reorder list. _Done when:_ `class="fragment"`+index write and reveal steps work. (Spec 07)
-- [ ] **P6-8 — Transitions UI.** Per-deck/per-slide `data-transition` + speed. _Done when:_ transition changes apply. (Spec 07)
-- [ ] **P6-9 — Auto-animate authoring.** "Animate from previous slide": set `data-auto-animate` on the pair, derive `data-id` from `data-eid`. _Done when:_ moving an element across the pair tweens. (Spec 07)
-- [ ] **P6-10 — Theme picker.** Select bundled reveal theme per deck. _Done when:_ theme switch re-styles the deck. (Spec 09)
-- [ ] **P6-11 — `custom.css` pane.** Edit per-deck CSS in CM6. _Done when:_ edits apply and persist to `custom.css`. (Spec 09)
-- [ ] **P6-12 — CSS variable controls.** Color/font pickers bound to CSS custom properties. _Done when:_ picker changes `--accent`/`--heading-font` and canvas updates. (Spec 09)
-- [ ] **P6-13 — Font localization.** Download a chosen Google Font into `assets/fonts/`, rewrite `@font-face` local. _Done when:_ deck renders the font with network disabled. (Spec 09, 12)
+- [x] **P6-1 — Slide navigator filmstrip.** List slides; click to jump. _Done when:_ navigator reflects sections and navigates. (Spec 06)
+- [x] **P6-2 — Slide thumbnails.** Scaled render/snapshot per slide, updated on edit. _Done when:_ thumbnails match content. (Spec 06)
+- [x] **P6-3 — Add/duplicate/delete slide.** Duplicate regenerates `data-eid` but preserves `data-id` pairing potential. _Done when:_ each op updates source correctly. (Spec 06)
+- [x] **P6-4 — Reorder slides.** Drag in the filmstrip. _Done when:_ document order changes persist. (Spec 06)
+- [x] **P6-5 — Vertical slides (2D navigator).** Nest/promote/demote verticals. _Done when:_ nested sections render and navigate down. (Spec 06)
+- [x] **P6-6 — Hide slide.** `data-visibility="hidden"`; skipped when presenting. _Done when:_ hidden slide stays in source, absent from present. (Spec 06)
+- [x] **P6-7 — Fragments UI.** Mark element to appear at step N; reorder list. _Done when:_ `class="fragment"`+index write and reveal steps work. (Spec 07)
+- [x] **P6-8 — Transitions UI.** Per-deck/per-slide `data-transition` + speed. _Done when:_ transition changes apply. (Spec 07)
+- [x] **P6-9 — Auto-animate authoring.** "Animate from previous slide": set `data-auto-animate` on the pair, derive `data-id` from `data-eid`. _Done when:_ moving an element across the pair tweens. (Spec 07)
+- [x] **P6-10 — Theme picker.** Select bundled reveal theme per deck. _Done when:_ theme switch re-styles the deck. (Spec 09)
+- [x] **P6-11 — `custom.css` pane.** Edit per-deck CSS in CM6. _Done when:_ edits apply and persist to `custom.css`. (Spec 09)
+- [x] **P6-12 — CSS variable controls.** Color/font pickers bound to CSS custom properties. _Done when:_ picker changes `--accent`/`--heading-font` and canvas updates. (Spec 09)
+- [x] **P6-13 — Font localization.** Download a chosen Google Font into `assets/fonts/`, rewrite `@font-face` local. _Done when:_ deck renders the font with network disabled. (Spec 09, 12)
+
+> **Phase 6 STATUS (done, tag 0.0.7):** P6-1..P6-13 complete. 3 lanes + Opus integration; verified (FE 944 vitest tests, svelte-check 0/0, Go green; offline-first re-verified — 9 themes bundled, zero external URLs, custom.css PUT/GET byte-identical).
+> - **Slide mgmt (`web/src/lib/slides/`, `components/navigator/`):** undoable+autosaved `addSlide`/`duplicateSlide` (regenerates eids, preserves data-id for auto-animate)/`deleteSlide`/`moveSlide`/`moveVerticalSlide`/`nestSlide`(=demote)/`promoteSlide`/`setSlideHidden` (`data-visibility="hidden"`). Navigator filmstrip (click-to-jump via Reveal.slide, current-slide reflect), drag-reorder, 2D verticals. **Thumbnails** = per-slide sandboxed `srcdoc` iframe with the deck's own stylesheets, scaled (offline, zero external URLs; visual approximation).
+> - **Motion (`web/src/lib/motion/`, `components/motion/`):** fragments (`class="fragment"`+`data-fragment-index`, reorder), per-deck/per-slide transitions (`data-transition`+speed), auto-animate (`data-auto-animate` on the pair + derived `data-id`). New right-panel **Motion** tab.
+> - **Theming (`components/theming/`, Go):** theme picker (9 reveal themes vendored into binary + copied per deck), `custom.css` CM6 pane (`PUT/GET /api/decks/{name}/custom.css`, atomic), CSS-variable controls (idempotent `:root` writes), offline **font localization** (`POST /api/decks/{name}/fonts` downloads Google Font → `assets/fonts/` + local `@font-face`; 503 graceful when offline). New **Theme** tab. Right panel reorganized: Outline pinned + tabbed Properties | Motion | Theme.
+> - **⚠️ Needs VISUAL/browser verification:** thumbnails render; navigator click moves canvas + highlight reflects; drag-reorder UX; theme/var/font visibly change canvas; fragment/transition/auto-animate playback. **Needs NETWORK** to exercise font localization end-to-end.
 
 ## Phase 7 — Presenting & export
 > Goal: present and export. Spec: [10](specs/10-presenting-and-export.md).

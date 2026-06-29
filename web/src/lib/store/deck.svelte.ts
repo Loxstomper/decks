@@ -59,10 +59,32 @@ import {
   type LayoutProps,
   type LogicalRect,
 } from '$lib/model';
+import {
+  addSlide as addSlideOp,
+  duplicateSlide as duplicateSlideOp,
+  deleteSlide as deleteSlideOp,
+  moveSlide as moveSlideOp,
+  moveVerticalSlide as moveVerticalSlideOp,
+  nestSlide as nestSlideOp,
+  promoteSlide as promoteSlideOp,
+  setSlideHidden as setSlideHiddenOp,
+} from '$lib/slides';
 import { undoStore } from './undo.svelte';
 import { selectionStore } from '$lib/canvas/selection.svelte';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
+import {
+  toggleFragment as toggleFragmentOp,
+  setFragmentIndex as setFragmentIndexOp,
+  setFragmentStyle as setFragmentStyleOp,
+  setSlideTransition as setSlideTransitionOp,
+  setDeckTransition as setDeckTransitionOp,
+  enableAutoAnimate as enableAutoAnimateOp,
+  disableAutoAnimate as disableAutoAnimateOp,
+  type FragmentStyle,
+  type TransitionType,
+  type TransitionSpeed,
+} from '$lib/motion';
 
 /** Debounce window for re-parse + autosave after a source edit (P1-8). */
 const SYNC_DEBOUNCE_MS = 400;
@@ -419,6 +441,33 @@ class DeckStore {
   }
 
   /**
+   * P6-10: Switch the active reveal.js theme by rewriting the theme <link> in
+   * the source HTML. The bundled themes live at
+   * assets/vendor/reveal/theme/{name}.css (spec 12 offline-first).
+   *
+   * WHY SOURCE REGEX INSTEAD OF MODEL:
+   * The theme link is in <head>, not inside <section> slides. parseDeck/
+   * serializeDeck focus on the presentation content; patching the <head> via
+   * the raw source string is simpler, safer, and guarantees a byte-stable
+   * round-trip (we only touch the one matching substring).
+   *
+   * If the theme path is not found in the source (e.g. the user hand-edited the
+   * head), this is a no-op so the user retains control over their <head>.
+   */
+  async applyTheme(themeName: string): Promise<void> {
+    // Match the reveal theme link href — covers any bundled theme filename.
+    const themePathRe = /assets\/vendor\/reveal\/theme\/[\w-]+\.css/g;
+    const next = this.source.replace(
+      themePathRe,
+      `assets/vendor/reveal/theme/${themeName}.css`,
+    );
+    // No-op if theme link not found or already on this theme.
+    if (next === this.source) return;
+    this.updateFromSource(next);
+    await this.commitCommand();
+  }
+
+  /**
    * P5-1 INSERT SEAM (owned by Lane FE-A; used by FE-B too).
    *
    * Insert a model subtree `node` (built via the blocks/ builders → edit.ts
@@ -487,6 +536,294 @@ class DeckStore {
     await this.commitCommand();
     if (eid) selectionStore.select(eid);
     return eid;
+  }
+
+  // ── Slide management (P6, spec 06) ────────────────────────────────────────
+  //
+  // Every slide op follows the same command pattern as insertBlock / applyLayout-
+  // Change: mutate the model via the pure ops in $lib/slides (which mark only the
+  // affected subtree dirty, preserving the byte-stable round-trip — spec 12 #4),
+  // then funnel through #commitStructure() so each is exactly ONE undo entry +
+  // ONE autosave. Methods that create a section return its freshly-minted
+  // data-eid (post-stamp); reorder/hide return a boolean. Unknown eids are safe
+  // no-ops (a stale navigator click after an external reload must not throw).
+
+  /**
+   * Shared tail for slide ops that ADD a section (add / duplicate / nest /
+   * promote): stamp eids (idempotent for everything already stamped — only the
+   * new section + any new wrapper get ids), reserialize, persist as one command,
+   * and select the new section so the canvas + panels focus it. Returns the new
+   * section's eid.
+   */
+  async #commitNewSection(section: ElementNode): Promise<string | null> {
+    if (!this.model) return null;
+    stampEids(this.model);
+    const eid = getAttribute(section, 'data-eid');
+    this.updateFromModel();
+    await this.commitCommand();
+    if (eid) selectionStore.select(eid);
+    return eid;
+  }
+
+  /**
+   * Shared tail for slide ops that only MOVE / MUTATE existing sections (delete /
+   * move / hide): reserialize + persist as one command. (No stamping needed —
+   * no new managed elements are introduced.)
+   */
+  async #commitStructure(): Promise<void> {
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P6-3: Add a new slide after the slide with `afterEid` (or appended when
+   * omitted). Returns the new slide's data-eid, or null when no deck is open.
+   */
+  async addSlide(afterEid?: string): Promise<string | null> {
+    if (!this.model) return null;
+    const section = addSlideOp(this.model, afterEid);
+    if (!section) return null;
+    return await this.#commitNewSection(section);
+  }
+
+  /**
+   * P6-3: Duplicate the slide carrying `eid` (top-level or vertical). The copy's
+   * data-eids are regenerated while data-ids are preserved for auto-animate
+   * pairing (spec 07). Returns the copy's new data-eid, or null when `eid` is
+   * unknown.
+   */
+  async duplicateSlide(eid: string): Promise<string | null> {
+    if (!this.model) return null;
+    const clone = duplicateSlideOp(this.model, eid);
+    if (!clone) return null;
+    return await this.#commitNewSection(clone);
+  }
+
+  /**
+   * P6-3: Delete the slide carrying `eid`. Clears the selection when the deleted
+   * slide (or one of its descendants) was selected so the panels don't show a
+   * stale node. Returns true on success.
+   */
+  async deleteSlide(eid: string): Promise<boolean> {
+    if (!this.model) return false;
+    const ok = deleteSlideOp(this.model, eid);
+    if (!ok) return false;
+    // The deleted subtree's eids no longer resolve — drop them from selection.
+    if (selectionStore.eid && !findByEid(this.model, selectionStore.eid)) {
+      selectionStore.clear();
+    }
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P6-4: Reorder the top-level slide at `fromIndex` to `toIndex`. Returns true
+   * on success.
+   */
+  async moveSlide(fromIndex: number, toIndex: number): Promise<boolean> {
+    if (!this.model) return false;
+    if (!moveSlideOp(this.model, fromIndex, toIndex)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P6-5: Reorder a vertical slide within the stack `stackEid` from `fromIndex`
+   * to `toIndex`. Returns true on success.
+   */
+  async moveVerticalSlide(
+    stackEid: string,
+    fromIndex: number,
+    toIndex: number,
+  ): Promise<boolean> {
+    if (!this.model) return false;
+    if (!moveVerticalSlideOp(this.model, stackEid, fromIndex, toIndex)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P6-5: Nest (demote) the top-level slide `eid` under the previous slide,
+   * making it a vertical slide. Returns the (re-selected) slide's eid, or null
+   * when there is no previous slide to nest under.
+   */
+  async nestSlide(eid: string): Promise<string | null> {
+    if (!this.model) return null;
+    const section = nestSlideOp(this.model, eid);
+    if (!section) return null;
+    return await this.#commitNewSection(section);
+  }
+
+  /**
+   * Alias for {@link nestSlide} — "demote" a horizontal slide one level into the
+   * preceding vertical stack (spec 06 nest/promote/demote vocabulary).
+   */
+  async demoteSlide(eid: string): Promise<string | null> {
+    return await this.nestSlide(eid);
+  }
+
+  /**
+   * P6-5: Promote a vertical slide `eid` out of its stack to become a top-level
+   * slide. Returns the (re-selected) slide's eid, or null when `eid` is not a
+   * vertical slide.
+   */
+  async promoteSlide(eid: string): Promise<string | null> {
+    if (!this.model) return null;
+    const section = promoteSlideOp(this.model, eid);
+    if (!section) return null;
+    // promoteSlide preserves eids (no new section created), but re-running the
+    // add tail keeps the behaviour uniform: stamp is a no-op, and we re-select.
+    return await this.#commitNewSection(section);
+  }
+
+  /**
+   * P6-6: Hide / show the slide `eid` (sets/removes data-visibility="hidden").
+   * The slide stays in source but is skipped when presenting. Returns true on
+   * success.
+   */
+  async setSlideHidden(eid: string, hidden: boolean): Promise<boolean> {
+    if (!this.model) return false;
+    if (!setSlideHiddenOp(this.model, eid, hidden)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  // ── Motion commands (P6-7 fragments, P6-8 transitions, P6-9 auto-animate) ──
+  //
+  // Each command follows the same one-undo / autosave pattern: find element(s)
+  // in the model → apply the pure-op mutation (marks only affected nodes dirty,
+  // byte-stable per spec 12 #4) → updateFromModel() → commitCommand().
+  //
+  // Unknown eids are safe no-ops — stale selections after external reloads must
+  // not throw into the UI.
+
+  /**
+   * P6-7: Toggle the `fragment` class on the element with `eid`.
+   *
+   * When adding, optionally stamps `data-fragment-index` so the user can
+   * control step order from the panel.  When removing, clears the index.
+   * Returns `true` when the element is now a fragment, `false` when it is
+   * not, or `null` when the eid is unknown.
+   */
+  async toggleFragment(eid: string, index?: number): Promise<boolean | null> {
+    if (!this.model) return null;
+    const el = findByEid(this.model, eid);
+    if (!el) return null;
+    const isNowFragment = toggleFragmentOp(el, index);
+    this.updateFromModel();
+    await this.commitCommand();
+    return isNowFragment;
+  }
+
+  /**
+   * P6-7: Set the `data-fragment-index` on the element with `eid`.
+   *
+   * Used by the fragment-order panel to reorder step reveals without toggling
+   * them on/off.  No-op when the eid is unknown.
+   */
+  async setFragmentIndex(eid: string, index: number): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setFragmentIndexOp(el, index);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P6-7: Set the fragment animation style class on the element with `eid`.
+   *
+   * Pass `null` to remove any explicit style (restoring reveal's default
+   * fade-in animation).  The `fragment` class itself is preserved.
+   * No-op when the eid is unknown.
+   */
+  async setFragmentStyle(eid: string, style: FragmentStyle | null): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setFragmentStyleOp(el, style);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P6-8: Set `data-transition` (and optionally `data-transition-speed`) on
+   * the slide section with `slideEid`.
+   *
+   * Pass `null` for `transition` to remove the per-slide override so the slide
+   * uses the deck default.  Omit `speed` to leave the existing value in place.
+   * No-op when the eid is unknown.
+   */
+  async setSlideTransition(
+    slideEid: string,
+    transition: TransitionType | null,
+    speed?: TransitionSpeed | null,
+  ): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, slideEid);
+    if (!el) return;
+    setSlideTransitionOp(el, transition, speed);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P6-8: Set the deck-level default transition on the `<div class="reveal">`.
+   *
+   * The companion slides-layout-init.js picks up `data-transition` and
+   * `data-transition-speed` from the reveal div at runtime and calls
+   * `Reveal.configure()` to apply them as the deck default, overriding the
+   * hardcoded value in the passthrough `<script>` block (spec 12 offline-safe).
+   *
+   * Returns `false` when the reveal div is not found in the model (malformed
+   * deck — safe no-op for the caller).
+   */
+  async setDeckTransition(
+    transition: TransitionType | null,
+    speed?: TransitionSpeed | null,
+  ): Promise<boolean> {
+    if (!this.model) return false;
+    const changed = setDeckTransitionOp(this.model, transition, speed);
+    if (!changed) return false;
+    this.updateFromModel();
+    await this.commitCommand();
+    return true;
+  }
+
+  /**
+   * P6-9: Enable "animate from previous slide" for the slide with `slideEid`.
+   *
+   * Sets `data-auto-animate` on both the target slide and its previous sibling
+   * section, then derives `data-id` values (from `data-eid`) for matched element
+   * pairs so reveal can tween them automatically (spec 07 "signature feature").
+   *
+   * Returns `true` on success, `false` when the slide is not found or has no
+   * previous sibling (e.g. the first slide in the deck).
+   */
+  async enableAutoAnimate(slideEid: string): Promise<boolean> {
+    if (!this.model) return false;
+    const ok = enableAutoAnimateOp(this.model, slideEid);
+    if (!ok) return false;
+    this.updateFromModel();
+    await this.commitCommand();
+    return true;
+  }
+
+  /**
+   * P6-9: Remove `data-auto-animate` from the slide with `slideEid`.
+   *
+   * `data-id` attributes are intentionally left intact so the user can re-enable
+   * auto-animate later without losing established element pairings.
+   *
+   * Returns `true` on success, `false` when the slide is not found.
+   */
+  async disableAutoAnimate(slideEid: string): Promise<boolean> {
+    if (!this.model) return false;
+    const ok = disableAutoAnimateOp(this.model, slideEid);
+    if (!ok) return false;
+    this.updateFromModel();
+    await this.commitCommand();
+    return true;
   }
 
   #scheduleSync(): void {

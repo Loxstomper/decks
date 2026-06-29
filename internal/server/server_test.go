@@ -535,3 +535,245 @@ func TestCapabilities_ReturnsJSON(t *testing.T) {
 		t.Error("capabilities missing 'ffmpeg' key")
 	}
 }
+
+// ── Custom CSS endpoint tests (P6-11) ─────────────────────────────────────────
+
+func TestCustomCSSWrite_OK(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "css-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	css := []byte(":root { --r-main-color: #ff0000; }\n")
+	req := httptest.NewRequest("PUT", "/api/decks/css-deck/custom.css", bytes.NewReader(css))
+	req.Header.Set("Content-Type", "text/css")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNoContent {
+		t.Errorf("PUT custom.css: want 204, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Verify the file was written correctly.
+	got, err := deck.ReadCustomCSS(root, "css-deck")
+	if err != nil {
+		t.Fatalf("ReadCustomCSS: %v", err)
+	}
+	if !bytes.Equal(css, got) {
+		t.Errorf("custom.css mismatch:\nwant: %q\ngot:  %q", css, got)
+	}
+}
+
+func TestCustomCSSRead_OK(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "css-read"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	// Write some content first.
+	want := []byte("/* test */\n:root { --r-main-color: blue; }\n")
+	if err := deck.WriteCustomCSS(root, "css-read", want); err != nil {
+		t.Fatalf("WriteCustomCSS: %v", err)
+	}
+
+	req := httptest.NewRequest("GET", "/api/decks/css-read/custom.css", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET custom.css: want 200, got %d", rr.Code)
+	}
+	if !bytes.Equal(want, rr.Body.Bytes()) {
+		t.Errorf("custom.css body mismatch:\nwant: %q\ngot:  %q", want, rr.Body.Bytes())
+	}
+}
+
+func TestCustomCSSWrite_NotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	req := httptest.NewRequest("PUT", "/api/decks/no-such/custom.css", strings.NewReader("/* x */"))
+	req.Header.Set("Content-Type", "text/css")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("PUT custom.css nonexistent deck: want 404, got %d", rr.Code)
+	}
+}
+
+func TestCustomCSS_RoundTrip(t *testing.T) {
+	// Write then read via the HTTP API must be byte-identical (P6-11 byte-stable).
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "css-rt"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	content := []byte(":root {\n  --r-background-color: #1a1a2e;\n  --r-main-color: #eee;\n}\n")
+
+	req := httptest.NewRequest("PUT", "/api/decks/css-rt/custom.css", bytes.NewReader(content))
+	req.Header.Set("Content-Type", "text/css")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNoContent {
+		t.Fatalf("PUT: want 204, got %d", rr.Code)
+	}
+
+	req2 := httptest.NewRequest("GET", "/api/decks/css-rt/custom.css", nil)
+	rr2 := httptest.NewRecorder()
+	srv.ServeHTTP(rr2, req2)
+	if rr2.Code != http.StatusOK {
+		t.Fatalf("GET: want 200, got %d", rr2.Code)
+	}
+	if !bytes.Equal(content, rr2.Body.Bytes()) {
+		t.Errorf("round-trip mismatch:\nwant: %q\ngot:  %q", content, rr2.Body.Bytes())
+	}
+}
+
+// ── Theme list endpoint tests (P6-10) ─────────────────────────────────────────
+
+func TestThemeList_OK(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	req := httptest.NewRequest("GET", "/api/themes", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("GET /api/themes: want 200, got %d", rr.Code)
+	}
+
+	var themes []string
+	if err := json.Unmarshal(rr.Body.Bytes(), &themes); err != nil {
+		t.Fatalf("decode themes: %v", err)
+	}
+	if len(themes) == 0 {
+		t.Error("expected at least one bundled theme, got empty list")
+	}
+
+	// "black" must always be present (default theme).
+	hasBlack := false
+	for _, t := range themes {
+		if t == "black" {
+			hasBlack = true
+			break
+		}
+	}
+	if !hasBlack {
+		t.Errorf("bundled themes list missing 'black': %v", themes)
+	}
+}
+
+// ── Font localization endpoint tests (P6-13) ───────────────────────────────────
+
+// mockFontAPIServer starts a local HTTP server that simulates the Google Fonts
+// CSS2 API + font CDN for server endpoint tests.
+func mockFontAPIServer(t *testing.T) *httptest.Server {
+	t.Helper()
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/css2"):
+			host := "http://" + r.Host
+			fmt.Fprintf(w, `@font-face {
+  font-family: 'TestFont';
+  font-style: normal;
+  font-weight: 400;
+  src: url(%s/fonts/test.woff2) format('woff2');
+}
+`, host)
+		case strings.HasSuffix(r.URL.Path, ".woff2"):
+			w.Header().Set("Content-Type", "font/woff2")
+			w.Write([]byte("FAKE_WOFF2"))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+}
+
+func TestFontLocalize_OK(t *testing.T) {
+	fontSrv := mockFontAPIServer(t)
+	defer fontSrv.Close()
+
+	origBase := deck.GoogleFontsBaseURL()
+	deck.SetGoogleFontsBaseURL(fontSrv.URL + "/css2")
+	defer deck.SetGoogleFontsBaseURL(origBase)
+
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "fontdeck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	body := `{"family":"TestFont","weights":"400"}`
+	req := httptest.NewRequest("POST", "/api/decks/fontdeck/fonts",
+		strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("POST /fonts: want 200, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var result struct {
+		CSSPath string `json:"cssPath"`
+		Family  string `json:"family"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &result); err != nil {
+		t.Fatalf("decode font result: %v", err)
+	}
+	if result.Family != "TestFont" {
+		t.Errorf("family: want %q, got %q", "TestFont", result.Family)
+	}
+	if !strings.HasPrefix(result.CSSPath, "assets/fonts/") {
+		t.Errorf("cssPath should start with assets/fonts/, got %q", result.CSSPath)
+	}
+
+	// Verify the generated CSS is free of external URLs (spec 12).
+	cssFull := filepath.Join(root, "decks", "fontdeck", result.CSSPath)
+	cssData, err := os.ReadFile(cssFull)
+	if err != nil {
+		t.Fatalf("read font-face.css: %v", err)
+	}
+	if bytes.Contains(cssData, []byte("http")) {
+		t.Errorf("font-face.css contains external URL after localization — violates spec 12:\n%s", cssData)
+	}
+}
+
+func TestFontLocalize_MissingFamily(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "fontmiss"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/decks/fontmiss/fonts",
+		strings.NewReader(`{"weights":"400"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusBadRequest {
+		t.Errorf("missing family: want 400, got %d", rr.Code)
+	}
+}
+
+func TestFontLocalize_Offline503(t *testing.T) {
+	// Simulate offline by pointing at a refused port.
+	origBase := deck.GoogleFontsBaseURL()
+	deck.SetGoogleFontsBaseURL("http://127.0.0.1:1/css2")
+	defer deck.SetGoogleFontsBaseURL(origBase)
+
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "offline503"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/decks/offline503/fonts",
+		strings.NewReader(`{"family":"Inter"}`))
+	req.Header.Set("Content-Type", "application/json")
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusServiceUnavailable {
+		t.Errorf("offline font: want 503, got %d", rr.Code)
+	}
+}
+

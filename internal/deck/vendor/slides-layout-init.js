@@ -105,6 +105,38 @@
     applyAll();
   }
 
+  // ── Deck-level transition override (P6-8, spec 07) ────────────────────────
+  // The slides-builder motion panel stores the deck default transition as
+  // data-transition / data-transition-speed on <div class="reveal">.  We cannot
+  // modify the passthrough Reveal.initialize() <script> from the model layer
+  // (spec 12 — never destroy the unknown), so we call Reveal.configure() here
+  // after Reveal is ready to apply the stored preference.
+  //
+  // We use window.load (fires after ALL scripts have been parsed and executed,
+  // including the inline Reveal.initialize() call) and check Reveal.isReady()
+  // to cover both the synchronous-init path and the common async path where
+  // Reveal emits a 'ready' event.
+  window.addEventListener('load', function applyDeckTransition() {
+    try {
+      var reveal = document.querySelector('.reveal');
+      if (!reveal || typeof Reveal === 'undefined') return;
+      var t  = reveal.getAttribute('data-transition');
+      var ts = reveal.getAttribute('data-transition-speed');
+      if (t === null && ts === null) return; // no preference stored
+      var cfg = {};
+      if (t  !== null) cfg.transition      = t;
+      if (ts !== null) cfg.transitionSpeed = ts;
+      // Reveal.configure() is safe to call at any point after initialize() —
+      // it merges the new config and re-applies without reinitialising plugins.
+      if (typeof Reveal.configure === 'function') {
+        Reveal.configure(cfg);
+      }
+    } catch (e) {
+      // Non-fatal: log but don't break presentation.
+      if (typeof console !== 'undefined') console.warn('[slides-layout] deck transition:', e);
+    }
+  }, false);
+
   // ── Observe dynamic content (reveal.js plugins, fragments, etc.) ───────────
   // Re-apply when reveal inserts new nodes so fragments and plugin-injected
   // elements are also styled correctly.

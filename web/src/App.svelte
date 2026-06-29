@@ -28,8 +28,18 @@
   import InsertPalette from './components/insert/InsertPalette.svelte';
   import OutlinePanel from './components/outline/OutlinePanel.svelte';
   import PropertiesPanel from './components/properties/PropertiesPanel.svelte';
+  // Phase 6 surfaces (integrated here):
+  //   Navigator     — slide filmstrip (Lane A): add/dup/delete/reorder/nest/hide.
+  //   Motion panels — fragments / transitions / auto-animate (Lane B).
+  //   ThemingPanel  — theme picker + custom.css editor + CSS-var + fonts (Lane C).
+  import Navigator from './components/navigator/Navigator.svelte';
+  import FragmentsPanel from './components/motion/FragmentsPanel.svelte';
+  import TransitionPanel from './components/motion/TransitionPanel.svelte';
+  import AutoAnimatePanel from './components/motion/AutoAnimatePanel.svelte';
+  import ThemingPanel from './components/theming/ThemingPanel.svelte';
   import { createSseClient } from '$lib/sse';
   import { deckStore, type DeckStatus } from '$lib/store/deck.svelte.ts';
+  import { customCssStore } from '$lib/store/customCss.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
   import { gridStore } from '$lib/canvas/grid.svelte.ts';
   import { aspectStore } from '$lib/canvas/aspect.svelte.ts';
@@ -44,7 +54,15 @@
     readLogicalSizeFromInit,
   } from '$lib/canvas/aspect-commands.ts';
   import { domRectToLogical } from '$lib/canvas/overlay-geometry.ts';
-  import { classify, findByEid, type LogicalRect } from '$lib/model';
+  import {
+    classify,
+    findByEid,
+    findParentOf,
+    getAttribute,
+    getSlides,
+    type ElementNode,
+    type LogicalRect,
+  } from '$lib/model';
   import type { Transform } from '$lib/coords.ts';
 
   // RevealFrame instance (exposes reload()); bound via the canvas snippet.
@@ -217,22 +235,67 @@
     error:    { label: 'Error',          class: 'text-red-400' },
   };
   const statusMeta = $derived(STATUS_META[deckStore.status]);
+
+  // ── Phase 6: custom.css lifecycle (Lane C) ──────────────────────────────────
+  // The custom.css document is a separate file (decks/<name>/custom.css) served
+  // by its own endpoints, so it is NOT part of the deck source/model. Load it
+  // whenever the open deck changes; clear it when no deck is open. customCssStore
+  // owns its own debounced PUT-save.
+  $effect(() => {
+    if (deckStore.name) customCssStore.loadForDeck(deckStore.name);
+    else customCssStore.clear();
+  });
+
+  // ── Phase 6: current slide for the motion panels (Lanes A↔B) ─────────────────
+  // The motion panels (fragments / transition / auto-animate) operate on "the
+  // current slide". We resolve that as the nearest enclosing <section> of the
+  // current selection (so editing an element inside a slide targets that slide),
+  // falling back to the first top-level slide when nothing is selected. reveal is
+  // 2D, so the innermost enclosing <section> is exactly the presented slide.
+  const currentSlideEid = $derived.by<string | null>(() => {
+    const model = deckStore.model;
+    if (!model) return null;
+    const sel = selectionStore.eid;
+    if (sel) {
+      let cursor: ElementNode | null = findByEid(model, sel);
+      while (cursor) {
+        if (cursor.tagName.toLowerCase() === 'section') {
+          return getAttribute(cursor, 'data-eid');
+        }
+        const eid = getAttribute(cursor, 'data-eid');
+        cursor = eid ? findParentOf(model, eid) : null;
+      }
+    }
+    const slides = getSlides(model);
+    return slides.length ? getAttribute(slides[0], 'data-eid') : null;
+  });
+
+  // Right-panel lower zone: tabbed between element Properties, Motion authoring,
+  // and Theme/Styles. Outline (element tree) stays pinned above the tabs.
+  let rightTab = $state<'properties' | 'motion' | 'theme'>('properties');
 </script>
 
 <PaneLayout>
   {#snippet navigator()}
-    <div class="flex flex-col gap-3">
+    <!--
+      Navigator zone (P6-1..P6-6): deck switcher + sync status on top, then the
+      live slide filmstrip filling the rest. The filmstrip (Lane A's Navigator)
+      reads deckStore + selectionStore singletons itself; its only prop is the
+      live canvas iframe so clicking a slide drives Reveal.slide() and the current
+      slide is reflected back.
+    -->
+    <div class="flex flex-col h-full min-h-0 gap-2">
       <!-- Sync status indicator (spec 11 §5) -->
-      <div class="flex items-center gap-2 px-1">
+      <div class="flex items-center gap-2 px-1 flex-shrink-0">
         <span class="inline-block w-2 h-2 rounded-full {statusMeta.class}" style="background-color: currentColor;"></span>
         <span class="text-xs {statusMeta.class}">{statusMeta.label}</span>
       </div>
 
       <!-- Deck list -->
       {#if decks.length === 0}
-        <p class="text-xs text-white/30 mt-2 text-center">No decks yet</p>
+        <p class="text-xs text-white/30 text-center flex-shrink-0">No decks yet</p>
       {:else}
-        <ul class="flex flex-col gap-0.5">
+        <ul class="flex flex-col gap-0.5 flex-shrink-0">
           {#each decks as name (name)}
             <li>
               <button
@@ -249,6 +312,11 @@
           {/each}
         </ul>
       {/if}
+
+      <!-- Slide filmstrip (P6-1..P6-6). Fills the remaining height and scrolls. -->
+      <div class="flex-1 min-h-0 overflow-y-auto border-t border-surface-overlay pt-2">
+        <Navigator iframeEl={canvasIframe} />
+      </div>
     </div>
   {/snippet}
 
@@ -460,12 +528,61 @@
       <div class="flex-1 min-h-0 overflow-hidden">
         <OutlinePanel model={deckStore.model} selection={selectionStore} />
       </div>
-      <div class="properties-zone overflow-y-auto border-t border-surface-overlay">
-        <PropertiesPanel
-          selectedEid={selectionStore.eid}
-          onApplyLayoutChange={(eid, delta) => deckStore.applyLayoutChange(eid, delta)}
-          onApplyEqualColumns={(eid) => deckStore.applyEqualColumns(eid)}
-        />
+
+      <!--
+        Tabbed lower zone (P3-3/4 + P6-7..P6-13): the element tree stays pinned
+        above; below it the user switches between element Properties, Motion
+        authoring (fragments / transitions / auto-animate), and Theme/Styles.
+        All three operate on the live selection / current slide and route their
+        mutations through deckStore / customCssStore (one undo entry + autosave).
+      -->
+      <div class="right-tabs flex flex-col border-t border-surface-overlay min-h-0">
+        <div class="right-tabbar flex gap-1 px-2 py-1 flex-shrink-0" role="tablist" aria-label="Inspector tabs">
+          <button
+            type="button" role="tab" class="right-tab" class:active={rightTab === 'properties'}
+            aria-selected={rightTab === 'properties'} onclick={() => (rightTab = 'properties')}
+          >Properties</button>
+          <button
+            type="button" role="tab" class="right-tab" class:active={rightTab === 'motion'}
+            aria-selected={rightTab === 'motion'} onclick={() => (rightTab = 'motion')}
+          >Motion</button>
+          <button
+            type="button" role="tab" class="right-tab" class:active={rightTab === 'theme'}
+            aria-selected={rightTab === 'theme'} onclick={() => (rightTab = 'theme')}
+          >Theme</button>
+        </div>
+
+        <div class="right-tab-content flex-1 min-h-0 overflow-y-auto">
+          {#if rightTab === 'properties'}
+            <PropertiesPanel
+              selectedEid={selectionStore.eid}
+              onApplyLayoutChange={(eid, delta) => deckStore.applyLayoutChange(eid, delta)}
+              onApplyEqualColumns={(eid) => deckStore.applyEqualColumns(eid)}
+            />
+          {:else if rightTab === 'motion'}
+            <div class="flex flex-col gap-3 p-2">
+              <FragmentsPanel
+                slideEid={currentSlideEid}
+                selectedEid={selectionStore.eid}
+                onToggleFragment={(eid, index) => deckStore.toggleFragment(eid, index)}
+                onSetFragmentIndex={(eid, n) => deckStore.setFragmentIndex(eid, n)}
+                onSetFragmentStyle={(eid, style) => deckStore.setFragmentStyle(eid, style)}
+              />
+              <TransitionPanel
+                slideEid={currentSlideEid}
+                onSetSlideTransition={(eid, type, speed) => deckStore.setSlideTransition(eid, type, speed)}
+                onSetDeckTransition={(type, speed) => deckStore.setDeckTransition(type, speed)}
+              />
+              <AutoAnimatePanel
+                slideEid={currentSlideEid}
+                onEnableAutoAnimate={(eid) => deckStore.enableAutoAnimate(eid)}
+                onDisableAutoAnimate={(eid) => deckStore.disableAutoAnimate(eid)}
+              />
+            </div>
+          {:else}
+            <ThemingPanel />
+          {/if}
+        </div>
       </div>
     </div>
   {/snippet}
@@ -580,5 +697,36 @@
   .canvas-toolbar-btn svg {
     width: 1rem;
     height: 1rem;
+  }
+
+  /* Right-panel inspector tabs (Properties / Motion / Theme). */
+  .right-tab {
+    padding: 0.15rem 0.5rem;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    background: none;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+  .right-tab:hover:not(.active) {
+    color: rgba(255, 255, 255, 0.65);
+  }
+  .right-tab.active {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+  }
+
+  /*
+   * The tabbed lower zone shares the right-top panel height with the outline.
+   * Cap it so the outline tree always keeps room; the content scrolls inside.
+   */
+  .right-tabs {
+    max-height: 60%;
   }
 </style>

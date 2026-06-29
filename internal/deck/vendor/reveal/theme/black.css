@@ -1,9 +1,8 @@
 /**
- * Black theme for reveal.js. This is the opposite of the 'white' theme.
- *
- * By Hakim El Hattab, http://hakim.se
+ * Black theme for reveal.js 5.1.0. This is the opposite of the 'white' theme.
+ * By Hakim El Hattab. MIT License.
+ * Bundled without external @import for offline-first use (spec 12).
  */
-@import url(./fonts/source-sans-pro/source-sans-pro.css);
 section.has-light-background, section.has-light-background h1, section.has-light-background h2, section.has-light-background h3, section.has-light-background h4, section.has-light-background h5, section.has-light-background h6 {
   color: #222;
 }

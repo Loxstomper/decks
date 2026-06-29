@@ -1,0 +1,80 @@
+/**
+ * Beige theme for reveal.js 5.1.0 (MIT License, Hakim El Hattab).
+ * Warm paper-like background with dark text. Bundled without external @import
+ * to work offline (spec 12).
+ */
+section.has-dark-background,
+section.has-dark-background h1, section.has-dark-background h2,
+section.has-dark-background h3, section.has-dark-background h4,
+section.has-dark-background h5, section.has-dark-background h6 {
+  color: #fff;
+}
+
+:root {
+  --r-background-color: #f7f3de;
+  --r-main-font: Georgia, "Times New Roman", serif;
+  --r-main-font-size: 40px;
+  --r-main-color: #333;
+  --r-block-margin: 20px;
+  --r-heading-margin: 0 0 20px 0;
+  --r-heading-font: Georgia, "Times New Roman", serif;
+  --r-heading-color: #333;
+  --r-heading-line-height: 1.2;
+  --r-heading-letter-spacing: normal;
+  --r-heading-text-transform: none;
+  --r-heading-text-shadow: none;
+  --r-heading-font-weight: normal;
+  --r-heading1-text-shadow: none;
+  --r-heading1-size: 2.5em;
+  --r-heading2-size: 1.6em;
+  --r-heading3-size: 1.3em;
+  --r-heading4-size: 1em;
+  --r-code-font: monospace;
+  --r-link-color: #8b743d;
+  --r-link-color-dark: #564826;
+  --r-link-color-hover: #c0a86e;
+  --r-selection-background-color: rgba(139, 116, 61, 0.75);
+  --r-selection-color: #fff;
+  --r-overlay-element-bg-color: 0, 0, 0;
+  --r-overlay-element-fg-color: 240, 240, 240;
+}
+
+.reveal-viewport {
+  background: #f7f3de;
+  background-color: var(--r-background-color);
+}
+
+.reveal {
+  font-family: var(--r-main-font);
+  font-size: var(--r-main-font-size);
+  font-weight: normal;
+  color: var(--r-main-color);
+}
+
+.reveal ::selection { color: var(--r-selection-color); background: var(--r-selection-background-color); text-shadow: none; }
+.reveal ::-moz-selection { color: var(--r-selection-color); background: var(--r-selection-background-color); text-shadow: none; }
+
+.reveal h1, .reveal h2, .reveal h3, .reveal h4, .reveal h5, .reveal h6 {
+  margin: var(--r-heading-margin);
+  color: var(--r-heading-color);
+  font-family: var(--r-heading-font);
+  font-weight: var(--r-heading-font-weight);
+  line-height: var(--r-heading-line-height);
+  letter-spacing: var(--r-heading-letter-spacing);
+  text-transform: var(--r-heading-text-transform);
+  text-shadow: var(--r-heading-text-shadow);
+  word-wrap: break-word;
+}
+
+.reveal h1 { font-size: var(--r-heading1-size); }
+.reveal h2 { font-size: var(--r-heading2-size); }
+.reveal h3 { font-size: var(--r-heading3-size); }
+.reveal h4 { font-size: var(--r-heading4-size); }
+.reveal h1 { text-shadow: var(--r-heading1-text-shadow); }
+
+.reveal a { color: var(--r-link-color); text-decoration: none; transition: color .15s ease; }
+.reveal a:hover { color: var(--r-link-color-hover); text-shadow: none; border: none; }
+.reveal .roll span:after { color: #fff; background: var(--r-link-color-dark); }
+
+.reveal .controls { color: var(--r-link-color); }
+.reveal .progress { background: rgba(0,0,0,.2); color: var(--r-link-color); }

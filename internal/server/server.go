@@ -7,6 +7,10 @@
 //	GET  /api/decks/{name}                    → deck.html contents
 //	PUT  /api/decks/{name}                    → write deck.html atomically
 //	POST /api/decks/{name}/assets             → upload asset (multipart or raw body)
+//	GET  /api/decks/{name}/custom.css         → read custom.css (P6-11)
+//	PUT  /api/decks/{name}/custom.css         → write custom.css atomically (P6-11)
+//	POST /api/decks/{name}/fonts              → localize a Google Font offline (P6-13)
+//	GET  /api/themes                          → list bundled reveal.js themes (P6-10)
 //	GET  /api/shared                          → list shared/ library entries
 //	POST /api/shared/{filename}/copy          → copy shared file into a deck (?deck=)
 //	GET  /api/providers                       → list enabled image providers
@@ -85,6 +89,18 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Asset upload (P5-3, P5-14)
 	s.mux.HandleFunc("POST /api/decks/{name}/assets", s.handleAssetUpload)
+
+	// Custom CSS (P6-11): read and atomic write of per-deck custom.css.
+	// GET is redundant with the static /decks/{name}/custom.css route but
+	// provided here for symmetry and to allow JSON error responses.
+	s.mux.HandleFunc("GET /api/decks/{name}/custom.css", s.handleCustomCSSRead)
+	s.mux.HandleFunc("PUT /api/decks/{name}/custom.css", s.handleCustomCSSWrite)
+
+	// Font localization (P6-13): download a Google Font into assets/fonts/.
+	s.mux.HandleFunc("POST /api/decks/{name}/fonts", s.handleFontLocalize)
+
+	// Bundled theme list (P6-10): static list of themes shipped in the binary.
+	s.mux.HandleFunc("GET /api/themes", s.handleThemeList)
 
 	// Shared library (P5-5)
 	s.mux.HandleFunc("GET /api/shared", s.handleSharedList)
@@ -613,6 +629,134 @@ func spaHandler(staticFS fs.FS) http.Handler {
 		r2.URL.Path = "/index.html"
 		fileServer.ServeHTTP(w, r2)
 	})
+}
+
+// ── Custom CSS (P6-11) ────────────────────────────────────────────────────────
+
+// handleCustomCSSRead returns the current custom.css for a named deck.
+//
+//	GET /api/decks/{name}/custom.css
+//
+// WHY THIS ENDPOINT: the static /decks/{name}/custom.css route already serves
+// the file, but having an explicit API endpoint lets the FE store use a uniform
+// /api/… path and receive proper JSON errors on missing decks.
+func (s *Server) handleCustomCSSRead(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+	data, err := deck.ReadCustomCSS(s.root, name)
+	if err != nil {
+		if isNotExist(err) {
+			http.Error(w, "deck not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Write(data)
+}
+
+// handleCustomCSSWrite atomically writes custom.css for a named deck (P6-11).
+//
+//	PUT /api/decks/{name}/custom.css
+//
+// Body: the raw CSS text. Uses the same atomic temp+rename pattern as
+// handleDeckWrite so a partial write never leaves a corrupt file.
+func (s *Server) handleCustomCSSWrite(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	if err := deck.WriteCustomCSS(s.root, name, body); err != nil {
+		if isNotExist(err) {
+			http.Error(w, "deck not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// ── Font localization (P6-13) ──────────────────────────────────────────────────
+
+// handleFontLocalize downloads a Google Font and localizes it into the deck's
+// assets/fonts/ directory so the deck renders offline (spec 12).
+//
+//	POST /api/decks/{name}/fonts
+//	Body: {"family":"Inter","weights":"400;700"}
+//
+// Response: {"cssPath":"assets/fonts/inter/font-face.css","family":"Inter"}
+//
+// On network error (device offline, Google Fonts unreachable) returns 503 so
+// the FE can surface a friendly "font unavailable offline" message rather than
+// crashing. The deck is left unchanged.
+func (s *Server) handleFontLocalize(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	// Verify deck exists before attempting a network fetch.
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	var reqBody struct {
+		Family  string `json:"family"`
+		Weights string `json:"weights"` // optional, e.g. "400;700"
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if reqBody.Family == "" {
+		http.Error(w, "missing 'family' in request body", http.StatusBadRequest)
+		return
+	}
+
+	result, err := deck.LocalizeFont(s.root, name, reqBody.Family, reqBody.Weights)
+	if err != nil {
+		// WHY 503 for network-related errors:
+		// A 503 tells the FE the operation failed transiently (network offline or
+		// Google Fonts down) rather than the request itself being malformed.
+		log.Printf("font: localize %q (deck=%s): %v", reqBody.Family, name, err)
+		http.Error(w, "font localization failed: "+err.Error(), http.StatusServiceUnavailable)
+		return
+	}
+
+	log.Printf("font: localized %q → %s (deck=%s)", result.Family, result.CSSPath, name)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(result)
+}
+
+// ── Theme list (P6-10) ────────────────────────────────────────────────────────
+
+// handleThemeList returns the ordered list of bundled reveal.js themes.
+//
+//	GET /api/themes
+//
+// Response: ["black","white","league","beige","night","moon","solarized","dracula","sky"]
+//
+// WHY EXPOSE AN API: the FE can rely on this instead of a hardcoded list, so
+// adding a new theme to the binary automatically surfaces it in the picker.
+func (s *Server) handleThemeList(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(deck.BundledThemes)
 }
 
 // ── helpers ───────────────────────────────────────────────────────────────────

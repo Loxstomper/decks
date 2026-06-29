@@ -147,6 +147,21 @@ const customCSS = `/* Per-deck CSS custom properties and overrides.
 // DecksDir is the workspace-relative path for decks.
 const DecksDir = "decks"
 
+// BundledThemes is the ordered list of reveal.js themes vendored into the binary
+// (internal/deck/vendor/reveal/theme/*.css). Black is always first (default).
+// The FE theme picker uses this list; Vendor() copies all of them into each deck.
+var BundledThemes = []string{
+	"black",
+	"white",
+	"league",
+	"beige",
+	"night",
+	"moon",
+	"solarized",
+	"dracula",
+	"sky",
+}
+
 // sharedVendorDir is the workspace-relative path where reveal vendor files
 // are mirrored for human inspection.  Each deck carries its own private copy;
 // shared/ is a reference, not a runtime dependency.
@@ -411,4 +426,63 @@ func validateName(name string) error {
 // /decks/{name}/... static route against path traversal.
 func ValidName(name string) bool {
 	return validateName(name) == nil
+}
+
+// ReadCustomCSS returns the contents of decks/<name>/custom.css under root.
+func ReadCustomCSS(root, name string) ([]byte, error) {
+	if err := validateName(name); err != nil {
+		return nil, err
+	}
+	path := filepath.Join(root, DecksDir, name, "custom.css")
+	return os.ReadFile(path)
+}
+
+// WriteCustomCSS atomically writes content to decks/<name>/custom.css under root.
+// Uses the same temp-file + os.Rename pattern as Write (P6-11 byte-stable, atomic).
+func WriteCustomCSS(root, name string, content []byte) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	dir := filepath.Join(root, DecksDir, name)
+	target := filepath.Join(dir, "custom.css")
+
+	// Validate deck folder exists before writing to avoid silent creation outside
+	// of a properly scaffolded deck.
+	if info, err := os.Stat(dir); err != nil || !info.IsDir() {
+		return fmt.Errorf("deck %q not found", name)
+	}
+
+	// Atomic write: temp file in the same directory → os.Rename (POSIX atomic).
+	tmp, err := os.CreateTemp(dir, ".custom.css.tmp.*")
+	if err != nil {
+		return fmt.Errorf("custom css write: create temp: %w", err)
+	}
+	tmpName := tmp.Name()
+
+	if _, err := tmp.Write(content); err != nil {
+		tmp.Close()
+		os.Remove(tmpName)
+		return fmt.Errorf("custom css write: write temp: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("custom css write: close temp: %w", err)
+	}
+	if err := os.Rename(tmpName, target); err != nil {
+		os.Remove(tmpName)
+		return fmt.Errorf("custom css write: rename: %w", err)
+	}
+	log.Printf("deck: wrote %s", target)
+	return nil
+}
+
+// ValidTheme reports whether themeName is one of the bundled reveal themes.
+// The HTTP layer uses this to guard the theme endpoint against path traversal.
+func ValidTheme(themeName string) bool {
+	for _, t := range BundledThemes {
+		if t == themeName {
+			return true
+		}
+	}
+	return false
 }
