@@ -35,7 +35,7 @@ feature investigation this project grew out of.)
 | Distribution | Single static binary via `go:embed` |
 | Frontend | Svelte 5 + TypeScript + Tailwind, built with Vite |
 | Renderer | reveal.js in a sandboxed `<iframe>` |
-| Document model | DOM-as-model with verbatim passthrough |
+| Document model | Source-preserving element tree (raw bytes; verbatim passthrough) |
 | Code pane | CodeMirror 6 |
 | Undo/redo | Snapshot-based (session-only; git is durable history) |
 | Concurrency | Turn-taking + reload over SSE |

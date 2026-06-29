@@ -25,6 +25,7 @@ web/e2e/.e2e-state.json
 /slides-builder
 /slides
 /decks
+/shared
 *.test
 *.out
 coverage.*

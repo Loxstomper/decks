@@ -30,5 +30,17 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
   workspace on port 19999, runs Chromium). In CI/without local browsers, run inside the host
   `mcr.microsoft.com/playwright` image via `npm run test:e2e:docker`. Specs live in `web/e2e/*.spec.ts`.
 
+## Gotchas
+- **The layout contract is encoded twice** — `web/src/lib/model/layout.ts` (TS, editor) and
+  `internal/validate/validate.go` (Go, CLI/save-path `validate`). They are independent
+  re-implementations of the same `data-*` enums/numeric rules; **keep their allowed-sets in
+  sync** when changing the layout vocabulary, or `validate` and the editor will disagree.
+- **Optional external tools degrade gracefully** (offline-first): image providers need
+  `UNSPLASH_ACCESS_KEY` / `GIPHY_API_KEY` (absent → provider disabled); PDF export needs Chrome
+  via `$CHROME_BIN` or a common name (absent → 503); video transcode needs `ffmpeg` (absent →
+  skipped). `GET /api/capabilities` reports what's available so the UI can adapt.
+- **Generated/gitignored, never commit:** the `slides` binary, and the workspace runtime dirs
+  `decks/`, `shared/` (re-created/refreshed on run). Rebuild `web/dist/` before `go build`.
+
 ## Endpoints
 `GET /health` · `GET /api/decks` · `GET|PUT /api/decks/{name}` · `GET /decks/{name}/...` (static deck files: `deck.html` + `assets/`, traversal-guarded; the iframe loads `/decks/{name}/deck.html`) · `GET /events` (SSE) · `GET /` (SPA).
