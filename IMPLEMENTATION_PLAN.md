@@ -22,9 +22,23 @@ dependencies are noted inline.
 >
 > **STATUS (done, tag 0.0.1):** Phase 0 complete + P1-1. Go backend (`cmd/slides`, `internal/{config,deck,server,watch}`, `web/embed.go`) and Svelte 5 + TS + Vite + Tailwind frontend (`web/`) build and test green. Default port **3000** (Go `internal/config`; Vite proxy matches). Embed contract: Vite outputs to `web/dist/`, served at root via `fs.Sub(distEmbed,"dist")`. P0-14 coords transform in `web/src/lib/coords.ts` (78 vitest tests). Routes: `GET /health`, `GET/PUT /api/decks[/{name}]`, `GET /events` (SSE). Atomic deck writes via temp+rename (byte-identical round-trip verified).
 >
-> **Follow-ups discovered (not blocking Phase 0):**
-> - **[offline-first] `slides new` deck template uses CDN reveal.js (jsDelivr 5.1.0).** Violates spec 12 / principle #2. Must vendor reveal.js + theme into the deck (or `shared/`) and reference locally before M1. Ties into X-1 (offline guard) and P6-13 (font localization). _Owner: a near-term task._
+> **Follow-ups:**
+> - ~~[offline-first] `slides new` uses CDN reveal.js~~ **RESOLVED in Phase 1 (Lane V):** reveal 5.x vendored to `shared/vendor/reveal/`, copied into `decks/<name>/assets/vendor/reveal/` on `slides new`, referenced relatively; `slides vendor <deck>` re-vendors. Verified zero `http(s)://` in generated deck.html.
 > - **[cleanup] `Splitter.svelte` uses `createEventDispatcher`** (Svelte 4 compat). Migrate to Svelte 5 callback props during Phase 2/3 canvas work.
+
+## Phase 1 — Live editor shell
+> **STATUS (done, tag 0.0.2):** P1-1..P1-9 complete. Built via 5 parallel lanes + Opus integration; independently verified (FE: 130 vitest tests green incl. 23 model round-trip + 29 SSE + 78 coords; Go build/vet/test green; binary smoke-tested: deck APIs, `/decks/{name}/...` static route traversal-safe, offline-vendored reveal).
+>
+> **Key design decision (Lane M, spec 12 #4):** the document model is a **source-preserving element tree**, NOT DOMParser/outerHTML. Each node keeps its exact original bytes (`raw`); `serializeDeck` emits `raw` for untouched subtrees and canonical markup only for `dirty` ones → guarantees `serializeDeck(parseDeck(html)) === html` for well-formed input and scoped edits never churn siblings. Parser targets well-formed reveal HTML (explicit close tags; no HTML5 tag-omission) — `slides validate` (P8-2) will gate malformed input. Model API in `web/src/lib/model/` (`parseDeck`, `serializeDeck`, `edit.ts` mutators set `dirty`).
+>
+> **Infra added at integration:** `$lib` Vite/tsconfig alias; `main.ts` uses Svelte 5 `mount()`; `web/svelte.config.js` (fixed project-wide svelte-check); Go `/decks/{name}/...` static deck route (path-traversal guarded, `deck.ValidName`); `deckStore` (`web/src/lib/store/deck.svelte.ts`) loads→parses→autosaves (PUT, debounced) and reloads canvas after save; SSE reload wired with a turn-taking status badge. **Canvas refresh = server file + iframe reload after autosave** (not srcdoc) so relative asset URLs resolve and the canvas reflects persisted bytes.
+> - **[build] `web/dist/.gitkeep`** is recreated by a Vite `closeBundle` hook (`emptyOutDir` wipes it) so `go:embed` compiles on fresh clone and the tree stays clean.
+>
+> **Follow-ups discovered (not blocking Phase 1):**
+> - **[spec 11 §4] Turn-taking has a status badge but no conflict-resolution prompt/diff UI** on external-change-while-dirty. Implement in P8-6 (dirty-guard conflict prompt).
+> - **[spec 11] `slides validate` not yet run on the editor save path** (P8-3) — wire once P8-2 exists.
+> - **[perf] CodeMirror bundle trips Vite's >500 kB warning.** Consider `manualChunks`/code-split later (cosmetic).
+> - **[X-1] Offline guard** is currently a deck-template test; promote to a CI/dev check over a built deck's loaded URLs.
 
 - [x] **P0-1 — Init Go module.** `go mod init`, repo layout (`cmd/`, `internal/`). _Done when:_ `go build ./...` succeeds on an empty `main`.
 - [x] **P0-2 — Init frontend toolchain.** Svelte 5 + TypeScript + Vite + Tailwind in `web/`. _Done when:_ `npm run dev` serves a blank app with Tailwind working.
@@ -45,14 +59,14 @@ dependencies are noted inline.
 > Goal: open a deck, see it rendered, edit source, hot-reload. Specs: [02](specs/02-document-model.md), [04](specs/04-canvas-interaction.md).
 
 - [x] **P1-1 — Pane layout shell.** Navigator | Canvas | Outline+Properties/Source zones (static). _Done when:_ resizable panes render. (Spec 04)
-- [ ] **P1-2 — Sandboxed iframe renderer.** Mount reveal.js in a sandboxed iframe at logical 1920×1080. _Done when:_ a deck renders inside the iframe. (Spec 04, 05)
-- [ ] **P1-3 — Load deck into iframe.** Fetch `deck.html` and render it. _Done when:_ the scaffolded deck displays.
-- [ ] **P1-4 — DOM-as-model parse.** `DOMParser` → detached document held as the model. _Done when:_ model round-trips to identical HTML via the serializer (P1-5). (Spec 02)
-- [ ] **P1-5 — Deterministic serializer.** Model → HTML with stable indentation/attribute order. _Done when:_ same model always yields identical bytes. (Spec 02)
-- [ ] **P1-6 — Idempotent round-trip invariant + golden tests.** Corpus of decks (incl. odd/AI-authored HTML) must survive load→save byte-stable. _Done when:_ golden-file test suite passes. (Spec 12 — invariant)
-- [ ] **P1-7 — CodeMirror 6 source pane.** HTML editing view bound to the model. _Done when:_ editing source updates the in-memory model.
-- [ ] **P1-8 — Source → canvas sync.** Debounced re-parse + re-render on source edits. _Done when:_ typing in source updates the iframe.
-- [ ] **P1-9 — SSE client + reload.** Listen on `/events`; reload model on external change. _Done when:_ editing `deck.html` on disk updates the canvas live. (Spec 11)
+- [x] **P1-2 — Sandboxed iframe renderer.** Mount reveal.js in a sandboxed iframe at logical 1920×1080. _Done when:_ a deck renders inside the iframe. (Spec 04, 05)
+- [x] **P1-3 — Load deck into iframe.** Fetch `deck.html` and render it. _Done when:_ the scaffolded deck displays.
+- [x] **P1-4 — DOM-as-model parse.** `DOMParser` → detached document held as the model. _Done when:_ model round-trips to identical HTML via the serializer (P1-5). (Spec 02)
+- [x] **P1-5 — Deterministic serializer.** Model → HTML with stable indentation/attribute order. _Done when:_ same model always yields identical bytes. (Spec 02)
+- [x] **P1-6 — Idempotent round-trip invariant + golden tests.** Corpus of decks (incl. odd/AI-authored HTML) must survive load→save byte-stable. _Done when:_ golden-file test suite passes. (Spec 12 — invariant)
+- [x] **P1-7 — CodeMirror 6 source pane.** HTML editing view bound to the model. _Done when:_ editing source updates the in-memory model.
+- [x] **P1-8 — Source → canvas sync.** Debounced re-parse + re-render on source edits. _Done when:_ typing in source updates the iframe.
+- [x] **P1-9 — SSE client + reload.** Listen on `/events`; reload model on external change. _Done when:_ editing `deck.html` on disk updates the canvas live. (Spec 11)
 
 ## Phase 2 — Text editing & write-back
 > Goal: select and edit content visually; changes persist. Specs: [02](specs/02-document-model.md), [04](specs/04-canvas-interaction.md).

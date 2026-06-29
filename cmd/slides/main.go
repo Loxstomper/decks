@@ -4,6 +4,7 @@
 //
 //	slides [serve]           start the HTTP server (default action)
 //	slides new <name>        scaffold a new deck
+//	slides vendor <name>     (re)vendor reveal.js into an existing deck
 package main
 
 import (
@@ -33,8 +34,13 @@ func main() {
 			fatalf("usage: slides new <name>")
 		}
 		runNew(args[1])
+	case len(args) >= 1 && args[0] == "vendor":
+		if len(args) < 2 || args[1] == "" {
+			fatalf("usage: slides vendor <name>")
+		}
+		runVendor(args[1])
 	default:
-		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>", args[0])
+		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>\n  slides vendor <name>", args[0])
 	}
 }
 
@@ -93,6 +99,29 @@ func runNew(name string) {
 		log.Fatalf("deck new: %v", err)
 	}
 	fmt.Printf("Created deck %q at %s\n", name, filepath.Join(root, deck.DecksDir, name))
+}
+
+// runVendor (re)vendors the embedded reveal.js distribution into an existing
+// deck's assets/vendor/reveal/ directory.  Use this if vendor files were
+// deleted or to upgrade after a binary update.
+func runVendor(name string) {
+	root := workspaceRoot()
+
+	if err := scaffoldWorkspace(root); err != nil {
+		log.Fatalf("workspace: %v", err)
+	}
+
+	// Verify the deck exists before attempting to vendor.
+	deckDir := deck.DeckPath(root, name)
+	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
+		fatalf("deck %q not found at %s", name, deckDir)
+	}
+
+	if err := deck.Vendor(root, name); err != nil {
+		log.Fatalf("vendor: %v", err)
+	}
+	fmt.Printf("Vendored reveal.js into deck %q at %s\n", name,
+		filepath.Join(deckDir, "assets", "vendor", "reveal"))
 }
 
 // workspaceRoot returns the directory where the binary is run (cwd).

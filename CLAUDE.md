@@ -12,7 +12,8 @@ operational only (commands, gotchas).
   - `cd web && npm install && npm run build`   # outputs to web/dist/
   - `go build -o slides ./cmd/slides`          # single binary
 - Run server: `./slides` (or `go run ./cmd/slides`). Default port **3000** (override in `config.toml`: `port = 8080`).
-- Scaffold a deck: `./slides new <name>` → `decks/<name>/{deck.html,custom.css,assets/}`.
+- Scaffold a deck: `./slides new <name>` → `decks/<name>/{deck.html,custom.css,assets/}` (created **workspace-relative to CWD**, with reveal.js vendored offline into `assets/vendor/reveal/`).
+- Re-vendor reveal into an existing deck: `./slides vendor <name>`.
 
 ## Dev
 - `cd web && npm run dev` (Vite on :5173). Vite proxies `/api` and `/events` to the Go backend on **:3000** (override with `GO_PORT`). Run the Go server separately.
@@ -22,4 +23,4 @@ operational only (commands, gotchas).
 - Frontend: `cd web && npx vitest run`
 
 ## Endpoints
-`GET /health` · `GET /api/decks` · `GET|PUT /api/decks/{name}` · `GET /events` (SSE) · `GET /` (SPA).
+`GET /health` · `GET /api/decks` · `GET|PUT /api/decks/{name}` · `GET /decks/{name}/...` (static deck files: `deck.html` + `assets/`, traversal-guarded; the iframe loads `/decks/{name}/deck.html`) · `GET /events` (SSE) · `GET /` (SPA).

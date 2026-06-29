@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>Multi-slide Deck</title>
+    <link rel="stylesheet" href="dist/reveal.css" />
+    <link rel="stylesheet" href="dist/theme/white.css" />
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section data-eid="s1" data-background-color="#1a1a1a">
+          <h1>Title</h1>
+          <p class="subtitle">Horizontal slide one</p>
+        </section>
+        <section data-eid="s2">
+          <section data-eid="s2a">
+            <h2>Vertical stack &mdash; top</h2>
+            <ul>
+              <li>First</li>
+              <li class="fragment">Second</li>
+            </ul>
+          </section>
+          <section data-eid="s2b">
+            <h2>Vertical stack &mdash; bottom</h2>
+            <pre><code data-trim>const x = 1 &lt; 2;</code></pre>
+          </section>
+        </section>
+        <section data-eid="s3" data-transition="zoom">
+          <h2>Last slide</h2>
+          <img src="assets/diagram.svg" alt="A diagram" width="640" height="480" />
+        </section>
+      </div>
+    </div>
+    <script src="dist/reveal.js"></script>
+    <script>
+      Reveal.initialize({ hash: true, slideNumber: 'c/t' });
+    </script>
+  </body>
+</html>

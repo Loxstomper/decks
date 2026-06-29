@@ -1,1 +1,2 @@
-Placeholder so go:embed has an embeddable file on a fresh clone before `npm run build`. Real Vite output overwrites web/dist/. Do not delete.
+Placeholder so go:embed (web/embed.go) has an embeddable file on a fresh
+clone before `npm run build`. Recreated by vite.config.ts after each build.

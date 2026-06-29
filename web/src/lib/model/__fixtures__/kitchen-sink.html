@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<!-- Kitchen-sink deck: every edge case the round-trip invariant must survive. -->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Kitchen Sink &amp; Friends</title>
+    <link rel="stylesheet" href="dist/reveal.css" />
+    <style>
+      /* Inline author CSS — preserved verbatim, including odd whitespace. */
+      .reveal h1   { color: #f0f; }
+      .reveal .note::after { content: "  spaces  &  ampersands "; }
+    </style>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <!-- A normal slide with speaker notes. -->
+        <section data-eid="t1" id="intro" class="title-slide" data-background="#000">
+          <h1>Entities: &lt;tag&gt; &amp; &quot;quotes&quot; &copy; 2026</h1>
+          <p data-x="1" data-y='2' data-flag>Mixed quote styles and a boolean attr.</p>
+          <aside class="notes">
+            Remember to mention the &amp; in the title.
+          </aside>
+        </section>
+
+        <!-- A slide the canvas cannot model: an unknown custom element. -->
+        <section data-eid="t2">
+          <my-widget data-config='{"mode":"live","n":3}' enabled>
+            <span>Custom element content stays untouched.</span>
+          </my-widget>
+          <p>Self-closing void: <br/> and unclosed-style <br> mix.</p>
+        </section>
+
+        <!-- Embedded data island with CDATA. -->
+        <section data-eid="t3">
+          <script type="application/json">
+            { "items": [1, 2, 3], "note": "raw <text> not parsed" }
+          </script>
+          <svg viewBox="0 0 10 10" xmlns="http://www.w3.org/2000/svg">
+            <![CDATA[ arbitrary <markup> & data ]]>
+            <rect x="0" y="0" width="10" height="10" />
+          </svg>
+        </section>
+      </div>
+    </div>
+    <script src="dist/reveal.js"></script>
+    <script>
+      // Comment with <fake tag> and an entity-ish &amp; that must not be touched.
+      Reveal.initialize({ hash: true, plugins: [] });
+    </script>
+  </body>
+</html>

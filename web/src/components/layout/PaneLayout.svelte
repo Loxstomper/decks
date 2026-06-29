@@ -17,6 +17,23 @@
    */
 
   import Splitter from './Splitter.svelte';
+  import type { Snippet } from 'svelte';
+
+  /**
+   * Zone snippets (P1 wiring). The shell (App.svelte) injects the live
+   * components — Navigator deck list, RevealFrame canvas, SourcePane editor —
+   * while PaneLayout stays a pure layout primitive. Each is optional: when a
+   * zone is not provided we fall back to the original static placeholder so the
+   * layout is still demonstrable on its own.
+   */
+  interface Props {
+    navigator?: Snippet;
+    canvasHeader?: Snippet;
+    canvas?: Snippet;
+    outline?: Snippet;
+    source?: Snippet;
+  }
+  let { navigator, canvasHeader, canvas, outline, source }: Props = $props();
 
   // Panel widths in CSS pixels.  Defaults: Nav=220, Right=380, Canvas=remainder.
   let navWidth   = $state(220);
@@ -49,8 +66,12 @@
       Navigator
     </header>
     <div class="flex-1 overflow-y-auto px-2 py-1">
-      <!-- Slide filmstrip — populated in P6-1 -->
-      <p class="text-xs text-white/30 mt-4 text-center">No slides yet</p>
+      {#if navigator}
+        {@render navigator()}
+      {:else}
+        <!-- Slide filmstrip — populated in P6-1 -->
+        <p class="text-xs text-white/30 mt-4 text-center">No slides yet</p>
+      {/if}
     </div>
   </aside>
 
@@ -60,23 +81,31 @@
   <main class="canvas-pane flex-1 flex flex-col overflow-hidden bg-black/30 relative">
     <header class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50 border-b border-surface-overlay flex items-center gap-2">
       <span>Canvas</span>
-      <!-- Zoom controls slot — wired up in P1-2 -->
-      <span class="ml-auto text-white/30">100%</span>
+      {#if canvasHeader}
+        {@render canvasHeader()}
+      {:else}
+        <!-- Zoom controls slot — wired up in P1-2 -->
+        <span class="ml-auto text-white/30">100%</span>
+      {/if}
     </header>
 
     <!-- Canvas viewport — iframe + overlay layer live here (P1-2+) -->
     <div class="canvas-viewport flex-1 relative overflow-hidden flex items-center justify-center">
-      <div class="canvas-placeholder flex flex-col items-center gap-2 text-white/20 select-none">
-        <!-- Visual proof that Tailwind utilities work -->
-        <div class="w-16 h-16 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-              d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
-          </svg>
+      {#if canvas}
+        {@render canvas()}
+      {:else}
+        <div class="canvas-placeholder flex flex-col items-center gap-2 text-white/20 select-none">
+          <!-- Visual proof that Tailwind utilities work -->
+          <div class="w-16 h-16 rounded-lg bg-accent/20 border border-accent/40 flex items-center justify-center">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-accent/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7" />
+            </svg>
+          </div>
+          <span class="text-sm">Canvas (iframe + overlay)</span>
+          <span class="text-xs">1920 × 1080 logical</span>
         </div>
-        <span class="text-sm">Canvas (iframe + overlay)</span>
-        <span class="text-xs">1920 × 1080 logical</span>
-      </div>
+      {/if}
     </div>
   </main>
 
@@ -96,8 +125,12 @@
         Outline / Properties
       </header>
       <div class="flex-1 overflow-y-auto px-2 py-1">
-        <!-- Element tree — populated in P3-3 -->
-        <p class="text-xs text-white/30 mt-4 text-center">Select an element</p>
+        {#if outline}
+          {@render outline()}
+        {:else}
+          <!-- Element tree — populated in P3-3 -->
+          <p class="text-xs text-white/30 mt-4 text-center">Select an element</p>
+        {/if}
       </div>
     </div>
 
@@ -108,10 +141,17 @@
       <header class="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-white/50 border-b border-surface-overlay">
         Source
       </header>
-      <div class="flex-1 overflow-auto px-2 py-1 font-mono text-xs text-white/30">
-        <!-- CodeMirror 6 mounts here in P1-7 -->
-        <pre class="whitespace-pre-wrap">No deck open.</pre>
-      </div>
+      {#if source}
+        <!-- SourcePane (CodeMirror) fills the remaining height of this column. -->
+        <div class="flex-1 overflow-hidden">
+          {@render source()}
+        </div>
+      {:else}
+        <div class="flex-1 overflow-auto px-2 py-1 font-mono text-xs text-white/30">
+          <!-- CodeMirror 6 mounts here in P1-7 -->
+          <pre class="whitespace-pre-wrap">No deck open.</pre>
+        </div>
+      {/if}
     </div>
   </aside>
 

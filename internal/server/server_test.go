@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"slides-builder/internal/deck"
@@ -138,5 +139,72 @@ func TestDeckWrite_RoundTrip(t *testing.T) {
 
 	if !bytes.Equal(original, after) {
 		t.Errorf("round-trip not byte-identical: original=%d bytes, after=%d bytes", len(original), len(after))
+	}
+}
+
+// TestDeckStatic_ServesEntryAndAssets verifies the /decks/{name}/... static
+// route the iframe relies on: the entry document, a sibling asset, and the
+// folder root (which defaults to deck.html) all resolve.
+func TestDeckStatic_ServesEntryAndAssets(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "served"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	cases := []struct {
+		path        string
+		wantStatus  int
+		wantCTHas   string
+		wantBodyHas string
+	}{
+		{"/decks/served/deck.html", http.StatusOK, "text/html", `<div class="reveal">`},
+		{"/decks/served/", http.StatusOK, "text/html", `<div class="reveal">`}, // root → deck.html
+		{"/decks/served/assets/vendor/reveal/reveal.css", http.StatusOK, "text/css", ""},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest("GET", tc.path, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code != tc.wantStatus {
+			t.Errorf("%s: want status %d, got %d", tc.path, tc.wantStatus, rr.Code)
+			continue
+		}
+		if ct := rr.Header().Get("Content-Type"); tc.wantCTHas != "" && !strings.Contains(ct, tc.wantCTHas) {
+			t.Errorf("%s: Content-Type %q does not contain %q", tc.path, ct, tc.wantCTHas)
+		}
+		if tc.wantBodyHas != "" && !strings.Contains(rr.Body.String(), tc.wantBodyHas) {
+			t.Errorf("%s: body missing %q", tc.path, tc.wantBodyHas)
+		}
+	}
+}
+
+// TestDeckStatic_PathTraversalBlocked ensures a crafted URL cannot escape the
+// deck folder to read files elsewhere in the workspace (spec 12 invariant).
+func TestDeckStatic_PathTraversalBlocked(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "guarded"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+	// Plant a secret one level above the deck folder.
+	if err := os.WriteFile(filepath.Join(root, "decks", "secret.txt"), []byte("top-secret"), 0o644); err != nil {
+		t.Fatalf("write secret: %v", err)
+	}
+
+	// net/http cleans "../" before routing, so also try an encoded variant.
+	for _, path := range []string{"/decks/guarded/../secret.txt", "/decks/guarded/..%2fsecret.txt"} {
+		req := httptest.NewRequest("GET", path, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code == http.StatusOK && strings.Contains(rr.Body.String(), "top-secret") {
+			t.Errorf("%s: traversal succeeded — leaked secret", path)
+		}
+	}
+
+	// An invalid deck name must be rejected outright.
+	req := httptest.NewRequest("GET", "/decks/..%2f..%2f/deck.html", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code == http.StatusOK {
+		t.Errorf("invalid deck name served with 200")
 	}
 }

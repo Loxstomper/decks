@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"slides-builder/internal/deck"
@@ -142,4 +143,167 @@ func TestRead_NotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error reading nonexistent deck, got nil")
 	}
+}
+
+// ── Offline-first / vendor tests ──────────────────────────────────────────────
+
+// TestNew_VendorFilesPresent verifies that slides new copies all required
+// reveal.js vendor files into assets/vendor/reveal/ (spec 12 – offline-first).
+func TestNew_VendorFilesPresent(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "offline-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	vendorDir := filepath.Join(root, "decks", "offline-test", "assets", "vendor", "reveal")
+
+	requiredFiles := []string{
+		"reveal.js",
+		"reveal.css",
+		"reset.css",
+		filepath.Join("theme", "black.css"),
+	}
+	for _, rel := range requiredFiles {
+		p := filepath.Join(vendorDir, rel)
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("vendor file missing: %s: %v", rel, err)
+			continue
+		}
+		// Sanity: file should be non-empty.
+		if info.Size() == 0 {
+			t.Errorf("vendor file is empty: %s", rel)
+		}
+	}
+}
+
+// TestNew_DeckHTMLUsesRelativeRevealPaths asserts that the scaffolded deck.html
+// references reveal.js assets via relative paths (assets/vendor/reveal/…) rather
+// than absolute CDN URLs — required for offline-first rendering (spec 12).
+func TestNew_DeckHTMLUsesRelativeRevealPaths(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "rel-paths"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "rel-paths", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	// Invariant X-1 (offline guard): deck.html must NOT contain any external URLs.
+	// This is checked first so the error message is clear.
+	externalURL := regexp.MustCompile(`https?://`)
+	if externalURL.Match(html) {
+		t.Errorf("deck.html contains an external http(s):// URL — violates offline-first invariant (spec 12).\n"+
+			"Offending snippet: %s",
+			findMatchContext(html, externalURL))
+	}
+
+	// Verify the expected relative paths ARE present.
+	wantRefs := []string{
+		"assets/vendor/reveal/reset.css",
+		"assets/vendor/reveal/reveal.css",
+		"assets/vendor/reveal/theme/black.css",
+		"assets/vendor/reveal/reveal.js",
+	}
+	for _, ref := range wantRefs {
+		if !bytes.Contains(html, []byte(ref)) {
+			t.Errorf("deck.html missing expected relative path %q", ref)
+		}
+	}
+}
+
+// TestNew_OfflineGuard_NoExternalURLs is an explicit cross-cutting test for
+// invariant X-1: the generated deck.html must contain zero http(s):// URLs.
+func TestNew_OfflineGuard_NoExternalURLs(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "guard-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "guard-test", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	re := regexp.MustCompile(`https?://\S+`)
+	if matches := re.FindAll(html, -1); len(matches) > 0 {
+		t.Errorf("deck.html contains %d external URL(s) — violates offline-first (spec 12, X-1):", len(matches))
+		for _, m := range matches {
+			t.Errorf("  %s", m)
+		}
+	}
+}
+
+// TestVendor_RevendorExistingDeck verifies that Vendor() restores deleted
+// vendor files in an existing deck (the `slides vendor <name>` use-case).
+func TestVendor_RevendorExistingDeck(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "revendor"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Delete the vendor directory to simulate removal.
+	vendorDir := filepath.Join(root, "decks", "revendor", "assets", "vendor", "reveal")
+	if err := os.RemoveAll(vendorDir); err != nil {
+		t.Fatalf("RemoveAll: %v", err)
+	}
+	if _, err := os.Stat(vendorDir); !os.IsNotExist(err) {
+		t.Fatal("expected vendor dir to be gone after RemoveAll")
+	}
+
+	// Re-vendor.
+	if err := deck.Vendor(root, "revendor"); err != nil {
+		t.Fatalf("Vendor: %v", err)
+	}
+
+	// All files must be restored.
+	for _, rel := range []string{"reveal.js", "reveal.css", "reset.css", filepath.Join("theme", "black.css")} {
+		p := filepath.Join(vendorDir, rel)
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("after Vendor(): file missing: %s: %v", rel, err)
+		}
+	}
+}
+
+// TestEnsureSharedVendor verifies the workspace-level shared/vendor/reveal/ copy.
+func TestEnsureSharedVendor(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.EnsureSharedVendor(root); err != nil {
+		t.Fatalf("EnsureSharedVendor: %v", err)
+	}
+
+	sharedDir := filepath.Join(root, "shared", "vendor", "reveal")
+	for _, rel := range []string{"reveal.js", "reveal.css", "reset.css", filepath.Join("theme", "black.css")} {
+		p := filepath.Join(sharedDir, rel)
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("shared vendor file missing: %s: %v", rel, err)
+		}
+	}
+}
+
+// findMatchContext returns a short excerpt around the first regex match for
+// diagnostic purposes in test failure messages.
+func findMatchContext(data []byte, re *regexp.Regexp) []byte {
+	loc := re.FindIndex(data)
+	if loc == nil {
+		return nil
+	}
+	start := loc[0]
+	if start > 40 {
+		start -= 40
+	} else {
+		start = 0
+	}
+	end := loc[1] + 80
+	if end > len(data) {
+		end = len(data)
+	}
+	return data[start:end]
 }
