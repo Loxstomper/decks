@@ -318,6 +318,7 @@
           <button
             class="layout-picker-item"
             role="option"
+            aria-selected={false}
             onclick={() => { layoutPickerOpen = false; void addSlide(); }}
           >
             Blank
@@ -326,6 +327,7 @@
             <button
               class="layout-picker-item"
               role="option"
+              aria-selected={false}
               onclick={() => void addWithLayout(preset.html)}
             >
               {preset.label}
