@@ -17,6 +17,7 @@
   import { buildThumbnailSrcdoc } from '$lib/slides';
   import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '$lib/coords';
   import type { ElementNode } from '$lib/model';
+  import { deckStore } from '$lib/store/deck.svelte';
 
   interface Props {
     /** Open deck name — for the `/decks/<name>/…` stylesheet + asset URLs. */
@@ -29,11 +30,18 @@
 
   let { deckName, section, width = 168 }: Props = $props();
 
+  // Derive the active reveal theme from the deck's raw HTML source.
+  // The theme link tag looks like: assets/vendor/reveal/theme/<name>.css
+  // Fall back to "black" when no theme link is found.
+  const theme = $derived(
+    deckStore.source.match(/assets\/vendor\/reveal\/theme\/([\w-]+)\.css/)?.[1] ?? 'black',
+  );
+
   // Scale the logical canvas down to the thumbnail width; height follows the
   // logical aspect ratio so it never distorts.
   const scale = $derived(width / LOGICAL_WIDTH);
   const height = $derived((width * LOGICAL_HEIGHT) / LOGICAL_WIDTH);
-  const srcdoc = $derived(buildThumbnailSrcdoc(deckName, section));
+  const srcdoc = $derived(buildThumbnailSrcdoc(deckName, section, { theme }));
 </script>
 
 <div class="thumb" style="width: {width}px; height: {height}px;">

@@ -282,4 +282,123 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     // No external URLs (offline-first, spec 12).
     expect(doc).not.toMatch(/https?:\/\//);
   });
+
+  it('uses the theme passed via opts (non-black theme link present)', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1, { theme: 'moon' });
+    expect(doc).toContain('assets/vendor/reveal/theme/moon.css');
+    expect(doc).not.toContain('assets/vendor/reveal/theme/black.css');
+  });
+
+  it('falls back to the black theme when no opts.theme is provided', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    expect(doc).toContain('assets/vendor/reveal/theme/black.css');
+  });
+
+  it('links slides-slide-themes.css for per-slide data-theme overrides', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    expect(doc).toContain('assets/vendor/slides-slide-themes.css');
+  });
+
+  it('forces .fragment elements visible so all content shows in the thumbnail', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    expect(doc).toContain('.fragment');
+    expect(doc).toContain('opacity: 1 !important');
+    expect(doc).toContain('visibility: visible !important');
+  });
+
+  it('applies data-background-color as the section background in the thumbnail', () => {
+    const DECK_WITH_BG = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1" data-background-color="#ff0000"><h1>Red BG</h1></section>
+</div></div></body></html>`;
+    const model = parseDeck(DECK_WITH_BG);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    expect(doc).toContain('background-color: #ff0000 !important');
+  });
+
+  it('does not add a background-color rule when the section has none', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    // The rule should be absent (empty string injection).
+    expect(doc).not.toContain('background-color:');
+  });
+
+  it('contains no external (http/https) URLs — offline-first', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1, { theme: 'white' });
+    expect(doc).not.toMatch(/https?:\/\//);
+  });
+
+  it('does not force flex on every section (lets data-lay display win)', () => {
+    const model = parseDeck(DECK);
+    const s1 = topLevelSlides(model)[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    // The flex-everything override (the old bug) must be gone.
+    expect(doc).not.toContain('display: flex !important');
+    // Each layout type's real display is re-asserted at the section level.
+    expect(doc).toContain('.reveal .slides > section[data-lay="grid"]   { display: grid; }');
+    expect(doc).toContain('.reveal .slides > section[data-lay="row"]    { display: flex; flex-direction: row; }');
+    expect(doc).toContain('.reveal .slides > section[data-lay="stack"]  { display: flex; flex-direction: column; }');
+    // Plain (no data-lay) sections still centre vertically.
+    expect(doc).toContain('.reveal .slides > section:not([data-lay])');
+  });
+
+  describe('numeric layout is resolved statically (P12 wiring)', () => {
+    it('renders grid-template-columns inline for a grid section', () => {
+      const GRID = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="g1" data-lay="grid" data-cols="3" data-gap="24"><div>a</div><div>b</div><div>c</div></section>
+</div></div></body></html>`;
+      const model = parseDeck(GRID);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      // Numeric layout resolved to inline style (mirrors slides-layout-init.js).
+      expect(doc).toContain('grid-template-columns: repeat(3, 1fr)');
+      // Gap is applied (logical px).
+      expect(doc).toContain('gap: 24px');
+      // No external URLs (offline-first, spec 12).
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('renders left/top/width/height inline for a free-positioned element', () => {
+      const FREE = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="f1"><div data-free data-x="120" data-y="80" data-w="400" data-h="300" data-rot="15">box</div></section>
+</div></div></body></html>`;
+      const model = parseDeck(FREE);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      expect(doc).toContain('left: 120px');
+      expect(doc).toContain('top: 80px');
+      expect(doc).toContain('width: 400px');
+      expect(doc).toContain('height: 300px');
+      expect(doc).toContain('transform: rotate(15deg)');
+      expect(doc).not.toMatch(/https?:\/\//);
+    });
+
+    it('resolves flex grow/basis on row children', () => {
+      const ROW = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="r1" data-lay="row" data-gap="40"><div data-grow="1" data-basis="200">l</div><div data-basis="50%">r</div></section>
+</div></div></body></html>`;
+      const model = parseDeck(ROW);
+      const s1 = topLevelSlides(model)[0];
+      const doc = buildThumbnailSrcdoc('My Deck', s1);
+      expect(doc).toContain('flex-grow: 1');
+      expect(doc).toContain('flex-basis: 200px');
+      expect(doc).toContain('flex-basis: 50%');
+      expect(doc).toContain('gap: 40px');
+    });
+  });
 });

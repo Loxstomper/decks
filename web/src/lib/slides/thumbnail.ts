@@ -35,7 +35,8 @@
  */
 
 import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '$lib/coords';
-import { serializeDeck, type ElementNode } from '$lib/model';
+import { serializeDeck, getAttribute, type ElementNode } from '$lib/model';
+import { applyThumbnailLayout } from './thumbnail-layout';
 
 /**
  * Serialize a single slide `<section>` to HTML. We wrap it in a throwaway
@@ -47,15 +48,37 @@ export function serializeSection(section: ElementNode): string {
   return serializeDeck({ nodes: [section] });
 }
 
+/** Options for buildThumbnailSrcdoc. */
+export interface ThumbnailOptions {
+  /** Reveal theme name (e.g. "black", "white", "moon"). Defaults to "black". */
+  theme?: string;
+}
+
 /**
  * Build the `srcdoc` document for a slide thumbnail.
  *
  * @param deckName  the open deck's name (for the `/decks/<name>/` URLs)
  * @param section   the slide's `<section>` model node
+ * @param opts      optional overrides (theme name, etc.)
  */
-export function buildThumbnailSrcdoc(deckName: string, section: ElementNode): string {
+export function buildThumbnailSrcdoc(
+  deckName: string,
+  section: ElementNode,
+  opts?: ThumbnailOptions,
+): string {
   const base = `/decks/${encodeURIComponent(deckName)}/`;
-  const sectionHtml = serializeSection(section);
+  const theme = opts?.theme ?? 'black';
+  // Resolve the numeric layout vocabulary (gap/pad/grid/grow/basis/span + free
+  // x/y/w/h/rot) into inline styles BEFORE serializing, so the script-free
+  // thumbnail renders the same static geometry the runtime slides-layout-init.js
+  // produces on the live canvas. Operates on a clone — the model is untouched.
+  const sectionHtml = serializeSection(applyThumbnailLayout(section));
+
+  // Per-slide background color from data-background-color attribute.
+  const bgColor = getAttribute(section, 'data-background-color');
+  const bgColorRule = bgColor
+    ? `background-color: ${bgColor} !important;`
+    : '';
 
   // Override stylesheet: reveal.js normally drives `.slides` positioning + the
   // visibility of the current section from JavaScript. With no JS we pin a single
@@ -75,18 +98,35 @@ export function buildThumbnailSrcdoc(deckName: string, section: ElementNode): st
       left: auto; top: auto; transform: none; text-align: center;
     }
     /* Pin THIS slide to the whole canvas and force it visible (reveal hides
-       non-present sections by default). */
+       non-present sections by default). NOTE: deliberately does NOT set display
+       here — reveal's "section { display:none }" rule has the same specificity,
+       so we re-assert the section's REAL display per data-lay below (rather than
+       forcing flex on everything, which would clobber grid/row). */
     .reveal .slides > section {
       position: absolute; top: 0; left: 0;
       width: ${LOGICAL_WIDTH}px; height: ${LOGICAL_HEIGHT}px;
-      display: flex !important; flex-direction: column; justify-content: center;
       opacity: 1 !important; visibility: visible !important;
       transform: none !important; pointer-events: none;
       box-sizing: border-box; padding: 40px;
+      ${bgColorRule}
+    }
+    /* Re-assert each top-level section's real display so it wins over reveal's
+       display:none (no JS adds a .present class). For a section carrying data-lay
+       this mirrors slides-layout.css; the attribute selectors raise specificity
+       above reveal's "section" rule, which a bare [data-lay] rule cannot.
+       A plain section (no data-lay) falls back to a vertically-centred column. */
+    .reveal .slides > section[data-lay="stack"]  { display: flex; flex-direction: column; }
+    .reveal .slides > section[data-lay="row"]    { display: flex; flex-direction: row; }
+    .reveal .slides > section[data-lay="grid"]   { display: grid; }
+    .reveal .slides > section[data-lay="layers"] { display: grid; }
+    .reveal .slides > section:not([data-lay]) {
+      display: flex; flex-direction: column; justify-content: center;
     }
     /* A vertical stack wrapper shows its first nested slide as the thumbnail. */
     .reveal .slides > section > section { position: static; height: auto; }
     .reveal .slides > section > section ~ section { display: none; }
+    /* Show all fragment steps in the thumbnail (no JS to advance them). */
+    .fragment { opacity: 1 !important; visibility: visible !important; }
   `;
 
   // NOTE: the override <link>/<style> order matters — overrides come AFTER the
@@ -98,8 +138,9 @@ export function buildThumbnailSrcdoc(deckName: string, section: ElementNode): st
 <base href="${base}">
 <link rel="stylesheet" href="assets/vendor/reveal/reset.css">
 <link rel="stylesheet" href="assets/vendor/reveal/reveal.css">
-<link rel="stylesheet" href="assets/vendor/reveal/theme/black.css">
+<link rel="stylesheet" href="assets/vendor/reveal/theme/${theme}.css">
 <link rel="stylesheet" href="assets/vendor/slides-layout.css">
+<link rel="stylesheet" href="assets/vendor/slides-slide-themes.css">
 <link rel="stylesheet" href="assets/vendor/highlight/monokai.min.css">
 <link rel="stylesheet" href="custom.css">
 <style>${overrideCss}</style>
