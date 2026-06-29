@@ -2,13 +2,21 @@
 //
 // Routes:
 //
-//	GET  /health           → 200 OK
-//	GET  /api/decks        → JSON list of deck names
-//	GET  /api/decks/{name} → deck.html contents
-//	PUT  /api/decks/{name} → write deck.html atomically
-//	GET  /decks/{name}/... → static deck files (deck.html + assets/, for the iframe)
-//	GET  /events           → SSE stream of watcher events
-//	GET  /                 → embedded Svelte SPA (falls back to index.html)
+//	GET  /health                              → 200 OK
+//	GET  /api/decks                           → JSON list of deck names
+//	GET  /api/decks/{name}                    → deck.html contents
+//	PUT  /api/decks/{name}                    → write deck.html atomically
+//	POST /api/decks/{name}/assets             → upload asset (multipart or raw body)
+//	GET  /api/shared                          → list shared/ library entries
+//	POST /api/shared/{filename}/copy          → copy shared file into a deck (?deck=)
+//	GET  /api/providers                       → list enabled image providers
+//	GET  /api/providers/{name}/search         → search a provider (?q=&page=)
+//	POST /api/providers/{name}/fetch          → fetch & localize into deck (body JSON)
+//	GET  /api/capabilities                    → feature-detection flags (e.g. ffmpeg)
+//	GET  /decks/{name}/...                    → static deck files (for the iframe)
+//	GET  /shared/...                          → static shared/ library files (previews)
+//	GET  /events                              → SSE stream of watcher events
+//	GET  /                                    → embedded Svelte SPA (falls back to index.html)
 package server
 
 import (
@@ -17,29 +25,45 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
 
+	"slides-builder/internal/assets"
 	"slides-builder/internal/deck"
+	"slides-builder/internal/provider"
 	"slides-builder/internal/watch"
 )
 
 // Server holds the HTTP mux and its dependencies.
 type Server struct {
-	root    string
-	watcher *watch.Watcher
-	mux     *http.ServeMux
+	root      string
+	watcher   *watch.Watcher
+	mux       *http.ServeMux
+	providers *provider.Registry
 }
 
 // New creates a Server.  root is the workspace root directory.
 // staticFS is the embedded frontend filesystem (web/dist); pass nil to skip
 // serving static files (useful in tests).
+// reg is the provider registry; pass nil to disable provider routes.
 func New(root string, w *watch.Watcher, staticFS fs.FS) *Server {
+	return NewWithProviders(root, w, staticFS, nil)
+}
+
+// NewWithProviders creates a Server with an explicit provider registry.
+func NewWithProviders(root string, w *watch.Watcher, staticFS fs.FS, reg *provider.Registry) *Server {
+	if reg == nil {
+		reg = &provider.Registry{}
+	}
 	s := &Server{
-		root:    root,
-		watcher: w,
-		mux:     http.NewServeMux(),
+		root:      root,
+		watcher:   w,
+		mux:       http.NewServeMux(),
+		providers: reg,
 	}
 	s.routes(staticFS)
 	return s
@@ -53,16 +77,43 @@ func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 // routes registers all HTTP handlers.
 func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("GET /health", s.handleHealth)
+
+	// Deck CRUD
 	s.mux.HandleFunc("GET /api/decks", s.handleDeckList)
 	s.mux.HandleFunc("GET /api/decks/{name}", s.handleDeckRead)
 	s.mux.HandleFunc("PUT /api/decks/{name}", s.handleDeckWrite)
+
+	// Asset upload (P5-3, P5-14)
+	s.mux.HandleFunc("POST /api/decks/{name}/assets", s.handleAssetUpload)
+
+	// Shared library (P5-5)
+	s.mux.HandleFunc("GET /api/shared", s.handleSharedList)
+	s.mux.HandleFunc("POST /api/shared/{filename}/copy", s.handleSharedCopy)
+
+	// Provider system (P5-6, P5-7, P5-8)
+	s.mux.HandleFunc("GET /api/providers", s.handleProviderList)
+	s.mux.HandleFunc("GET /api/providers/{name}/search", s.handleProviderSearch)
+	s.mux.HandleFunc("POST /api/providers/{name}/fetch", s.handleProviderFetch)
+
+	// Capability flags
+	s.mux.HandleFunc("GET /api/capabilities", s.handleCapabilities)
+
+	// Iframe static serving
 	s.mux.HandleFunc("GET /decks/{name}/{path...}", s.handleDeckStatic)
+
+	// Shared library static serving (P5-5): lets the editor preview shared/
+	// thumbnails. Read-only; copy-into-deck is the only way content enters a deck.
+	s.mux.HandleFunc("GET /shared/{path...}", s.handleSharedStatic)
+
+	// SSE
 	s.mux.HandleFunc("GET /events", s.handleSSE)
 
 	if staticFS != nil {
 		s.mux.Handle("/", spaHandler(staticFS))
 	}
 }
+
+// ── Core deck handlers ────────────────────────────────────────────────────────
 
 // handleHealth returns a 200 with a simple JSON body.
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
@@ -129,6 +180,323 @@ func (s *Server) handleDeckWrite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// ── Asset upload (P5-3, P5-14) ───────────────────────────────────────────────
+
+// assetResponse is the JSON shape returned by POST /api/decks/{name}/assets.
+type assetResponse struct {
+	// Src is the relative path from the deck folder, e.g. "assets/img/photo.jpg".
+	Src string `json:"src"`
+	// Transcoded is true when ffmpeg re-encoded a video to H.264/MP4 (P5-14).
+	Transcoded bool `json:"transcoded,omitempty"`
+}
+
+// handleAssetUpload accepts a multipart/form-data upload with a "file" field,
+// copies the file into decks/<name>/assets/ (traversal-safe, deduplicated),
+// and returns a JSON body with the relative src.
+//
+// For video files, optional ffmpeg transcoding is attempted when available (P5-14).
+//
+// Content-Type detection order:
+//  1. The Content-Type of the multipart part (most reliable for browser uploads).
+//  2. File extension of the uploaded filename.
+func (s *Server) handleAssetUpload(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	// Verify the deck exists.
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	// Parse multipart form (32 MB in-memory limit; larger files spill to disk).
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		http.Error(w, "invalid multipart form: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fh, header, err := r.FormFile("file")
+	if err != nil {
+		http.Error(w, "missing 'file' field in multipart form", http.StatusBadRequest)
+		return
+	}
+	defer fh.Close()
+
+	// Determine MIME type from the part's Content-Type header, falling back to
+	// extension-based detection.  Never trust the extension alone for security
+	// decisions, but here we only use it to choose a storage subdirectory.
+	mimeType := header.Header.Get("Content-Type")
+	if mimeType == "" || mimeType == "application/octet-stream" {
+		mimeType = mimeByFilename(header.Filename)
+	}
+	// Strip parameters (e.g. "image/jpeg; charset=utf-8" → "image/jpeg").
+	if mt, _, err2 := mime.ParseMediaType(mimeType); err2 == nil {
+		mimeType = mt
+	}
+
+	data, err := io.ReadAll(fh)
+	if err != nil {
+		http.Error(w, "read upload: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	var relSrc string
+	var transcoded bool
+
+	if strings.HasPrefix(mimeType, "video/") {
+		// Video path: optional ffmpeg transcode (P5-14, graceful if absent).
+		relSrc, transcoded, err = assets.LocalizeVideo(s.root, name, data, header.Filename)
+	} else {
+		relSrc, err = assets.LocalizeBytes(s.root, name, data, header.Filename, mimeType)
+	}
+	if err != nil {
+		http.Error(w, "asset upload: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	log.Printf("asset: uploaded %s → %s (deck=%s, transcoded=%v)", header.Filename, relSrc, name, transcoded)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(assetResponse{Src: relSrc, Transcoded: transcoded})
+}
+
+// mimeByFilename returns a MIME type inferred from the filename extension.
+func mimeByFilename(name string) string {
+	ext := strings.ToLower(strings.TrimPrefix(strings.ToLower(name[max(0, strings.LastIndex(name, ".")):]), ""))
+	// mime.TypeByExtension returns "type/sub; ...params" but we just need the type.
+	if t := mime.TypeByExtension(ext); t != "" {
+		return t
+	}
+	// Fallback table for types not in the stdlib mime package.
+	switch ext {
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".svg":
+		return "image/svg+xml"
+	case ".mp4":
+		return "video/mp4"
+	case ".webm":
+		return "video/webm"
+	case ".mov":
+		return "video/quicktime"
+	case ".avi":
+		return "video/avi"
+	}
+	return "application/octet-stream"
+}
+
+// max returns the larger of a and b (used for string index clamping above).
+func max(a, b int) int {
+	if a > b {
+		return a
+	}
+	return b
+}
+
+// ── Shared library (P5-5) ────────────────────────────────────────────────────
+
+// handleSharedList returns a JSON array of files in the shared/ library.
+func (s *Server) handleSharedList(w http.ResponseWriter, r *http.Request) {
+	entries, err := assets.ListShared(s.root)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if entries == nil {
+		entries = []assets.SharedEntry{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(entries)
+}
+
+// handleSharedCopy copies a shared library file into a deck's assets/.
+//
+//	POST /api/shared/{filename}/copy?deck=<deckname>
+//
+// Response: {"src":"assets/img/logo.png"}
+func (s *Server) handleSharedCopy(w http.ResponseWriter, r *http.Request) {
+	filename := r.PathValue("filename")
+	deckName := r.URL.Query().Get("deck")
+
+	if deckName == "" {
+		http.Error(w, "missing 'deck' query parameter", http.StatusBadRequest)
+		return
+	}
+	if !deck.ValidName(deckName) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	relSrc, err := assets.CopyFromShared(s.root, deckName, filename)
+	if err != nil {
+		if strings.Contains(err.Error(), "not found") {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"src": relSrc})
+}
+
+// handleSharedStatic serves a read-only preview of files in the workspace
+// shared/ library so the editor's Shared-library picker can render thumbnails.
+//
+//	GET /shared/{path...}
+//
+// Path-traversal safety mirrors handleDeckStatic: fs.ValidPath rejects absolute
+// paths and ".." segments, and os.DirFS confines all access to the shared/ dir,
+// so a crafted URL cannot read files outside it.
+func (s *Server) handleSharedStatic(w http.ResponseWriter, r *http.Request) {
+	rel := r.PathValue("path")
+	if rel == "" || !fs.ValidPath(rel) {
+		http.Error(w, "invalid path", http.StatusBadRequest)
+		return
+	}
+	sharedDir := filepath.Join(s.root, "shared")
+	if info, err := os.Stat(sharedDir); err != nil || !info.IsDir() {
+		http.Error(w, "shared library not found", http.StatusNotFound)
+		return
+	}
+	http.ServeFileFS(w, r, os.DirFS(sharedDir), rel)
+}
+
+// ── Provider system (P5-6, P5-7, P5-8) ───────────────────────────────────────
+
+// handleProviderList returns a JSON array of enabled providers.
+func (s *Server) handleProviderList(w http.ResponseWriter, r *http.Request) {
+	enabled := s.providers.Enabled()
+	list := make([]provider.ProviderInfo, 0, len(enabled))
+	for _, p := range enabled {
+		list = append(list, provider.ProviderInfo{Name: p.Name(), Label: p.Label()})
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(list)
+}
+
+// handleProviderSearch proxies a search query to the named provider.
+//
+//	GET /api/providers/{name}/search?q=<query>&page=<n>
+//
+// Response: {"results":[…],"page":1,"total_pages":10}
+func (s *Server) handleProviderSearch(w http.ResponseWriter, r *http.Request) {
+	pName := r.PathValue("name")
+	p := s.providers.Get(pName)
+	if p == nil {
+		http.Error(w, "unknown provider: "+pName, http.StatusNotFound)
+		return
+	}
+	if !p.Enabled() {
+		http.Error(w, "provider not enabled: "+pName, http.StatusForbidden)
+		return
+	}
+
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		http.Error(w, "missing 'q' query parameter", http.StatusBadRequest)
+		return
+	}
+	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+	if page < 1 {
+		page = 1
+	}
+
+	results, totalPages, err := p.Search(query, page)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{
+		"results":     results,
+		"page":        page,
+		"total_pages": totalPages,
+	})
+}
+
+// handleProviderFetch downloads an asset from a provider and localizes it.
+//
+//	POST /api/providers/{name}/fetch
+//	Body: {"id":"<provider-id>","deck":"<deck-name>"}
+//
+// Response: {"src":"assets/img/photo.jpg"}
+func (s *Server) handleProviderFetch(w http.ResponseWriter, r *http.Request) {
+	pName := r.PathValue("name")
+	p := s.providers.Get(pName)
+	if p == nil {
+		http.Error(w, "unknown provider: "+pName, http.StatusNotFound)
+		return
+	}
+	if !p.Enabled() {
+		http.Error(w, "provider not enabled: "+pName, http.StatusForbidden)
+		return
+	}
+
+	var body struct {
+		ID   string `json:"id"`
+		Deck string `json:"deck"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if body.ID == "" {
+		http.Error(w, "missing 'id' in request body", http.StatusBadRequest)
+		return
+	}
+	if body.Deck == "" {
+		http.Error(w, "missing 'deck' in request body", http.StatusBadRequest)
+		return
+	}
+	if !deck.ValidName(body.Deck) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	// Verify deck exists.
+	deckDir := deck.DeckPath(s.root, body.Deck)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	relSrc, err := p.Fetch(body.ID, s.root, body.Deck)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadGateway)
+		return
+	}
+
+	log.Printf("provider: fetched %s/%s → %s (deck=%s)", pName, body.ID, relSrc, body.Deck)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"src": relSrc})
+}
+
+// ── Capabilities (P5-14) ──────────────────────────────────────────────────────
+
+// handleCapabilities reports optional feature availability (e.g. ffmpeg).
+// The frontend uses this to show/hide the "transcode video" option.
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]bool{
+		"ffmpeg": assets.HasFFmpeg(),
+	})
+}
+
+// ── Static deck serving ───────────────────────────────────────────────────────
+
 // handleDeckStatic serves the on-disk files of a deck folder so the editor's
 // reveal.js <iframe> can load /decks/{name}/deck.html and resolve its sibling
 // assets (assets/vendor/reveal/..., images, custom.css) via relative URLs.
@@ -172,6 +540,8 @@ func (s *Server) handleDeckStatic(w http.ResponseWriter, r *http.Request) {
 	// from the file extension and handles conditional/range requests.
 	http.ServeFileFS(w, r, os.DirFS(deckDir), rel)
 }
+
+// ── SSE ───────────────────────────────────────────────────────────────────────
 
 // handleSSE streams watcher events as Server-Sent Events.
 func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
@@ -220,6 +590,8 @@ func (s *Server) handleSSE(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// ── SPA handler ───────────────────────────────────────────────────────────────
+
 // spaHandler serves files from staticFS and falls back to index.html for
 // unknown paths (client-side routing).
 func spaHandler(staticFS fs.FS) http.Handler {
@@ -243,6 +615,8 @@ func spaHandler(staticFS fs.FS) http.Handler {
 	})
 }
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
 // isNotExist returns true when err (or its chain) represents a not-found error.
 func isNotExist(err error) bool {
 	if err == nil {
@@ -251,3 +625,4 @@ func isNotExist(err error) bool {
 	return strings.Contains(err.Error(), "no such file") ||
 		strings.Contains(err.Error(), "not found")
 }
+

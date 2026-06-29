@@ -29,7 +29,7 @@
  *                 never touches these; they round-trip byte-identically (spec 12 #4).
  */
 
-import { hasAttribute } from './edit';
+import { hasAttribute, getAttribute } from './edit';
 import type { ElementNode } from './types';
 
 export type ElementClass = 'container' | 'leaf' | 'free' | 'passthrough';
@@ -65,6 +65,13 @@ const LEAF_TAGS = new Set<string>([
  * This is a pure function of the node's tag name and attributes — it does not
  * walk children or inspect ancestors. Call it at any point; it never mutates.
  */
+/** True when `el`'s class attribute contains `token` as a whitespace-delimited class. */
+function hasClassToken(el: ElementNode, token: string): boolean {
+  const cls = getAttribute(el, 'class');
+  if (!cls) return false;
+  return cls.split(/\s+/).includes(token);
+}
+
 export function classify(el: ElementNode): ElementClass {
   // Rule 1 — free escape-hatch (highest priority so data-free wins over data-lay).
   if (hasAttribute(el, 'data-free')) return 'free';
@@ -76,6 +83,16 @@ export function classify(el: ElementNode): ElementClass {
 
   // Rule 3 — leaf: known block-content tag.
   if (LEAF_TAGS.has(tag)) return 'leaf';
+
+  // Rule 3b — math block: a KaTeX leaf has no dedicated HTML tag, so the editor
+  // marks it with its OWN class token `math-block` (see blocks/builders.ts).
+  // spec 03 lists Math as a leaf block type — recognise the editor's own marker
+  // so the math block gets a data-eid and is individually selectable/styleable.
+  // This is the editor's emitted marker, not user styling, so reading it here
+  // does not violate the "no class-string parsing for layout" principle.
+  if ((tag === 'div' || tag === 'span') && hasClassToken(el, 'math-block')) {
+    return 'leaf';
+  }
 
   // Rule 4 — passthrough: everything else.
   return 'passthrough';

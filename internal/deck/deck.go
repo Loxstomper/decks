@@ -41,6 +41,27 @@ var revealVendor embed.FS
 //go:embed vendor/slides-layout.css vendor/slides-layout-init.js
 var layoutVendor embed.FS
 
+// highlightVendor holds the reveal.js highlight plugin (P5-9, spec 12):
+//   - vendor/highlight/plugin.js       — UMD bundle (includes highlight.js)
+//   - vendor/highlight/monokai.min.css — Monokai colour theme
+//
+// Bundled so code blocks in decks are syntax-highlighted without CDN.
+//
+//go:embed vendor/highlight
+var highlightVendor embed.FS
+
+// mathVendor holds the reveal.js math/KaTeX plugin and KaTeX runtime (P5-10):
+//   - vendor/math/plugin.js                    — UMD bundle (RevealMath.KaTeX)
+//   - vendor/katex/dist/katex.min.js           — KaTeX renderer
+//   - vendor/katex/dist/katex.min.css          — KaTeX styles
+//   - vendor/katex/dist/contrib/auto-render.min.js — auto-render extension
+//   - vendor/katex/dist/fonts/*.woff2          — KaTeX maths fonts
+//
+// Bundled so LaTeX math expressions render offline (spec 12 – zero CDN URLs).
+//
+//go:embed vendor/math vendor/katex
+var mathVendor embed.FS
+
 // revealVersion is the pinned reveal.js version embedded in the binary.
 // Update this constant whenever vendor/ is refreshed.
 const revealVersion = "5.1.0"
@@ -49,6 +70,10 @@ const revealVersion = "5.1.0"
 // All resource paths are RELATIVE so the deck renders without any network
 // access (spec 12 – offline-first).  The path structure mirrors the deck
 // folder layout: assets/vendor/reveal/ next to deck.html.
+//
+// Plugins enabled (all served from assets/vendor/ — zero CDN):
+//   - RevealHighlight  syntax-highlights <code> blocks (P5-9)
+//   - RevealMath.KaTeX renders LaTeX math via $ … $ and $$ … $$ (P5-10)
 const deckHTML = `<!doctype html>
 <html lang="en">
 <head>
@@ -61,6 +86,8 @@ const deckHTML = `<!doctype html>
   <link rel="stylesheet" href="assets/vendor/reveal/theme/black.css" />
   <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec 03) -->
   <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
+  <!-- Highlight.js Monokai theme – loaded before plugin to avoid FOUC (P5-9) -->
+  <link rel="stylesheet" href="assets/vendor/highlight/monokai.min.css" />
   <link rel="stylesheet" href="custom.css" />
 </head>
 <body>
@@ -83,6 +110,10 @@ const deckHTML = `<!doctype html>
   <!-- Numeric data-* → inline styles companion (data-gap, data-pad, free coords) -->
   <script src="assets/vendor/slides-layout-init.js"></script>
   <script src="assets/vendor/reveal/reveal.js"></script>
+  <!-- Highlight plugin – syntax highlights <code class="language-*"> blocks (P5-9) -->
+  <script src="assets/vendor/highlight/plugin.js"></script>
+  <!-- Math/KaTeX plugin – renders LaTeX inside $ … $ and $$ … $$ (P5-10) -->
+  <script src="assets/vendor/math/plugin.js"></script>
   <script>
     Reveal.initialize({
       // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
@@ -94,7 +125,12 @@ const deckHTML = `<!doctype html>
       controls: true,
       progress: true,
       slideNumber: false,
-      transition: 'slide'
+      transition: 'slide',
+      // KaTeX: point at local assets so math renders offline (spec 12, P5-10).
+      // The math plugin constructs URLs as: local + '/dist/katex.min.{css,js}'
+      // and local + '/dist/contrib/auto-render.min.js'.
+      katex: { local: 'assets/vendor/katex' },
+      plugins: [ RevealHighlight, RevealMath.KaTeX ]
     });
   </script>
 </body>
@@ -215,9 +251,10 @@ func New(root, name string) error {
 	return nil
 }
 
-// Vendor copies the embedded reveal.js distribution and slides-builder layout
-// files into an existing deck at decks/<name>/assets/vendor/, replacing any
-// prior version.  It also refreshes the workspace-level reference.
+// Vendor copies the embedded reveal.js distribution, slides-builder layout
+// files, and plugin vendor files (highlight.js, math/KaTeX) into an existing
+// deck at decks/<name>/assets/vendor/, replacing any prior version.  It also
+// refreshes the workspace-level reference.
 //
 // This is the backing implementation of the `slides vendor <name>` CLI command.
 func Vendor(root, name string) error {
@@ -237,6 +274,21 @@ func Vendor(root, name string) error {
 		return fmt.Errorf("vendor: copy layout to deck: %w", err)
 	}
 	log.Printf("deck: vendored slides-layout → %s", vendorDir)
+
+	// Highlight plugin → assets/vendor/highlight/ (P5-9, spec 12 offline-first)
+	if err := copyEmbeddedFS(highlightVendor, "vendor/highlight", filepath.Join(vendorDir, "highlight")); err != nil {
+		return fmt.Errorf("vendor: copy highlight plugin: %w", err)
+	}
+	log.Printf("deck: vendored highlight plugin → %s/highlight", vendorDir)
+
+	// Math/KaTeX plugin → assets/vendor/math/ + assets/vendor/katex/ (P5-10)
+	if err := copyEmbeddedFS(mathVendor, "vendor/math", filepath.Join(vendorDir, "math")); err != nil {
+		return fmt.Errorf("vendor: copy math plugin: %w", err)
+	}
+	if err := copyEmbeddedFS(mathVendor, "vendor/katex", filepath.Join(vendorDir, "katex")); err != nil {
+		return fmt.Errorf("vendor: copy katex: %w", err)
+	}
+	log.Printf("deck: vendored math/KaTeX → %s/math, %s/katex", vendorDir, vendorDir)
 
 	if err := EnsureSharedVendor(root); err != nil {
 		// Non-fatal: shared/ is a reference copy, not required for deck rendering.
@@ -291,41 +343,32 @@ func EnsureSharedVendor(root string) error {
 	return nil
 }
 
-// copyEmbeddedReveal walks the embedded vendor/reveal FS and writes every
-// file to destDir, preserving the subdirectory structure.
-// Destination directories are created as needed; existing files are overwritten.
-func copyEmbeddedReveal(destDir string) error {
-	// The embed FS root is "vendor/reveal"; strip that prefix when constructing
-	// destination paths so the layout at destDir matches dist/ of the npm package.
-	const srcRoot = "vendor/reveal"
-
-	return fs.WalkDir(revealVendor, srcRoot, func(path string, d fs.DirEntry, err error) error {
+// copyEmbeddedFS is a generic helper that walks an embed.FS rooted at srcRoot
+// and copies all files to destDir, preserving the sub-directory structure.
+// Existing destination files are overwritten.
+func copyEmbeddedFS(fsys embed.FS, srcRoot, destDir string) error {
+	return fs.WalkDir(fsys, srcRoot, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
 
-		// Compute the relative path inside the vendor tree.
 		rel := strings.TrimPrefix(path, srcRoot)
-		rel = strings.TrimPrefix(rel, "/") // remove leading slash if present
-
+		rel = strings.TrimPrefix(rel, "/")
 		dest := filepath.Join(destDir, rel)
 
 		if d.IsDir() {
 			return os.MkdirAll(dest, 0o755)
 		}
 
-		// Open source from embed FS.
-		src, err := revealVendor.Open(path)
+		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+			return fmt.Errorf("mkdir %s: %w", filepath.Dir(dest), err)
+		}
+
+		src, err := fsys.Open(path)
 		if err != nil {
 			return fmt.Errorf("open embedded %s: %w", path, err)
 		}
 		defer src.Close()
-
-		// Ensure parent directory exists (WalkDir visits parent before child,
-		// but be defensive).
-		if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
-			return fmt.Errorf("mkdir %s: %w", filepath.Dir(dest), err)
-		}
 
 		out, err := os.OpenFile(dest, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
 		if err != nil {
@@ -338,6 +381,12 @@ func copyEmbeddedReveal(destDir string) error {
 		}
 		return nil
 	})
+}
+
+// copyEmbeddedReveal copies the embedded vendor/reveal subtree to destDir.
+// It is a thin wrapper around copyEmbeddedFS kept for call-site clarity.
+func copyEmbeddedReveal(destDir string) error {
+	return copyEmbeddedFS(revealVendor, "vendor/reveal", destDir)
 }
 
 // DeckPath returns the absolute path to a deck folder.

@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"testing"
 
 	"slides-builder/internal/deck"
@@ -398,6 +399,169 @@ func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 			for _, m := range matches {
 				t.Errorf("  %s", m)
 			}
+		}
+	}
+}
+
+// ── Highlight + KaTeX plugin vendor tests (P5-9, P5-10) ─────────────────────
+
+// TestNew_HighlightPluginPresent verifies that slides new copies the highlight
+// plugin files into assets/vendor/highlight/ (P5-9, spec 12 offline-first).
+func TestNew_HighlightPluginPresent(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "hltest"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	hlDir := filepath.Join(root, "decks", "hltest", "assets", "vendor", "highlight")
+	for _, f := range []string{"plugin.js", "monokai.min.css"} {
+		p := filepath.Join(hlDir, f)
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("highlight vendor file missing: %s: %v", f, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("highlight vendor file empty: %s", f)
+		}
+	}
+}
+
+// TestNew_KaTeXPluginPresent verifies that slides new copies the math/KaTeX
+// plugin and fonts into assets/vendor/math/ and assets/vendor/katex/ (P5-10).
+func TestNew_KaTeXPluginPresent(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "katextest"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	vendorDir := filepath.Join(root, "decks", "katextest", "assets", "vendor")
+	required := []string{
+		filepath.Join("math", "plugin.js"),
+		filepath.Join("katex", "dist", "katex.min.js"),
+		filepath.Join("katex", "dist", "katex.min.css"),
+		filepath.Join("katex", "dist", "contrib", "auto-render.min.js"),
+	}
+	for _, rel := range required {
+		p := filepath.Join(vendorDir, rel)
+		info, err := os.Stat(p)
+		if err != nil {
+			t.Errorf("KaTeX vendor file missing: %s: %v", rel, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("KaTeX vendor file empty: %s", rel)
+		}
+	}
+
+	// At least one woff2 font must be present.
+	fontsDir := filepath.Join(vendorDir, "katex", "dist", "fonts")
+	entries, err := os.ReadDir(fontsDir)
+	if err != nil {
+		t.Fatalf("katex fonts dir missing: %v", err)
+	}
+	woff2Count := 0
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".woff2") {
+			woff2Count++
+		}
+	}
+	if woff2Count == 0 {
+		t.Error("no .woff2 font files in katex/dist/fonts/")
+	}
+}
+
+// TestNew_DeckHTMLLinksHighlightAndKaTeX asserts that the scaffolded deck.html
+// references the highlight and math plugins via relative paths (offline-first,
+// spec 12) and enables them in Reveal.initialize.
+func TestNew_DeckHTMLLinksHighlightAndKaTeX(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "plugin-link"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "plugin-link", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	// The offline invariant must still hold (no external http URLs).
+	re := regexp.MustCompile(`https?://`)
+	if re.Match(html) {
+		t.Errorf("deck.html contains an external URL — violates spec 12 offline-first:\n%s",
+			findMatchContext(html, re))
+	}
+
+	// Required local paths.
+	wantRefs := []string{
+		"assets/vendor/highlight/plugin.js",
+		"assets/vendor/highlight/monokai.min.css",
+		"assets/vendor/math/plugin.js",
+		"assets/vendor/katex",
+		"RevealHighlight",
+		"RevealMath.KaTeX",
+	}
+	for _, ref := range wantRefs {
+		if !bytes.Contains(html, []byte(ref)) {
+			t.Errorf("deck.html missing expected reference %q", ref)
+		}
+	}
+}
+
+// TestVendor_RevendorsPlugins verifies that Vendor() restores deleted plugin
+// files in an existing deck (the `slides vendor <name>` use-case).
+func TestVendor_RevendorsPlugins(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "plugin-revendor"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	// Remove plugin directories to simulate deletion.
+	vendorDir := filepath.Join(root, "decks", "plugin-revendor", "assets", "vendor")
+	for _, dir := range []string{"highlight", "math", "katex"} {
+		if err := os.RemoveAll(filepath.Join(vendorDir, dir)); err != nil {
+			t.Fatalf("RemoveAll %s: %v", dir, err)
+		}
+	}
+
+	// Re-vendor.
+	if err := deck.Vendor(root, "plugin-revendor"); err != nil {
+		t.Fatalf("Vendor: %v", err)
+	}
+
+	// Check plugin files are restored.
+	restored := []string{
+		filepath.Join("highlight", "plugin.js"),
+		filepath.Join("highlight", "monokai.min.css"),
+		filepath.Join("math", "plugin.js"),
+		filepath.Join("katex", "dist", "katex.min.js"),
+	}
+	for _, rel := range restored {
+		p := filepath.Join(vendorDir, rel)
+		if _, err := os.Stat(p); err != nil {
+			t.Errorf("after Vendor(): plugin file missing: %s: %v", rel, err)
+		}
+	}
+}
+
+// TestNew_OfflineGuard_NoExternalURLs_WithPlugins re-runs the global offline
+// guard after adding plugins to confirm the template has no CDN URLs.
+func TestNew_OfflineGuard_NoExternalURLs_WithPlugins(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "offline-plugin-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "offline-plugin-test", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	re := regexp.MustCompile(`https?://\S+`)
+	if matches := re.FindAll(html, -1); len(matches) > 0 {
+		t.Errorf("deck.html (with plugins) contains %d external URL(s):", len(matches))
+		for _, m := range matches {
+			t.Errorf("  %s", m)
 		}
 	}
 }

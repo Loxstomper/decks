@@ -132,20 +132,27 @@ dependencies are noted inline.
 ## Phase 5 — Content blocks & assets
 > Goal: insert rich content; the acquire→localize asset pipeline. Spec: [08](specs/08-assets-and-media.md).
 
-- [ ] **P5-1 — Insert palette UI.** Menu of insertable block types. _Done when:_ palette opens and lists block types. (Spec 03)
-- [ ] **P5-2 — Insert text block.** Add heading/paragraph/list leaves. _Done when:_ inserted text is editable and persists.
-- [ ] **P5-3 — Asset copy pipeline.** On image add, copy file into `decks/<name>/assets/`, insert relative `src`. _Done when:_ added image is referenced relatively and deck stays self-contained. (Spec 08)
-- [ ] **P5-4 — Insert image (local upload/drag/paste).** _Done when:_ dropped image is localized (via P5-3) and rendered. (Spec 08)
-- [ ] **P5-5 — `shared/` library + copy-on-insert.** Browse `shared/`; inserting copies into the deck's `assets/`. _Done when:_ no cross-deck reference is created. (Spec 08)
-- [ ] **P5-6 — Image provider interface.** Abstraction `search(query)→results`, `fetch(id)→localized asset`. _Done when:_ a provider can be registered and used uniformly. (Spec 08)
-- [ ] **P5-7 — Unsplash provider.** Implements P5-6; key from env. _Done when:_ searching inserts a localized image; absent key disables gracefully. (Spec 08, 12)
-- [ ] **P5-8 — Giphy provider.** Implements P5-6. _Done when:_ same as P5-7 for GIFs. (Spec 08)
-- [ ] **P5-9 — Code block.** highlight.js (bundled), language select + `data-line-numbers`. _Done when:_ code renders highlighted; line stepping works. (Spec 03, 12)
-- [ ] **P5-10 — Math block.** KaTeX (bundled), inline LaTeX field. _Done when:_ LaTeX renders. (Spec 03, 12)
-- [ ] **P5-11 — Table block.** Insert/edit a table leaf. _Done when:_ table renders and cells are editable. (Spec 03)
-- [ ] **P5-12 — Shape/line/arrow.** SVG-based shapes. _Done when:_ shapes insert and are selectable/resizable. (Spec 03)
-- [ ] **P5-13 — Embed/iframe block.** YouTube/Maps/etc. _Done when:_ an embed renders. (Spec 03)
-- [ ] **P5-14 — Video block + transcode.** Local `<video>`; optional Go `ffmpeg` transcode for unsupported formats. _Done when:_ a video plays; unsupported format is transcoded. (Spec 08)
+- [x] **P5-1 — Insert palette UI.** Menu of insertable block types. _Done when:_ palette opens and lists block types. (Spec 03)
+- [x] **P5-2 — Insert text block.** Add heading/paragraph/list leaves. _Done when:_ inserted text is editable and persists.
+- [x] **P5-3 — Asset copy pipeline.** On image add, copy file into `decks/<name>/assets/`, insert relative `src`. _Done when:_ added image is referenced relatively and deck stays self-contained. (Spec 08)
+- [x] **P5-4 — Insert image (local upload/drag/paste).** _Done when:_ dropped image is localized (via P5-3) and rendered. (Spec 08)
+- [x] **P5-5 — `shared/` library + copy-on-insert.** Browse `shared/`; inserting copies into the deck's `assets/`. _Done when:_ no cross-deck reference is created. (Spec 08)
+- [x] **P5-6 — Image provider interface.** Abstraction `search(query)→results`, `fetch(id)→localized asset`. _Done when:_ a provider can be registered and used uniformly. (Spec 08)
+- [x] **P5-7 — Unsplash provider.** Implements P5-6; key from env. _Done when:_ searching inserts a localized image; absent key disables gracefully. (Spec 08, 12)
+- [x] **P5-8 — Giphy provider.** Implements P5-6. _Done when:_ same as P5-7 for GIFs. (Spec 08)
+- [x] **P5-9 — Code block.** highlight.js (bundled), language select + `data-line-numbers`. _Done when:_ code renders highlighted; line stepping works. (Spec 03, 12)
+- [x] **P5-10 — Math block.** KaTeX (bundled), inline LaTeX field. _Done when:_ LaTeX renders. (Spec 03, 12)
+- [x] **P5-11 — Table block.** Insert/edit a table leaf. _Done when:_ table renders and cells are editable. (Spec 03)
+- [x] **P5-12 — Shape/line/arrow.** SVG-based shapes. _Done when:_ shapes insert and are selectable/resizable. (Spec 03)
+- [x] **P5-13 — Embed/iframe block.** YouTube/Maps/etc. _Done when:_ an embed renders. (Spec 03)
+- [x] **P5-14 — Video block + transcode.** Local `<video>`; optional Go `ffmpeg` transcode for unsupported formats. _Done when:_ a video plays; unsupported format is transcoded. (Spec 08)
+
+> **Phase 5 STATUS (done, tag 0.0.6 — completes milestone M2):** P5-1..P5-14 complete. 1 Go lane + 2 FE lanes + Opus integration; verified (FE 863 vitest tests, svelte-check 0/0, Go green incl. assets/provider packages; offline-first re-verified — fresh deck links highlight+math+KaTeX+20 local fonts, ZERO external URLs).
+> - **Go backend:** `internal/assets` (upload `POST /api/decks/{name}/assets` → MIME-routed `assets/{img,video,audio,files}/`, SHA-256 dedup, traversal-safe, returns relative src; ffmpeg video transcode w/ graceful absence + `GET /api/capabilities`); `internal/provider` (interface + Registry, Unsplash + Giphy, env keys `UNSPLASH_ACCESS_KEY`/`GIPHY_API_KEY`, **disabled w/o key**, localize-on-fetch); `shared/` library (`GET /api/shared`, `POST /api/shared/{file}/copy?deck=`, `GET /shared/{path}`); `server.NewWithProviders` wired in `main.go`.
+> - **Offline plugins (P5-9/10):** reveal highlight (monokai) + math/KaTeX vendored into the binary (go:embed), copied into decks, enabled in template (`katex:{local:...}`, `plugins:[RevealHighlight, RevealMath.KaTeX]`). ~1.55 MB binary growth (acceptable for offline-first).
+> - **FE:** single insert seam — `deckStore.insertBlock/insertAfter` + palette REGISTRY (`web/src/lib/blocks/`, FE-B folded in, duplicate `palette.ts` deleted). Blocks: text/heading/list, table, SVG shape/line/arrow (free), embed/iframe, image (drag/paste/upload + shared browser + provider search), code (lang + line-numbers), math (LaTeX). `InsertPalette` in toolbar (`+` button + `/` hotkey); `ProviderSearch`/`SharedLibrary` panels. `math-block` marked leaf in classify (selectable/eid-stamped). Every insert = one undo entry + one autosave, byte-stable.
+> - **⚠️ Needs VISUAL/browser verification:** palette dropdown + panel modals; inserted code renders highlighted + math renders via KaTeX in the iframe. **Needs API keys** to exercise provider search/fetch; **needs a real .mov/.avi** for transcode.
+> - **[migration gap, user decks]** pre-P5 decks don't get highlight/math plugins in their existing `deck.html` unless re-scaffolded; `slides vendor` copies plugin *files* but doesn't rewrite `deck.html`. Consider a `slides upgrade <deck>` later (out of scope; not a codebase migration).
 
 ## Phase 6 — Slides, motion, theming
 > Goal: deck organization, animation authoring, theming. Specs: [06](specs/06-slide-management.md), [07](specs/07-motion-and-transitions.md), [09](specs/09-theming-and-styles.md).

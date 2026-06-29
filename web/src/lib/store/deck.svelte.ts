@@ -49,14 +49,18 @@ import {
   serializeDeck,
   stampEids,
   findByEid,
+  getAttribute,
   setAttribute,
   setLayoutProps,
   toggleFree,
+  findParentOf,
   type DeckModel,
+  type ElementNode,
   type LayoutProps,
   type LogicalRect,
 } from '$lib/model';
 import { undoStore } from './undo.svelte';
+import { selectionStore } from '$lib/canvas/selection.svelte';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
 
@@ -412,6 +416,77 @@ class DeckStore {
     this.updateFromModel();
     await this.commitCommand();
     return next;
+  }
+
+  /**
+   * P5-1 INSERT SEAM (owned by Lane FE-A; used by FE-B too).
+   *
+   * Insert a model subtree `node` (built via the blocks/ builders → edit.ts
+   * factories) as the LAST child of the container with `parentEid`, or at
+   * `index` when given. One call == one undo entry + one autosave + selection of
+   * the new block.
+   *
+   * Byte-stability (spec 12 §4): the new subtree is `dirty` (createElement/
+   * createText set it), so the serializer re-renders ONLY it. The parent keeps
+   * its own original tag bytes and every existing sibling round-trips verbatim —
+   * we splice the node in rather than mark the parent dirty.
+   *
+   * Returns the new block's `data-eid` (minted by the post-insert stamp pass), or
+   * null when no deck is open or `parentEid` is unknown (a safe no-op for a stale
+   * selection after an external reload).
+   */
+  async insertBlock(
+    parentEid: string,
+    node: ElementNode,
+    index?: number,
+  ): Promise<string | null> {
+    if (!this.model) return null;
+    const parent = findByEid(this.model, parentEid);
+    if (!parent) return null;
+    const at =
+      index === undefined
+        ? parent.children.length
+        : Math.max(0, Math.min(index, parent.children.length));
+    parent.children.splice(at, 0, node);
+    node.dirty = true; // belt-and-braces: ensure canonical render of the new root
+    return await this.#commitInsert(node);
+  }
+
+  /**
+   * P5-1: Insert `node` as the next sibling immediately AFTER the element with
+   * `siblingEid` (the "insert after the current selection" path). Same one-undo /
+   * autosave / select-new-block contract as {@link insertBlock}.
+   *
+   * Returns the new block's `data-eid`, or null when the sibling (or its parent)
+   * is not found.
+   */
+  async insertAfter(siblingEid: string, node: ElementNode): Promise<string | null> {
+    if (!this.model) return null;
+    const parent = findParentOf(this.model, siblingEid);
+    if (!parent) return null;
+    const i = parent.children.findIndex(
+      (c) => c.type === 'element' && getAttribute(c, 'data-eid') === siblingEid,
+    );
+    if (i < 0) return null;
+    parent.children.splice(i + 1, 0, node);
+    node.dirty = true;
+    return await this.#commitInsert(node);
+  }
+
+  /**
+   * Shared tail for the insert seam: stamp eids for the freshly inserted subtree
+   * (idempotent for everything already stamped — only the new managed elements
+   * get ids), reserialize, persist as one command, and select the new block by
+   * its eid so the properties panel / canvas focus it immediately.
+   */
+  async #commitInsert(node: ElementNode): Promise<string | null> {
+    if (!this.model) return null;
+    stampEids(this.model);
+    const eid = getAttribute(node, 'data-eid');
+    this.updateFromModel();
+    await this.commitCommand();
+    if (eid) selectionStore.select(eid);
+    return eid;
   }
 
   #scheduleSync(): void {

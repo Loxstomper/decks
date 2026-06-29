@@ -148,6 +148,20 @@ describe('classify() — leaf', () => {
     expect(iframes.length).toBeGreaterThan(0);
     for (const e of iframes) expect(classify(e)).toBe('leaf');
   });
+
+  it('a div carrying the math-block class is a leaf (KaTeX block, spec 03)', () => {
+    // The math block has no dedicated tag; the editor marks it with class
+    // "math-block" (blocks/builders.ts buildMathBlock) so it is a selectable leaf.
+    const model = parseDeck(
+      '<section><div class="math-block">\\[ e=mc^2 \\]</div><div class="other">x</div></section>',
+    );
+    const divs = getElementsByTagName(model, 'div');
+    const math = divs.find((d) => getAttribute(d, 'class') === 'math-block')!;
+    const other = divs.find((d) => getAttribute(d, 'class') === 'other')!;
+    expect(classify(math)).toBe('leaf');
+    // A plain div (no marker, no data-lay) stays passthrough.
+    expect(classify(other)).toBe('passthrough');
+  });
 });
 
 describe('classify() — free', () => {

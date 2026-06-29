@@ -25,6 +25,7 @@
   import AspectRepositionOffer from './components/canvas/AspectRepositionOffer.svelte';
   import FreeAlignBar from './components/canvas/FreeAlignBar.svelte';
   import SourcePane from './components/source/SourcePane.svelte';
+  import InsertPalette from './components/insert/InsertPalette.svelte';
   import OutlinePanel from './components/outline/OutlinePanel.svelte';
   import PropertiesPanel from './components/properties/PropertiesPanel.svelte';
   import { createSseClient } from '$lib/sse';
@@ -347,6 +348,14 @@
 
       <!-- Undo / redo toolbar (bonus). Reflects canUndo/canRedo reactively. -->
       <div class="canvas-toolbar">
+        <!--
+          Insert palette (P5-1): the single seam for adding blocks (text / table /
+          shape / embed / image / code / math). Self-contained — reads deckStore +
+          selectionStore directly and registers every block type on import of
+          $lib/blocks. Opens with the "+ Insert" button or the `/` hotkey.
+        -->
+        <InsertPalette />
+
         <!--
           Aspect-ratio picker (P4-7). Reflects aspectStore.aspect; choosing a preset
           begins an aspect change (re-fits the canvas + surfaces the reposition

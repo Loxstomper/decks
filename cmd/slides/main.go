@@ -16,6 +16,9 @@ import (
 
 	"slides-builder/internal/config"
 	"slides-builder/internal/deck"
+	"slides-builder/internal/provider"
+	"slides-builder/internal/provider/giphy"
+	"slides-builder/internal/provider/unsplash"
 	"slides-builder/internal/server"
 	"slides-builder/internal/watch"
 	slideweb "slides-builder/web"
@@ -78,7 +81,15 @@ func runServe() {
 		log.Fatalf("embed: %v", err)
 	}
 
-	srv := server.New(root, w, staticFS)
+	// Image-acquisition providers (spec 08). Each reads its API key from the
+	// environment at construction (secrets-from-env-only, spec 12/13); a provider
+	// with no key reports Enabled()==false and is omitted from GET /api/providers,
+	// so the picker degrades gracefully when keys are absent.
+	reg := &provider.Registry{}
+	reg.Register(unsplash.New())
+	reg.Register(giphy.New())
+
+	srv := server.NewWithProviders(root, w, staticFS, reg)
 
 	addr := fmt.Sprintf(":%d", cfg.Port)
 	log.Printf("slides-builder: listening on http://localhost%s (workspace: %s)", addr, root)
