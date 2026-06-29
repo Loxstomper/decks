@@ -57,6 +57,7 @@ import {
   getSlideNotes,
   setSlideNotes as setSlideNotesOp,
   setInlineColor,
+  setChartProps,
   diffModels,
   validateSource,
   normalizeRemote,
@@ -1196,6 +1197,36 @@ class DeckStore {
     const el = findByEid(this.model, eid);
     if (!el) return;
     setInlineColor(el, color);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P17-15: Replace the chart data of the <canvas> chart leaf with `eid` — set
+   * `data-chart` (type) + `data-chart-data` (JSON config) as ONE undo entry + ONE
+   * autosave, byte-stable (mirrors {@link applyTextColor}).
+   *
+   * GUARDS (never throw into the UI):
+   *   • unknown eid → safe no-op (stale selection after an external reload);
+   *   • `dataJson` that does not JSON.parse → no-op (the inspector surfaces the
+   *     error; we never write malformed JSON into the deck);
+   *   • empty `type` → no-op (the marker must be a non-empty chart type).
+   *
+   * Whole-element scope: only this canvas's two marker attributes change, so it
+   * goes dirty and serializes canonically while every other element round-trips
+   * byte-for-byte (spec 12 #4).
+   */
+  async applyChartData(eid: string, type: string, dataJson: string): Promise<void> {
+    if (!this.model) return;
+    if (type.trim() === '') return;
+    try {
+      JSON.parse(dataJson);
+    } catch {
+      return; // invalid JSON — leave the deck untouched; the UI flags it.
+    }
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setChartProps(el, type, dataJson);
     this.updateFromModel();
     await this.commitCommand();
   }

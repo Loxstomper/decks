@@ -94,6 +94,17 @@ export function classify(el: ElementNode): ElementClass {
     return 'leaf';
   }
 
+  // Rule 3c — chart block (P17-15): a Chart.js chart is a <canvas> carrying the
+  // editor's own marker attribute `data-chart` (see blocks/builders.ts). spec 03
+  // lists Chart as a leaf block type — recognise the marker so the chart gets a
+  // data-eid and is individually selectable (its JSON data is edited in the
+  // inspector). A bare <canvas> WITHOUT data-chart is left passthrough — the
+  // editor only owns charts it emitted. Dual-encoded with classify-equivalent
+  // recognition in internal/validate/validate.go and getChartProps in layout.ts.
+  if (tag === 'canvas' && hasAttribute(el, 'data-chart')) {
+    return 'leaf';
+  }
+
   // Rule 4 — passthrough: everything else.
   return 'passthrough';
 }

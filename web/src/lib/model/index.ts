@@ -55,6 +55,8 @@ export {
   setLayoutMarker,
   getSlot,
   setSlot,
+  getChartProps,
+  setChartProps,
 } from './layout';
 export type { ElementClass } from './classify';
 export type {
@@ -63,6 +65,7 @@ export type {
   AlignValue,
   JustifyValue,
   LayoutProps,
+  ChartProps,
 } from './layout';
 export type {
   DeckModel,

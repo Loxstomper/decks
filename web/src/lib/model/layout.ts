@@ -355,6 +355,57 @@ export function setSlot(el: ElementNode, name: string | null): void {
   }
 }
 
+// ─── P17: Chart block accessors (data-chart / data-chart-data) ──────────────
+//
+// A Chart.js chart is a <canvas> carrying two MARKER attributes the editor owns:
+//   • `data-chart`      — the chart TYPE string ("bar", "line", "pie", …); also
+//                         the marker the vendored plugin scans for.
+//   • `data-chart-data` — a JSON Chart.js config `{type, data, options?}` the
+//                         runtime plugin JSON.parses to render the chart.
+// These have NO layout/reflow semantics; they are content for the chart plugin.
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go checkElement)
+// accepts a non-empty data-chart string and a parseable data-chart-data JSON on a
+// canvas, and classify.ts recognises the same marker as a leaf. Keep the three in
+// sync on the attribute names.
+
+/** Typed snapshot of a chart canvas's marker attributes. */
+export interface ChartProps {
+  /** The chart type string from `data-chart` (e.g. "bar"), or null if absent. */
+  type: string | null;
+  /** The raw `data-chart-data` JSON string (decoded literal), or null if absent. */
+  data: string | null;
+}
+
+/**
+ * Read a chart canvas's `data-chart` + `data-chart-data` markers as a typed
+ * snapshot. Empty/absent attributes read as `null`. Pure; never mutates.
+ */
+export function getChartProps(el: ElementNode): ChartProps {
+  const type = getAttribute(el, 'data-chart');
+  const data = getAttribute(el, 'data-chart-data');
+  return {
+    type: type !== null && type.trim() !== '' ? type : null,
+    data: data !== null && data !== '' ? data : null,
+  };
+}
+
+/**
+ * Write the chart markers on `el` (a <canvas>): set `data-chart` to the type and
+ * `data-chart-data` to the JSON config string, marking the element dirty.
+ *
+ * - `type`     — non-empty chart type string. Throws `TypeError` when empty.
+ * - `dataJson` — the JSON config string, written verbatim (the caller validates
+ *                it parses; layout.ts does not re-stringify, keeping bytes stable).
+ */
+export function setChartProps(el: ElementNode, type: string, dataJson: string): void {
+  if (type.trim() === '') {
+    throw new TypeError('setChartProps: type must be a non-empty string');
+  }
+  setAttribute(el, 'data-chart', type);
+  setAttribute(el, 'data-chart-data', dataJson);
+}
+
 /**
  * Find the nearest ancestor `ElementNode` of the element carrying `eid`.
  *

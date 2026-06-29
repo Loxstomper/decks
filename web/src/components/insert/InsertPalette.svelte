@@ -44,6 +44,7 @@
   import ProviderSearch from './ProviderSearch.svelte';
   import CodeBlockPanel from './CodeBlockPanel.svelte';
   import MathBlockPanel from './MathBlockPanel.svelte';
+  import ChartBlockPanel from './ChartBlockPanel.svelte';
 
   /**
    * Props every panel-driven block component accepts. The palette owns placement;
@@ -66,6 +67,7 @@
     ProviderSearch,
     CodeBlockPanel,
     MathBlockPanel,
+    ChartBlockPanel,
   };
 
   // ── Local UI state ───────────────────────────────────────────────────────────

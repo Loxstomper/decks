@@ -331,6 +331,48 @@ func TestValidate_DataSlotEmptyInvalid(t *testing.T) {
 	}
 }
 
+// TestValidate_ChartValid verifies a <canvas> chart with a non-empty data-chart
+// type and a parseable data-chart-data JSON config passes (P17-16).
+func TestValidate_ChartValid(t *testing.T) {
+	h := `<section data-eid="s1">` +
+		`<canvas data-eid="c1" data-chart="bar" width="600" height="400" ` +
+		`data-chart-data='{"type":"bar","data":{"labels":["A","B"],"datasets":[{"data":[1,2]}]}}'>` +
+		`</canvas></section>`
+	res := Bytes([]byte(h), "")
+	if !res.OK {
+		t.Fatalf("valid chart must pass, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_ChartMalformedJSON verifies malformed data-chart-data JSON is
+// flagged invalid-attr (P17-16).
+func TestValidate_ChartMalformedJSON(t *testing.T) {
+	h := `<section data-eid="s1"><canvas data-eid="c1" data-chart="bar" data-chart-data='{not valid json'></canvas></section>`
+	res := Bytes([]byte(h), "")
+	if res.OK || !hasCode(res, "invalid-attr") {
+		t.Fatalf("expected invalid-attr for malformed data-chart-data, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_ChartEmptyType verifies an empty data-chart type is flagged.
+func TestValidate_ChartEmptyType(t *testing.T) {
+	h := `<section data-eid="s1"><canvas data-eid="c1" data-chart="" data-chart-data='{"data":{}}'></canvas></section>`
+	res := Bytes([]byte(h), "")
+	if res.OK || !hasCode(res, "invalid-attr") {
+		t.Fatalf("expected invalid-attr for empty data-chart, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_ChartMissingData verifies a data-chart marker without a
+// data-chart-data config is flagged.
+func TestValidate_ChartMissingData(t *testing.T) {
+	h := `<section data-eid="s1"><canvas data-eid="c1" data-chart="bar"></canvas></section>`
+	res := Bytes([]byte(h), "")
+	if res.OK || !hasCode(res, "invalid-attr") {
+		t.Fatalf("expected invalid-attr for missing data-chart-data, got: %+v", res.Errors)
+	}
+}
+
 // TestValidate_DataLayoutAndSlotTogether verifies a realistic deck using both
 // data-layout on a <section> and data-slot on child containers passes cleanly.
 func TestValidate_DataLayoutAndSlotTogether(t *testing.T) {

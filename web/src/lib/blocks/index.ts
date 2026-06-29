@@ -13,6 +13,8 @@
 import './defaults';
 // Side-effect: register FE-B's media / code / math blocks (panel-driven).
 import './media';
+// Side-effect: register the chart block (P17-15, panel-driven).
+import './chart';
 
 // ── Registry API ──────────────────────────────────────────────────────────────
 export {
