@@ -98,11 +98,28 @@ func TestValidate_InvalidNumeric(t *testing.T) {
 		`<div data-lay="row" data-gap="lots">x</div>`,
 		`<div data-span="0">x</div>`,
 		`<div data-free data-w="-5">x</div>`,
+		// P17-20: data-autoslide must be a non-negative integer (ms).
+		`<section data-autoslide="-1">x</section>`,
+		`<section data-autoslide="fast">x</section>`,
 	}
 	for _, c := range cases {
 		res := Bytes([]byte(c), "")
 		if res.OK || !hasCode(res, "invalid-numeric") {
 			t.Fatalf("expected invalid-numeric for %q, got: %+v", c, res.Errors)
+		}
+	}
+}
+
+// TestValidate_AutoslideValid (P17-20): a non-negative integer data-autoslide on
+// a <section> is accepted (no invalid-numeric diagnostic).
+func TestValidate_AutoslideValid(t *testing.T) {
+	for _, c := range []string{
+		`<section data-autoslide="3000"><p>x</p></section>`,
+		`<section data-autoslide="0"><p>x</p></section>`,
+	} {
+		res := Bytes([]byte(c), "")
+		if hasCode(res, "invalid-numeric") {
+			t.Fatalf("unexpected invalid-numeric for %q: %+v", c, res.Errors)
 		}
 	}
 }

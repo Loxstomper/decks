@@ -26,6 +26,8 @@ import {
   setLayoutMarker,
   getSlot,
   setSlot,
+  getAutoslide,
+  setAutoslide,
   type LayoutProps,
   type AlignValue,
   type JustifyValue,
@@ -683,5 +685,52 @@ describe('getSlot() + setSlot() — P14', () => {
     expect(getLayoutMarker(section)).toBe('two-column');
     expect(getSlot(col1)).toBe('content');
     expect(getSlot(col2)).toBe('sidebar');
+  });
+});
+
+// ─── 11. P17-20: getAutoslide / setAutoslide ─────────────────────────────────
+//
+// data-autoslide is a reveal-native per-slide auto-advance override (ms) on a
+// <section>. number | null, where null means "no override" (attribute absent).
+// Dual-encoded: Go validator accepts it as a non-negative integer.
+
+describe('getAutoslide() + setAutoslide() — P17-20', () => {
+  it('returns null when data-autoslide is absent', () => {
+    expect(getAutoslide(createElement('section', {}))).toBeNull();
+  });
+
+  it('returns the integer ms when set', () => {
+    expect(getAutoslide(createElement('section', { 'data-autoslide': '3000' }))).toBe(3000);
+  });
+
+  it('returns null for a non-integer / negative value', () => {
+    expect(getAutoslide(createElement('section', { 'data-autoslide': 'fast' }))).toBeNull();
+    expect(getAutoslide(createElement('section', { 'data-autoslide': '-5' }))).toBeNull();
+  });
+
+  it('sets data-autoslide and marks the element dirty', () => {
+    const el = createElement('section', {});
+    el.dirty = false;
+    setAutoslide(el, 5000);
+    expect(getAttribute(el, 'data-autoslide')).toBe('5000');
+    expect(el.dirty).toBe(true);
+  });
+
+  it('removes data-autoslide when null is passed', () => {
+    const el = createElement('section', { 'data-autoslide': '3000' });
+    setAutoslide(el, null);
+    expect(getAttribute(el, 'data-autoslide')).toBeNull();
+  });
+
+  it('round-trips via get after set', () => {
+    const el = createElement('section', {});
+    setAutoslide(el, 0);
+    expect(getAutoslide(el)).toBe(0);
+  });
+
+  it('throws on a negative or non-integer ms', () => {
+    const el = createElement('section', {});
+    expect(() => setAutoslide(el, -1)).toThrow(TypeError);
+    expect(() => setAutoslide(el, 1.5)).toThrow(TypeError);
   });
 });

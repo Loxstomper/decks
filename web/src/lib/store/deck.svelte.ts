@@ -84,6 +84,7 @@ import {
   nestSlide as nestSlideOp,
   promoteSlide as promoteSlideOp,
   setSlideHidden as setSlideHiddenOp,
+  setSlideAutoslide as setSlideAutoslideOp,
   addSlideFromLayout as addSlideFromLayoutOp,
   changeSlideLayout as changeSlideLayoutOp,
 } from '$lib/slides';
@@ -1322,6 +1323,52 @@ class DeckStore {
     if (!this.model) return false;
     if (!setSlideHiddenOp(this.model, eid, hidden)) return false;
     await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P17-20: Set / clear the per-slide auto-advance interval (`data-autoslide`,
+   * in ms) on slide `eid`. `ms` (non-negative integer) writes the override;
+   * `null` removes it so the slide inherits the deck-level default. One undo
+   * entry + one autosave; byte-stable. Returns true on success.
+   */
+  async setSlideAutoslide(eid: string, ms: number | null): Promise<boolean> {
+    if (!this.model) return false;
+    if (!setSlideAutoslideOp(this.model, eid, ms)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P17-20: Set the DECK-LEVEL auto-advance default (`autoSlide`, in ms) and
+   * `loop` flag in Reveal.initialize. `ms` of 0 disables auto-advance. Unlike
+   * the per-slide override, this lives inside the opaque reveal-init <script>,
+   * so it is applied server-side via POST /api/decks/{name}/autoslide (a
+   * byte-stable rewrite of deck.html) rather than through the model. We flush
+   * any pending model edits first (save) so the server rewrites current bytes,
+   * then re-adopt disk truth via load(). Returns true on success.
+   */
+  async applyDeckAutoslide(ms: number, loop: boolean): Promise<boolean> {
+    if (!this.name) return false;
+    // Flush pending edits so the server-side rewrite operates on current bytes
+    // and load() below doesn't clobber unsaved work.
+    await this.save();
+    try {
+      const res = await fetch(`/api/decks/${encodeURIComponent(this.name)}/autoslide`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ms, loop }),
+      });
+      if (!res.ok) {
+        this.error = `auto-advance update failed: HTTP ${res.status}`;
+        return false;
+      }
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      return false;
+    }
+    // Re-read the rewritten deck.html so model + canvas reflect disk truth.
+    await this.load(this.name);
     return true;
   }
 

@@ -17,6 +17,7 @@ import {
   nestSlide,
   promoteSlide,
   setSlideHidden,
+  setSlideAutoslide,
   topLevelSlides,
   verticalChildren,
   isVerticalStack,
@@ -271,6 +272,32 @@ describe('setSlideHidden (P6-6)', () => {
     expect(out).not.toContain('data-visibility="hidden"');
     // Back to byte-stable original for s2.
     expect(out).toContain(S2);
+  });
+});
+
+describe('setSlideAutoslide (P17-20)', () => {
+  it('sets data-autoslide to the given ms and clears it on null', () => {
+    const model = parseDeck(DECK);
+    expect(setSlideAutoslide(model, 's2', 3000)).toBe(true);
+    let out = serializeDeck(model);
+    expect(out).toContain('data-autoslide="3000"');
+
+    // Re-set to a different value (replace, not duplicate).
+    expect(setSlideAutoslide(model, 's2', 5000)).toBe(true);
+    out = serializeDeck(model);
+    expect(out).toContain('data-autoslide="5000"');
+    expect(out).not.toContain('data-autoslide="3000"');
+
+    // null clears the attribute → byte-stable back to the original s2.
+    expect(setSlideAutoslide(model, 's2', null)).toBe(true);
+    out = serializeDeck(model);
+    expect(out).not.toContain('data-autoslide');
+    expect(out).toContain(S2);
+  });
+
+  it('returns false for an unknown eid', () => {
+    const model = parseDeck(DECK);
+    expect(setSlideAutoslide(model, 'nope', 1000)).toBe(false);
   });
 });
 

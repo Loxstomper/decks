@@ -65,6 +65,8 @@ export {
   setSlot,
   getChartProps,
   setChartProps,
+  getAutoslide,
+  setAutoslide,
 } from './layout';
 export type { ElementClass } from './classify';
 export type {
