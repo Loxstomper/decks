@@ -91,6 +91,7 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Deck CRUD
 	s.mux.HandleFunc("GET /api/decks", s.handleDeckList)
+	s.mux.HandleFunc("POST /api/decks/{name}", s.handleDeckCreate)
 	s.mux.HandleFunc("GET /api/decks/{name}", s.handleDeckRead)
 	s.mux.HandleFunc("PUT /api/decks/{name}", s.handleDeckWrite)
 
@@ -216,6 +217,52 @@ func (s *Server) handleDeckWrite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeckCreate scaffolds a new deck using the same logic as `slides new`.
+//
+//	POST /api/decks/{name}
+//
+// Name is validated via deck.ValidName; 409 Conflict is returned if the deck
+// folder already exists. On success the deck is created and watched, and the
+// handler returns 201 Created with a JSON body {"name":"<name>"}.
+//
+// WHY POST /api/decks/{name} (not POST /api/decks with a JSON body):
+// The deck name IS the resource identifier — it becomes the folder name and
+// the URL slug. Encoding it as a path segment is idiomatic REST and keeps the
+// UI simple: the only state the client needs to supply is the name.
+func (s *Server) handleDeckCreate(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	// Reject if the deck already exists — creation must never clobber.
+	deckDir := deck.DeckPath(s.root, name)
+	if _, err := os.Stat(deckDir); err == nil {
+		http.Error(w, "deck already exists", http.StatusConflict)
+		return
+	}
+
+	// Scaffold using the same function the CLI uses — single source of truth,
+	// no duplicated logic (spec 12 / P9-11 invariant).
+	if err := deck.New(s.root, name); err != nil {
+		http.Error(w, "create deck: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	// Begin watching the new deck so SSE change events fire for it.
+	if s.watcher != nil {
+		if err := s.watcher.Watch(name, deckDir); err != nil {
+			log.Printf("create-deck: could not watch %q: %v", name, err)
+		}
+	}
+
+	log.Printf("create-deck: scaffolded %q", name)
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	json.NewEncoder(w).Encode(map[string]string{"name": name})
 }
 
 // ── Asset upload (P5-3, P5-14) ───────────────────────────────────────────────

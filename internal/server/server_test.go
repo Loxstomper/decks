@@ -179,6 +179,136 @@ func TestDeckWrite_RoundTrip(t *testing.T) {
 	}
 }
 
+// ── Create-deck API (P9-11) ────────────────────────────────────────────────────
+
+// TestDeckCreate_OK verifies that POST /api/decks/{name} scaffolds a valid deck.
+func TestDeckCreate_OK(t *testing.T) {
+	srv, root := newTestServer(t)
+
+	req := httptest.NewRequest("POST", "/api/decks/new-talk", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create deck: want 201, got %d (body: %s)", rr.Code, rr.Body.String())
+	}
+
+	// Response must be JSON with the name.
+	var resp map[string]string
+	if err := json.Unmarshal(rr.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("create deck: decode json: %v", err)
+	}
+	if resp["name"] != "new-talk" {
+		t.Errorf("create deck: want name=new-talk, got %q", resp["name"])
+	}
+
+	// Deck folder must exist.
+	deckDir := deck.DeckPath(root, "new-talk")
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		t.Fatalf("create deck: expected deck directory at %s", deckDir)
+	}
+
+	// deck.html must exist.
+	htmlPath := filepath.Join(deckDir, "deck.html")
+	if _, err := os.Stat(htmlPath); err != nil {
+		t.Fatalf("create deck: expected deck.html at %s", htmlPath)
+	}
+
+	// custom.css must exist.
+	cssPath := filepath.Join(deckDir, "custom.css")
+	if _, err := os.Stat(cssPath); err != nil {
+		t.Fatalf("create deck: expected custom.css at %s", cssPath)
+	}
+
+	// Vendor files must be present (offline-first invariant).
+	revealJS := filepath.Join(deckDir, "assets", "vendor", "reveal", "reveal.js")
+	if _, err := os.Stat(revealJS); err != nil {
+		t.Fatalf("create deck: expected vendored reveal.js at %s", revealJS)
+	}
+
+	// The deck must appear in GET /api/decks after creation.
+	listReq := httptest.NewRequest("GET", "/api/decks", nil)
+	listRR := httptest.NewRecorder()
+	srv.ServeHTTP(listRR, listReq)
+	var names []string
+	if err := json.Unmarshal(listRR.Body.Bytes(), &names); err != nil {
+		t.Fatalf("create deck: list decode: %v", err)
+	}
+	found := false
+	for _, n := range names {
+		if n == "new-talk" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("create deck: new-talk not in deck list: %v", names)
+	}
+}
+
+// TestDeckCreate_Conflict verifies that a duplicate name returns 409.
+func TestDeckCreate_Conflict(t *testing.T) {
+	srv, root := newTestServer(t)
+
+	// Pre-create the deck via deck.New.
+	if err := deck.New(root, "existing"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/decks/existing", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusConflict {
+		t.Errorf("create deck duplicate: want 409, got %d", rr.Code)
+	}
+}
+
+// TestDeckCreate_BadName verifies that an invalid name returns 400.
+func TestDeckCreate_BadName(t *testing.T) {
+	srv, _ := newTestServer(t)
+
+	// The Go http.ServeMux handles path routing, so path-traversal names will
+	// typically 404 before reaching our handler. We test names that pass path
+	// routing but fail deck.ValidName — an empty segment is the canonical case,
+	// but because our route is POST /api/decks/{name} the mux requires a
+	// non-empty segment. Test via the empty literal "." instead.
+	for _, name := range []string{".", ".."} {
+		req := httptest.NewRequest("POST", "/api/decks/"+name, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		// "." and ".." fail ValidName → 400.
+		if rr.Code != http.StatusBadRequest {
+			t.Errorf("create deck bad name %q: want 400, got %d", name, rr.Code)
+		}
+	}
+}
+
+// TestDeckCreate_NoExternalURLs verifies the offline-first invariant: a freshly
+// created deck's deck.html must not contain any http/https URLs (spec 12).
+func TestDeckCreate_NoExternalURLs(t *testing.T) {
+	srv, root := newTestServer(t)
+
+	req := httptest.NewRequest("POST", "/api/decks/offline-test", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("create deck: want 201, got %d", rr.Code)
+	}
+
+	htmlPath := filepath.Join(deck.DeckPath(root, "offline-test"), "deck.html")
+	data, err := os.ReadFile(htmlPath)
+	if err != nil {
+		t.Fatalf("create deck offline: read deck.html: %v", err)
+	}
+	content := string(data)
+	for _, prefix := range []string{"https://", "http://"} {
+		if strings.Contains(content, prefix) {
+			t.Errorf("create deck offline: deck.html contains external URL (%s…)", prefix)
+		}
+	}
+}
+
 // TestDeckStatic_ServesEntryAndAssets verifies the /decks/{name}/... static
 // route the iframe relies on.
 func TestDeckStatic_ServesEntryAndAssets(t *testing.T) {
