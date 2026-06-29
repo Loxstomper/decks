@@ -13,7 +13,7 @@ decks/
     custom.css            # per-deck styling; CSS custom properties
     assets/               # images, video, fonts — self-contained
       fonts/              # downloaded/self-hosted fonts (offline)
-templates/                # reusable slide/layout snippets
+templates/                # reusable slide/layout snippets (user/Claude-authored layout presets)
 shared/                   # optional source library (copied into decks on insert)
 themes/                   # custom reveal themes (optional)
 ```
@@ -28,6 +28,9 @@ themes/                   # custom reveal themes (optional)
 - **`config.toml`** holds non-secret editor preferences (default aspect ratio, grid size,
   enabled providers, etc.).
 - **The binary is workspace-relative:** drop it into a workspace containing `decks/` and run.
+- **`templates/`** holds **slide-layout presets** — `<section>` snippets listed (alongside the
+  bundled built-in presets) via `GET /api/templates` and applied per slide
+  ([06](06-slide-management.md) "Slide layouts"). User- and Claude-authored; offline.
 
 ## Related
 

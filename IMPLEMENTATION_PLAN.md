@@ -339,6 +339,30 @@ dependencies are noted inline.
 - [ ] **P13-8 — Slide-level menu.** Right-click on empty slide background opens slide actions (Duplicate / Delete / Hide / Insert slide) via the existing navigator ops. _Done when:_ the empty-area menu performs each slide op. (Spec 06, 04)
 - [ ] **P13-9 — Passthrough/never-destroy guard + e2e.** Verify passthrough elements expose no structural edits; add a Playwright spec: right-click → Delete and right-click → Duplicate on a canvas element, and the slide-level menu. _Done when:_ e2e covers open→action for an element and a slide; passthrough is guarded. (Spec 04, 12)
 
+## Phase 14 — Slide layouts (Google-Slides-style presets)
+> Goal: per-slide layout presets composed from the existing `data-lay` primitives, pickable on
+> new slides and swappable on existing ones (content-preserving). Spec:
+> [06](specs/06-slide-management.md) "Slide layouts", [03](specs/03-layout-vocabulary.md),
+> [13](specs/13-project-structure.md). Built via worktree lanes + subagents.
+>
+> Decisions (locked): apply-to-existing **remaps content into the new layout's primary slot**
+> (never-destroy); placeholders are **starter content** (real leaves w/ prompt text); source =
+> **bundled built-ins + the `templates/` dir**; sections carry a non-authoritative
+> `data-layout` marker (no live master link). Layout = structure only, decoupled from theme.
+
+### Source & API
+- [ ] **P14-1 — Built-in layout preset snippets.** Bundle (go:embed) the preset set as `<section>` snippets with starter content + `data-slot="content"` on the primary container + a `data-layout` marker: Title, Title+Body, Section Header, Two Content, Comparison, Title Only, Big Number, Caption, Blank. Each composes `data-lay` primitives ([03]). _Done when:_ each preset is a valid, offline `<section>` that renders correctly. (Spec 06, 03)
+- [ ] **P14-2 — `templates/` dir + `GET /api/templates`.** Go lists bundled built-ins + user `templates/*.html` snippets as `{name, label, html}` (offline, traversal-safe). Activates the spec'd `templates/` dir. _Done when:_ the endpoint returns built-ins, and a user snippet dropped in `templates/` appears too. (Spec 13, 06)
+
+### Apply (one undo + one autosave, byte-stable)
+- [ ] **P14-3 — New slide from layout.** Build a slide from a chosen template (parse snippet → `<section>` subtree, stamp eids) and insert it via the existing slide ops. _Done when:_ picking a layout creates a slide with that structure + starter content. (Spec 06)
+- [ ] **P14-4 — Change layout (content-preserving remap).** Apply a layout to an existing slide: move its existing leaves into the new layout's `data-slot="content"` container (first slot if several), drop nothing, restamp/keep eids sensibly, update `data-layout`. _Done when:_ swapping the layout of a non-empty slide rearranges it without losing any content; undo restores the prior structure byte-stable. (Spec 06, 12)
+- [ ] **P14-5 — `data-layout`/`data-slot` recognized.** Model + `internal/validate/validate.go` accept `data-layout` and `data-slot` on the relevant elements (markers, not layout primitives; keep enums in sync). _Done when:_ `validate` passes a deck using them; the picker detects a slide's current layout. (Spec 06, 12)
+
+### UI & verification
+- [ ] **P14-6 — Layout picker UI.** A picker (new-slide dropdown + a "Change layout" item in the slide context menu, Phase 13) showing the presets; selecting runs P14-3 (new) or P14-4 (existing). _Done when:_ both entry points apply a layout from the picker. (Spec 06, 04)
+- [ ] **P14-7 — Tests + e2e.** Unit: builders/remap (content preserved, byte-stable). Playwright: new-slide-from-layout and change-layout-preserves-content; a `templates/` user snippet shows in the picker. _Done when:_ suites green. (Spec 06, 12)
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)

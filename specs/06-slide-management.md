@@ -42,6 +42,32 @@ These same operations are reachable from a **slide-level context menu** (right-c
 slide background; see [04](04-canvas-interaction.md) "Context menu") — one dispatch path, no
 duplicated logic.
 
+## Slide layouts
+
+Google-Slides-style **layout presets**: named, pre-arranged slide structures (Title, Title +
+Body, Section Header, Two Content, Comparison, Title Only, Big Number, Caption, Blank). A layout
+is **structure, not theme** — it composes the existing `data-lay` primitives
+([03](03-layout-vocabulary.md)), decoupled from the reveal CSS theme
+([09](09-theming-and-styles.md)). It generalizes what `addSlide` already does (a starter
+`data-lay="stack"` section).
+
+- **Source = template snippets.** Each layout is a `<section>` snippet with **starter content**
+  (real heading/body leaves carrying prompt text you overwrite — not ghost placeholders).
+  Built-in presets ship bundled (embedded, offline); user/Claude-authored layouts live in the
+  `templates/` directory ([13](13-project-structure.md)). Both are listed together via
+  `GET /api/templates`.
+- **Pick a layout** when adding a slide, or **change a slide's layout** from the slide context
+  menu ([04](04-canvas-interaction.md)).
+- **Apply preserves content (never-destroy, [12](12-principles-and-invariants.md)).** Changing
+  the layout of a slide that already has content **moves its existing leaves into the new
+  layout's primary content slot** rather than discarding them. A layout snippet marks its
+  target container (e.g. `data-slot="content"`; the first slot when several exist). Applying is
+  one undo entry + one autosave and round-trips byte-stable.
+- **`data-layout="<name>"`** is stamped on the section as a **non-authoritative** marker — it
+  lets the picker show the current layout and offer a swap. The structure remains the single
+  source of truth; there is **no live master link** (editing a template does not retro-edit
+  slides built from it).
+
 ## Thumbnails
 
 Rendered from the live model and updated on edit. Each thumbnail is a **static, script-free
