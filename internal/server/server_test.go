@@ -266,21 +266,31 @@ func TestDeckCreate_Conflict(t *testing.T) {
 
 // TestDeckCreate_BadName verifies that an invalid name returns 400.
 func TestDeckCreate_BadName(t *testing.T) {
-	srv, _ := newTestServer(t)
+	srv, root := newTestServer(t)
 
-	// The Go http.ServeMux handles path routing, so path-traversal names will
-	// typically 404 before reaching our handler. We test names that pass path
-	// routing but fail deck.ValidName — an empty segment is the canonical case,
-	// but because our route is POST /api/decks/{name} the mux requires a
-	// non-empty segment. Test via the empty literal "." instead.
+	// deck.ValidName rejects exactly the path-unsafe names ("." / ".." / names
+	// with slashes / empty) — and those are precisely the names http.ServeMux
+	// path-cleans (301) or refuses to route to {name} before the handler runs.
+	// So the handler's 400 branch is defensive but practically unreachable via
+	// routing. The invariant that actually matters here is the security one:
+	// a traversal name must NEVER create a deck. Assert that directly.
 	for _, name := range []string{".", ".."} {
 		req := httptest.NewRequest("POST", "/api/decks/"+name, nil)
 		rr := httptest.NewRecorder()
 		srv.ServeHTTP(rr, req)
-		// "." and ".." fail ValidName → 400.
-		if rr.Code != http.StatusBadRequest {
-			t.Errorf("create deck bad name %q: want 400, got %d", name, rr.Code)
+		// Must not be a successful creation (201).
+		if rr.Code == http.StatusCreated {
+			t.Errorf("create deck bad name %q: unexpectedly created (201)", name)
 		}
+	}
+	// No deck folder may have been written by any of the traversal attempts —
+	// the decks dir must still be empty.
+	entries, err := os.ReadDir(filepath.Join(root, "decks"))
+	if err != nil {
+		t.Fatalf("read decks dir: %v", err)
+	}
+	if len(entries) != 0 {
+		t.Errorf("traversal names created %d deck folder(s); want 0", len(entries))
 	}
 }
 
@@ -1092,8 +1102,8 @@ func TestNotesPlugin_VendoredAndEnabled(t *testing.T) {
 	}
 	html := string(htmlBytes)
 
-	if !strings.Contains(html, "assets/vendor/notes/plugin.js") {
-		t.Error("deck.html does not load assets/vendor/notes/plugin.js")
+	if !strings.Contains(html, "assets/vendor/notes/notes.js") {
+		t.Error("deck.html does not load assets/vendor/notes/notes.js")
 	}
 	if !strings.Contains(html, "RevealNotes") {
 		t.Error("deck.html does not include RevealNotes in plugins array")

@@ -26,6 +26,9 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
 ## Test
 - Go: `go test ./...`
 - Frontend: `cd web && npx vitest run`
+- E2e (Playwright vs the built binary): `cd web && npm run test:e2e` (builds FE+binary, spins a temp
+  workspace on port 19999, runs Chromium). In CI/without local browsers, run inside the host
+  `mcr.microsoft.com/playwright` image via `npm run test:e2e:docker`. Specs live in `web/e2e/*.spec.ts`.
 
 ## Endpoints
 `GET /health` · `GET /api/decks` · `GET|PUT /api/decks/{name}` · `GET /decks/{name}/...` (static deck files: `deck.html` + `assets/`, traversal-guarded; the iframe loads `/decks/{name}/deck.html`) · `GET /events` (SSE) · `GET /` (SPA).
