@@ -85,6 +85,11 @@ const deckHTML = `<!doctype html>
   <script src="assets/vendor/reveal/reveal.js"></script>
   <script>
     Reveal.initialize({
+      // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
+      // space to any screen at present time, so editor overlays and the rendered
+      // deck share one coordinate system (WYSIWYG). Aspect changes rewrite these.
+      width: 1920,
+      height: 1080,
       hash: true,
       controls: true,
       progress: true,

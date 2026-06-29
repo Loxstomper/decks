@@ -112,13 +112,22 @@ dependencies are noted inline.
 ## Phase 4 — Free positioning & geometry
 > Goal: the absolute-positioning escape hatch with smart guides. Specs: [03](specs/03-layout-vocabulary.md), [04](specs/04-canvas-interaction.md), [05](specs/05-scaling-and-resolution.md).
 
-- [ ] **P4-1 — `data-free` toggle.** Convert an element to/from free; write `data-free`+`data-x/y/w/h`. _Done when:_ toggling moves it between structured and absolute. (Spec 03)
-- [ ] **P4-2 — Absolute drag move.** Drag a free element in logical coordinates. _Done when:_ position persists as logical coords. (Spec 04)
-- [ ] **P4-3 — Resize handles.** 8 handles; Shift = aspect, Alt = from center. _Done when:_ resize updates `data-w/h` with modifiers honored. (Spec 04)
-- [ ] **P4-4 — Smart alignment guides.** Snap lines vs sibling edges/centers and slide center while dragging/resizing. _Done when:_ guides appear and snap. (Spec 04)
-- [ ] **P4-5 — Marquee multi-select.** Drag-select multiple elements. _Done when:_ multiple elements selected together. (Spec 04)
-- [ ] **P4-6 — Align/distribute (free).** Edge align + spacing distribute on multi-selection (coordinate ops). _Done when:_ selected free elements align/distribute. (Spec 04)
-- [ ] **P4-7 — Aspect-ratio change handling.** On ratio change: reflow structured; flag free elements with reposition offer. _Done when:_ switching 16:9→4:3 reflows structured content and flags free ones. (Spec 05)
+- [x] **P4-1 — `data-free` toggle.** Convert an element to/from free; write `data-free`+`data-x/y/w/h`. _Done when:_ toggling moves it between structured and absolute. (Spec 03)
+- [x] **P4-2 — Absolute drag move.** Drag a free element in logical coordinates. _Done when:_ position persists as logical coords. (Spec 04)
+- [x] **P4-3 — Resize handles.** 8 handles; Shift = aspect, Alt = from center. _Done when:_ resize updates `data-w/h` with modifiers honored. (Spec 04)
+- [x] **P4-4 — Smart alignment guides.** Snap lines vs sibling edges/centers and slide center while dragging/resizing. _Done when:_ guides appear and snap. (Spec 04)
+- [x] **P4-5 — Marquee multi-select.** Drag-select multiple elements. _Done when:_ multiple elements selected together. (Spec 04)
+- [x] **P4-6 — Align/distribute (free).** Edge align + spacing distribute on multi-selection (coordinate ops). _Done when:_ selected free elements align/distribute. (Spec 04)
+- [x] **P4-7 — Aspect-ratio change handling.** On ratio change: reflow structured; flag free elements with reposition offer. _Done when:_ switching 16:9→4:3 reflows structured content and flags free ones. (Spec 05)
+
+> **Phase 4 STATUS (done, tag 0.0.5):** P4-1..P4-7 complete. 4 lanes + Opus integration; verified (FE 791 vitest tests, svelte-check 0/0, Go green; byte-stability + offline-first re-verified).
+> - **Foundation:** `setFree`/`toggleFree` (`web/src/lib/model/free.ts`); **selection store now multi-select** (`.eids`/`.primary`/`add`/`remove`/`toggle`/`set`, `.eid`=primary for back-compat) — single source of truth, existing call sites preserved; `aspect.ts` (`logicalDimensions(aspect)`, presets incl. 1:1, `repositionFreeRect`).
+> - **Drag/resize:** pure geometry `resize-geometry.ts` (8 handles, Shift=aspect, Alt=from-center, snap, minSize) + `free-position.ts` writers; `FreeTransformOverlay.svelte`/`ResizeHandles.svelte` (free selections only; structured-drag path untouched). Move batches the selection as one undo entry.
+> - **Guides + align/distribute:** smart guides snap to sibling edges/centers + slide center/edges (aspect-aware); `FreeAlignBar` (2+ free selection; distribute at 3+) via `applyFreeGeometryBatch` (one undo entry).
+> - **Marquee + aspect:** `MarqueeController` (empty-space drag, swallows trailing click); aspect `<select>` rebinds RevealFrame logical size via `aspectStore`, structured reflows, free elements get a reposition OFFER (`AspectRepositionOffer`).
+> - **Fixed (was pre-existing bug):** scaffold template now seeds `Reveal.initialize({width:1920,height:1080})` so new decks are WYSIWYG-aligned with the editor's logical canvas (previously reveal defaulted to 960×700).
+> - **⚠️ Needs VISUAL/browser verification:** resize modifiers/snap; guide snapping; marquee (Shift union / Alt contain) + trailing-click swallow; aspect reflow + reposition dialog.
+> - **[visual nice-to-have]** multi-select draws only the primary's overlay box; draw all selected boxes later.
 
 ## Phase 5 — Content blocks & assets
 > Goal: insert rich content; the acquire→localize asset pipeline. Spec: [08](specs/08-assets-and-media.md).

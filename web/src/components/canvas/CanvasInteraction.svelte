@@ -164,7 +164,7 @@
     }
   }
 
-  // ── Click / selection (P2-3) ────────────────────────────────────────────────
+  // ── Click / selection (P2-3, P4-6 multi-select) ────────────────────────────
 
   function handleClick(e: MouseEvent): void {
     // While editing, a click inside the editing element just moves the caret —
@@ -174,8 +174,18 @@
       return;
     }
     const sel = resolveSelectable(e.target as unknown as ElementLike | null);
-    if (sel) selectionStore.select(sel.eid);
-    else selectionStore.clear(); // empty space → deselect
+    if (sel) {
+      if (e.shiftKey || e.metaKey || e.ctrlKey) {
+        // Shift/Cmd/Ctrl+click: toggle this element in the multi-selection
+        // (P4-6: multi-select accumulation via modifier keys).
+        selectionStore.toggle(sel.eid);
+      } else {
+        // Plain click: single-select (clears any multi-selection).
+        selectionStore.select(sel.eid);
+      }
+    } else {
+      selectionStore.clear(); // click on empty space → deselect all
+    }
   }
 
   // ── Double-click → edit (P2-5) ──────────────────────────────────────────────

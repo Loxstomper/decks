@@ -20,6 +20,10 @@
   import DragController from './components/canvas/DragController.svelte';
   import GridOverlay from './components/canvas/GridOverlay.svelte';
   import NudgeController from './components/canvas/NudgeController.svelte';
+  import FreeTransformOverlay from './components/canvas/FreeTransformOverlay.svelte';
+  import MarqueeController from './components/canvas/MarqueeController.svelte';
+  import AspectRepositionOffer from './components/canvas/AspectRepositionOffer.svelte';
+  import FreeAlignBar from './components/canvas/FreeAlignBar.svelte';
   import SourcePane from './components/source/SourcePane.svelte';
   import OutlinePanel from './components/outline/OutlinePanel.svelte';
   import PropertiesPanel from './components/properties/PropertiesPanel.svelte';
@@ -27,6 +31,19 @@
   import { deckStore, type DeckStatus } from '$lib/store/deck.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
   import { gridStore } from '$lib/canvas/grid.svelte.ts';
+  import { aspectStore } from '$lib/canvas/aspect.svelte.ts';
+  import {
+    ASPECT_PRESETS,
+    DEFAULT_ASPECT,
+    logicalSizeToAspect,
+  } from '$lib/canvas/aspect.ts';
+  import {
+    collectFreeRects,
+    persistAspectChange,
+    readLogicalSizeFromInit,
+  } from '$lib/canvas/aspect-commands.ts';
+  import { domRectToLogical } from '$lib/canvas/overlay-geometry.ts';
+  import { classify, findByEid, type LogicalRect } from '$lib/model';
   import type { Transform } from '$lib/coords.ts';
 
   // RevealFrame instance (exposes reload()); bound via the canvas snippet.
@@ -86,6 +103,70 @@
   async function openDeck(name: string): Promise<void> {
     if (name === deckStore.name) return;
     await deckStore.load(name);
+  }
+
+  // ── Aspect ratio (P4-7) ─────────────────────────────────────────────────────
+  // The logical canvas size is the spec-05 single source of truth living inside
+  // the deck's `Reveal.initialize({ width, height })` call. The aspectStore holds
+  // the reactive size that RevealFrame renders at (bound below) and that coords.ts
+  // threads through every overlay. Seed it from the persisted deck whenever the
+  // on-disk bytes change (load / save / external edit), so the canvas always
+  // matches what reveal will actually render. We slice from "Reveal.initialize" so
+  // a stray `width:` in CSS cannot be mistaken for the canvas size, and skip while
+  // an aspect change is mid-decision (pending offer) so we don't fight the user.
+  let lastSeededNonce = -1;
+  $effect(() => {
+    const n = deckStore.reloadNonce;
+    if (n === lastSeededNonce || aspectStore.pending) return;
+    lastSeededNonce = n;
+    const src = deckStore.source;
+    const idx = src.indexOf('Reveal.initialize');
+    const size = idx >= 0 ? readLogicalSizeFromInit(src.slice(idx)) : null;
+    aspectStore.init(size ? logicalSizeToAspect(size) : DEFAULT_ASPECT);
+  });
+
+  // Aspect picker → begin an aspect change. begin() updates the live canvas size
+  // immediately (structured content reflows via flex/grid) and computes a
+  // reposition OFFER for every free element (spec 05 forbids silently moving them).
+  // When there are no free elements the change is purely structural — there is no
+  // dialog to show, so we persist the new size directly as one undo entry.
+  function onAspectPick(value: string): void {
+    if (!deckStore.model || value === aspectStore.aspect) return;
+    aspectStore.begin(value, collectFreeRects(deckStore.model));
+    if (!aspectStore.pending) {
+      const size = aspectStore.newSize ?? aspectStore.size;
+      void persistAspectChange(size, []).then(() => aspectStore.finish());
+    }
+  }
+
+  // ── Make free / Make structured (P4-1) ──────────────────────────────────────
+  // The data-free toggle is a canvas concern: the model cannot measure rendered
+  // geometry, so we measure the selected element's current LOGICAL rect inside the
+  // iframe (getBoundingClientRect there is already logical — see overlay-geometry)
+  // and hand it to the store command, which stamps data-free + data-x/y/w/h so the
+  // element does not visually jump. One undo entry + one autosave.
+  const primaryEl = $derived(
+    selectionStore.primary && deckStore.model
+      ? findByEid(deckStore.model, selectionStore.primary)
+      : null,
+  );
+  const primaryIsFree = $derived(primaryEl ? classify(primaryEl) === 'free' : false);
+  const canToggleFree = $derived(!!primaryEl);
+
+  async function onToggleFree(): Promise<void> {
+    const eid = selectionStore.primary;
+    if (!eid) return;
+    let rect: LogicalRect | undefined;
+    const doc = canvasIframe?.contentDocument ?? null;
+    if (doc) {
+      const esc = typeof CSS !== 'undefined' && CSS.escape ? CSS.escape(eid) : eid;
+      const el = doc.querySelector(`[data-eid="${esc}"]`);
+      if (el) {
+        const r = domRectToLogical(el.getBoundingClientRect());
+        rect = { x: r.left, y: r.top, w: r.width, h: r.height };
+      }
+    }
+    await deckStore.toggleFree(eid, rect);
   }
 
   // ── Undo / redo (P2-7, P2-8) ────────────────────────────────────────────────
@@ -182,6 +263,8 @@
       <RevealFrame
         bind:this={frame}
         deckUrl={deckStore.deckUrl}
+        width={aspectStore.width}
+        height={aspectStore.height}
         bind:iframeEl={canvasIframe}
         bind:transform={canvasTransform}
       />
@@ -213,10 +296,100 @@
         iframe={canvasIframe}
         transform={canvasTransform}
         reloadNonce={deckStore.reloadNonce}
+        logicalWidth={aspectStore.width}
+        logicalHeight={aspectStore.height}
       />
+
+      <!--
+        Marquee controller (P4-5): rubber-band multi-select on empty-space drag.
+        Starts a marquee ONLY when the press resolves to no selectable element, so
+        it never conflicts with CanvasInteraction's click-select or DragController's
+        element drag. z-index:3 (visual band only — all pointer handling is on the
+        iframe doc/window). Mounted before FreeTransformOverlay so the latter's
+        handles (z-index:8) win pointer capture over a free element.
+      -->
+      <MarqueeController
+        iframe={canvasIframe}
+        transform={canvasTransform}
+        reloadNonce={deckStore.reloadNonce}
+      />
+
+      <!--
+        Free-transform overlay (P4-2 move / P4-3 resize): renders the 8 resize
+        handles + a move-frame ONLY when the selection is a single free, non-editing
+        element. Its handle DOM lives in the parent doc (pointer-events:auto) at
+        z-index:8 so a grab is captured before the iframe sees it; everything else
+        passes through to the iframe. A move-frame drag translates every selected
+        free element (multi-select), resize stays single-element.
+      -->
+      <FreeTransformOverlay
+        iframe={canvasIframe}
+        transform={canvasTransform}
+        reloadNonce={deckStore.reloadNonce}
+      />
+
+      <!--
+        Aspect reposition offer (P4-7): renders nothing unless an aspect change is
+        pending. Lists each free element with old→suggested coords for accept/decline
+        (spec 05: free elements must never be silently moved). Apply persists the new
+        reveal size + accepted offers as one undo entry; Cancel reverts the canvas.
+      -->
+      <AspectRepositionOffer />
+
+      <!--
+        Align / distribute bar (P4-6): self-shows when 2+ elements are selected and
+        applies coordinate ops to the free ones via deckStore.applyFreeGeometryBatch
+        (one undo entry). Anchored bottom-center over the canvas.
+      -->
+      <div class="free-align-anchor">
+        <FreeAlignBar iframe={canvasIframe} />
+      </div>
 
       <!-- Undo / redo toolbar (bonus). Reflects canUndo/canRedo reactively. -->
       <div class="canvas-toolbar">
+        <!--
+          Aspect-ratio picker (P4-7). Reflects aspectStore.aspect; choosing a preset
+          begins an aspect change (re-fits the canvas + surfaces the reposition
+          offer for free elements). Disabled when no deck is open.
+        -->
+        <select
+          class="canvas-toolbar-select"
+          title="Aspect ratio"
+          aria-label="Aspect ratio"
+          disabled={!deckStore.name}
+          value={aspectStore.aspect}
+          onchange={(e) => onAspectPick((e.currentTarget as HTMLSelectElement).value)}
+        >
+          {#each Object.keys(ASPECT_PRESETS) as preset (preset)}
+            <option value={preset}>{preset}</option>
+          {/each}
+          {#if !(aspectStore.aspect in ASPECT_PRESETS)}
+            <!-- Custom size loaded from the deck that matches no preset. -->
+            <option value={aspectStore.aspect}>{aspectStore.aspect}</option>
+          {/if}
+        </select>
+
+        <!--
+          Make free / Make structured toggle (P4-1). Enabled when an element is
+          selected; toggles the data-free escape hatch, capturing the element's
+          current logical rect so it does not jump.
+        -->
+        <button
+          type="button"
+          class="canvas-toolbar-btn"
+          class:is-active={primaryIsFree}
+          title={primaryIsFree ? 'Make structured (remove free positioning)' : 'Make free (absolute positioning)'}
+          aria-label="Toggle free positioning"
+          aria-pressed={primaryIsFree}
+          disabled={!canToggleFree}
+          onclick={onToggleFree}
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M5 9V5h4M15 5h4v4M19 15v4h-4M9 19H5v-4" />
+            <rect x="9" y="9" width="6" height="6" rx="1" />
+          </svg>
+        </button>
+
         <!--
           Snap-to-grid toggle (P3-8). Reflects gridStore.enabled; clicking flips
           it. When on, drags/nudges snap to gridStore.size and the GridOverlay
@@ -354,6 +527,45 @@
   .canvas-toolbar-btn.is-active {
     background-color: rgba(74, 158, 255, 0.35);
     color: #fff;
+  }
+
+  /* Aspect-ratio picker — matches the toolbar button visual language. */
+  .canvas-toolbar-select {
+    height: 1.75rem;
+    padding: 0 0.4rem;
+    border-radius: 0.375rem;
+    border: none;
+    color: rgba(255, 255, 255, 0.7);
+    background-color: rgba(0, 0, 0, 0.35);
+    backdrop-filter: blur(4px);
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: background-color 0.12s, color 0.12s, opacity 0.12s;
+  }
+
+  .canvas-toolbar-select:hover:not(:disabled) {
+    background-color: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+
+  .canvas-toolbar-select:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  /*
+   * Floating anchor for the align/distribute bar (FreeAlignBar self-hides when
+   * fewer than 2 elements are selected). Bottom-center over the canvas, above the
+   * pointer-events:none overlays. pointer-events:none here so the empty margins
+   * never block canvas interaction; the bar itself re-enables pointer events.
+   */
+  .free-align-anchor {
+    position: absolute;
+    bottom: 0.75rem;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 20;
+    pointer-events: none;
   }
 
   .canvas-toolbar-btn svg {

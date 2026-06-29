@@ -41,6 +41,8 @@
     logicalToScreen,
     type Transform,
     type Point,
+    LOGICAL_WIDTH,
+    LOGICAL_HEIGHT,
   } from '$lib/coords.ts';
   import { resolveSelectable, type ElementLike } from '$lib/canvas/eid.ts';
   import { logicalRectToScreen, domRectToLogical, type Rect } from '$lib/canvas/overlay-geometry.ts';
@@ -57,14 +59,28 @@
   import { reparentChildCommand, moveFreeCommand } from '$lib/canvas/structure-commands.ts';
   import { snapPointToGrid } from '$lib/canvas/snap-grid.ts';
   import { gridStore } from '$lib/canvas/grid.svelte.ts';
+  import { computeGuides, DEFAULT_GUIDE_THRESHOLD, type AlignGuide } from '$lib/canvas/alignment-guides.ts';
+  import GuidesOverlay from './GuidesOverlay.svelte';
 
   interface Props {
     iframe: HTMLIFrameElement | null | undefined;
     transform: Transform;
     reloadNonce?: number;
+    /**
+     * Logical canvas dimensions (for guide computation against slide edges/center).
+     * Defaults to the standard 1920×1080 logical canvas.
+     */
+    logicalWidth?: number;
+    logicalHeight?: number;
   }
 
-  let { iframe, transform, reloadNonce = 0 }: Props = $props();
+  let {
+    iframe,
+    transform,
+    reloadNonce = 0,
+    logicalWidth = LOGICAL_WIDTH,
+    logicalHeight = LOGICAL_HEIGHT,
+  }: Props = $props();
 
   /** Movement (in LOGICAL units) before a press becomes a drag — avoids hijacking
    *  plain clicks that CanvasInteraction turns into selection. */
@@ -76,6 +92,11 @@
   let indicatorScreen = $state<Rect | null>(null);
   /** Screen-space rect of the free-move ghost outline, or null. */
   let ghostScreen = $state<Rect | null>(null);
+  /**
+   * Active smart alignment guides to render during a free drag.
+   * Computed by `computeGuides` in updateFree; cleared on drag end.
+   */
+  let activeGuides = $state<AlignGuide[]>([]);
 
   // ── Non-reactive controller state ───────────────────────────────────────────
 
@@ -100,6 +121,12 @@
     drop: DropTarget | null;
     /** Latest resolved free landing position (snapped). */
     freeTarget: Point | null;
+    /**
+     * Logical rects of OTHER free elements on the same slide, collected at
+     * drag-activation time (not re-measured per move for performance).
+     * Used by computeGuides for sibling alignment snapping.
+     */
+    siblingRects: Rect[];
   }
 
   let drag: DragState | null = null;
@@ -172,6 +199,7 @@
       size: { width: rect.width, height: rect.height },
       drop: null,
       freeTarget: null,
+      siblingRects: [],
     };
   }
 
@@ -195,9 +223,11 @@
   function activate(): void {
     if (!drag) return;
     drag.active = true;
+
+    const doc = getDoc();
+    const win = getWin();
+
     if (drag.kind === 'structured') {
-      const doc = getDoc();
-      const win = getWin();
       if (doc && win) {
         const all = buildContainerCandidates(doc, win);
         // Exclude the dragged element and any container nested inside it — you
@@ -207,6 +237,18 @@
           (c) => c.eid !== drag!.eid && !(self && isInside(doc, c.eid, self)),
         );
       }
+    } else if (drag.kind === 'free' && doc) {
+      // Collect logical rects of all OTHER data-free elements on the slide so
+      // computeGuides can check alignment against them. Measured once at
+      // activation (not per-move) — free elements don't reflow during a drag.
+      const siblings: Rect[] = [];
+      const freeEls = doc.querySelectorAll<HTMLElement>('[data-free]');
+      for (const el of freeEls) {
+        const eid = el.getAttribute('data-eid');
+        if (!eid || eid === drag.eid) continue; // skip the dragging element
+        siblings.push(domRectToLogical(el.getBoundingClientRect()));
+      }
+      drag.siblingRects = siblings;
     }
   }
 
@@ -237,14 +279,43 @@
 
   function updateFree(pt: Point): void {
     if (!drag) return;
-    const next: Point = {
+
+    // Raw position from drag delta
+    const raw: Point = {
       x: drag.freeOrigin.x + (pt.x - drag.start.x),
       y: drag.freeOrigin.y + (pt.y - drag.start.y),
     };
-    const snapped = snapPointToGrid(next, gridStore.effectiveSize);
-    drag.freeTarget = snapped;
+
+    // Step 1: Apply smart guide snapping (P4-4).
+    //   computeGuides returns a snappedRect nudged toward alignment targets.
+    //   Only snap via guides when the grid is NOT dominant — if the guide snap
+    //   and grid snap point in opposite directions, the guide wins (it is more
+    //   intentional). Both can be applied axis-independently.
+    const rawRect = { left: raw.x, top: raw.y, width: drag.size.width, height: drag.size.height };
+    const { snappedRect, guides } = computeGuides(
+      rawRect,
+      drag.siblingRects,
+      { width: logicalWidth, height: logicalHeight },
+      DEFAULT_GUIDE_THRESHOLD,
+    );
+    activeGuides = guides;
+
+    // Step 2: Grid snap on each axis, but only if no guide already snapped that axis.
+    //   A guide snap is signalled by a non-zero displacement (snappedRect differs
+    //   from rawRect). If both axes have guide snaps, grid snap is skipped entirely;
+    //   if only one axis snapped, apply grid to the other for consistency.
+    const guideSnappedX = snappedRect.left !== raw.x;
+    const guideSnappedY = snappedRect.top !== raw.y;
+    const gridSize = gridStore.effectiveSize;
+
+    const finalX = guideSnappedX ? snappedRect.left : snapPointToGrid({ x: snappedRect.left, y: 0 }, gridSize).x;
+    const finalY = guideSnappedY ? snappedRect.top : snapPointToGrid({ x: 0, y: snappedRect.top }, gridSize).y;
+
+    const finalPt: Point = { x: finalX, y: finalY };
+    drag.freeTarget = finalPt;
+
     ghostScreen = logicalRectToScreen(
-      { left: snapped.x, top: snapped.y, width: drag.size.width, height: drag.size.height },
+      { left: finalPt.x, top: finalPt.y, width: drag.size.width, height: drag.size.height },
       transform,
     );
     indicatorScreen = null;
@@ -271,6 +342,7 @@
   function clearOverlay(): void {
     indicatorScreen = null;
     ghostScreen = null;
+    activeGuides = [];
   }
 
   // ── Document / window attach ────────────────────────────────────────────────
@@ -359,6 +431,8 @@
       style:height="{ghostScreen.height}px"
     ></div>
   {/if}
+  <!-- Smart alignment guides (P4-4): rendered during free-element drag -->
+  <GuidesOverlay guides={activeGuides} {transform} {logicalWidth} {logicalHeight} />
 </div>
 
 <style>

@@ -15,6 +15,7 @@
 
 import { getAttribute, setAttribute, type ElementNode } from '$lib/model';
 import type { Point } from '$lib/coords.ts';
+import type { Rect } from './overlay-geometry.ts';
 
 /**
  * Parse a free element's logical position from `data-x`/`data-y`. Missing or
@@ -52,4 +53,58 @@ export function translateFreePosition(el: ElementNode, dx: number, dy: number): 
   const next = { x: cur.x + dx, y: cur.y + dy };
   setFreePosition(el, next);
   return next;
+}
+
+/**
+ * Parse a free element's logical SIZE from `data-w`/`data-h` (P4-3 resize / spec
+ * 03 `data-w`/`data-h`). Returns null for a dimension that is absent or
+ * non-positive: such an element is sized by its content, so the caller must fall
+ * back to a measured rect (getBoundingClientRect inside the iframe is logical)
+ * rather than inventing a size here in the pure layer.
+ */
+export function getFreeSize(el: ElementNode): { width: number | null; height: number | null } {
+  const parse = (raw: string | null): number | null => {
+    if (raw === null) return null;
+    const n = parseFloat(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  };
+  return { width: parse(getAttribute(el, 'data-w')), height: parse(getAttribute(el, 'data-h')) };
+}
+
+/**
+ * Write a free element's logical SIZE to `data-w`/`data-h`. Mirrors
+ * {@link setFreePosition}: integer-valued sizes serialize without a trailing
+ * `.0`. Only this element goes dirty (spec 12 #4 round-trip).
+ */
+export function setFreeSize(el: ElementNode, width: number, height: number): void {
+  setAttribute(el, 'data-w', String(width));
+  setAttribute(el, 'data-h', String(height));
+}
+
+/**
+ * Write a free element's full logical geometry (`data-x`/`data-y`/`data-w`/
+ * `data-h`) in one go — the resize/move commit path. Rounding stays out of here:
+ * the command layer decides whether to snap before calling, so this writes
+ * exactly the rect it is given.
+ */
+export function setFreeRect(el: ElementNode, rect: Rect): void {
+  setFreePosition(el, { x: rect.left, y: rect.top });
+  setFreeSize(el, rect.width, rect.height);
+}
+
+/**
+ * Read a free element's logical geometry as a {@link Rect}. Position falls back
+ * to the origin and size to `fallback` (a measured rect) when the corresponding
+ * attributes are absent — so an as-yet-unsized free element still yields a
+ * concrete rect for the resize handles to act on.
+ */
+export function getFreeRect(el: ElementNode, fallback?: Partial<Rect>): Rect {
+  const pos = getFreePosition(el);
+  const size = getFreeSize(el);
+  return {
+    left: pos.x,
+    top: pos.y,
+    width: size.width ?? fallback?.width ?? 0,
+    height: size.height ?? fallback?.height ?? 0,
+  };
 }

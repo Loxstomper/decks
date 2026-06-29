@@ -51,11 +51,14 @@ import {
   findByEid,
   setAttribute,
   setLayoutProps,
+  toggleFree,
   type DeckModel,
   type LayoutProps,
+  type LogicalRect,
 } from '$lib/model';
 import { undoStore } from './undo.svelte';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
+import { setFreePosition } from '$lib/canvas/free-position';
 
 /** Debounce window for re-parse + autosave after a source edit (P1-8). */
 const SYNC_DEBOUNCE_MS = 400;
@@ -352,6 +355,63 @@ class DeckStore {
     }
     this.updateFromModel();
     await this.commitCommand();
+  }
+
+  /**
+   * P4-6: Apply a batch of free-element position changes as ONE undo entry and
+   * ONE autosave. Used by the align/distribute toolbar so that, e.g., "align
+   * left on 5 elements" is a single Ctrl+Z entry.
+   *
+   * `positions` maps each eid to its new logical {x, y} position.  Only
+   * elements found in the current model are updated; unknown eids are silently
+   * skipped (safe for stale selections after an external edit).  Returns false
+   * when no elements were changed (the caller can treat it as a no-op).
+   *
+   * This intentionally mirrors the pattern of applyLayoutChange: mutate model →
+   * updateFromModel → commitCommand.  All element mutations go through
+   * setFreePosition (which calls setAttribute → marks only that element dirty),
+   * so the byte-stable round-trip (spec 12 #4) is preserved for every unchanged
+   * element.
+   */
+  async applyFreeGeometryBatch(
+    positions: Map<string, { x: number; y: number }>,
+  ): Promise<boolean> {
+    if (!this.model) return false;
+    let changed = false;
+    for (const [eid, pos] of positions) {
+      const el = findByEid(this.model, eid);
+      if (!el) continue;
+      setFreePosition(el, pos);
+      changed = true;
+    }
+    if (!changed) return false;
+    this.updateFromModel();
+    await this.commitCommand();
+    return true;
+  }
+
+  /**
+   * P4-1: Toggle the free-positioning escape hatch on the element with `eid` as
+   * ONE undo entry + one autosave.
+   *
+   * The model layer cannot measure rendered geometry (it has no DOM), so the
+   * CALLER (a canvas component with iframe access) measures the element's current
+   * LOGICAL rect and passes it here. On enable we stamp data-free + data-x/y/w/h
+   * from that rect so the element does not visually jump; on disable toggleFree
+   * strips all five attributes (the rect is ignored). Only the toggled element
+   * goes dirty (spec 12 #4) — every sibling round-trips byte-for-byte.
+   *
+   * Returns the new state (true = now free, false = now structured) or null when
+   * the eid is unknown (e.g. a stale selection after an external reload) — the
+   * caller can no-op safely.
+   */
+  async toggleFree(eid: string, rect?: LogicalRect): Promise<boolean | null> {
+    if (!this.model) return null;
+    const next = toggleFree(this.model, eid, rect);
+    if (next === null) return null; // unknown eid — nothing changed
+    this.updateFromModel();
+    await this.commitCommand();
+    return next;
   }
 
   #scheduleSync(): void {

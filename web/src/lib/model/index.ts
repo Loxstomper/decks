@@ -33,6 +33,8 @@ export {
 export { decodeEntities, encodeAttr, encodeText } from './entities';
 export { classify } from './classify';
 export { stampEids, nextEid } from './eid';
+export { setFree, toggleFree } from './free';
+export type { LogicalRect } from './free';
 export {
   getContainerKind,
   getLayoutProps,
