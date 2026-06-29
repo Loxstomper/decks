@@ -214,9 +214,12 @@
     doc.addEventListener('pointerup', onUp, true);
     // Window-capture click swallow: fires before the document-phase click handler.
     win.addEventListener('click', onWindowClickCapture, true);
-    // Parent-window listeners cover the cursor leaving the iframe mid-drag.
-    win.parent.addEventListener('pointermove', onWinMove, true);
-    win.parent.addEventListener('pointerup', onUp, true);
+    // Editor-window listeners cover the cursor leaving the iframe mid-drag.
+    // Bind to the editor's own `window` (the iframe's parent) rather than
+    // `win.parent`: the latter goes null once RevealFrame's {#key} block tears
+    // down the old iframe, which would throw in detach() on reload.
+    window.addEventListener('pointermove', onWinMove, true);
+    window.addEventListener('pointerup', onUp, true);
   }
 
   function detach(doc: Document, win: Window): void {
@@ -224,8 +227,8 @@
     doc.removeEventListener('pointermove', onDocMove, true);
     doc.removeEventListener('pointerup', onUp, true);
     win.removeEventListener('click', onWindowClickCapture, true);
-    win.parent.removeEventListener('pointermove', onWinMove, true);
-    win.parent.removeEventListener('pointerup', onUp, true);
+    window.removeEventListener('pointermove', onWinMove, true);
+    window.removeEventListener('pointerup', onUp, true);
   }
 
   $effect(() => {

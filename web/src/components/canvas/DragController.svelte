@@ -366,17 +366,20 @@
     doc.addEventListener('pointerdown', onPointerDown, true);
     doc.addEventListener('pointermove', onDocMove, true);
     doc.addEventListener('pointerup', onDocUp, true);
-    // Parent-window listeners cover the cursor leaving the iframe mid-drag.
-    win.parent.addEventListener('pointermove', onWinMove, true);
-    win.parent.addEventListener('pointerup', onWinUp, true);
+    // Editor-window listeners cover the cursor leaving the iframe mid-drag.
+    // Bind to the editor's own `window` (the iframe's parent) rather than
+    // `win.parent`: the latter goes null once RevealFrame's {#key} block tears
+    // down the old iframe, which would throw in detachDoc() on reload.
+    window.addEventListener('pointermove', onWinMove, true);
+    window.addEventListener('pointerup', onWinUp, true);
   }
 
   function detachDoc(doc: Document, win: Window): void {
     doc.removeEventListener('pointerdown', onPointerDown, true);
     doc.removeEventListener('pointermove', onDocMove, true);
     doc.removeEventListener('pointerup', onDocUp, true);
-    win.parent.removeEventListener('pointermove', onWinMove, true);
-    win.parent.removeEventListener('pointerup', onWinUp, true);
+    window.removeEventListener('pointermove', onWinMove, true);
+    window.removeEventListener('pointerup', onWinUp, true);
   }
 
   $effect(() => {
