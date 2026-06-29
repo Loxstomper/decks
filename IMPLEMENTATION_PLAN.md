@@ -278,6 +278,20 @@ dependencies are noted inline.
 - [ ] **P10-7 — Vertical cascade.** Verify `data-theme` on a vertical-stack `<section>` cascades to its verticals (vars inherit; ensure `data-background-color` propagates — add propagation if reveal doesn't) and an inner `data-theme` overrides. _Done when:_ a themed stack restyles its verticals and an inner override wins. (Spec 09, 06)
 - [ ] **P10-8 — Present/PDF fidelity + e2e.** Confirm per-slide overrides render in the present route and in PDF export (scoped vars + native background both print). Add a Playwright spec: a deck with an overridden slide shows different computed styles on that slide vs an inherited one, and the offline-guard still passes. _Done when:_ e2e asserts the override is visible and offline; PDF export shows it. (Spec 09, 10, 12)
 
+## Phase 11 — Canvas reload preserves view state (bug fix)
+> Goal: a same-deck iframe reload must keep the viewer on their current slide instead of
+> snapping to slide 1. Spec: [04](specs/04-canvas-interaction.md) "Canvas reload preserves view state".
+>
+> Root cause: `App.svelte` watches `deckStore.reloadNonce` → `RevealFrame.reload()` bumps
+> `reloadKey` → the `{#key}` block destroys/recreates the iframe → reveal re-inits at slide 0.
+> Nothing captures/restores `(h, v)`. Most visible on text edits: Enter → commit →
+> `applyTextEdit` → autosave → reload → slide 1. The bridge already exposes the needed halves
+> (`getCurrentIndices` + `navigateToSlide` in `web/src/lib/slides/reveal-control.ts`).
+
+- [ ] **P11-1 — Preserve current slide across reload.** In `RevealFrame`, capture `getCurrentIndices(iframeEl)` into a `pendingRestore` field **before** `reload()` bumps `reloadKey`; in `handleLoad()`, if set, `navigateToSlide(iframeEl, h, v)` then clear it. Covers all reload causes (autosave, undo/redo, external SSE). Same-deck only — a `deckUrl` change (deck switch) still resets to slide 0; initial load (`null` indices) is a no-op. _Done when:_ editing/committing on slide N (incl. a vertical `v>0`) leaves the canvas on slide N; switching decks still opens at slide 1. (Spec 04)
+- [ ] **P11-2 — No first-slide flash.** Keep the iframe hidden (extend the existing `isLoading` gate) until the P11-1 restore navigation has completed, so the intermediate slide-0 render is never visible. _Done when:_ a reload after an edit shows no flash to slide 1. (Spec 04)
+- [ ] **P11-3 — (Deferred) Skip reload on pure text commits.** Evaluate persisting in-place text edits without a full iframe reload (the contenteditable already mutated the live DOM), reserving reloads for structural/external changes. Gate on a guarantee the canvas cannot drift from on-disk bytes. _Done when:_ decided + (if adopted) text commits no longer reload. (Spec 04, 02 — deferred)
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)

@@ -74,6 +74,28 @@ This is the first thing to prototype — everything visual depends on it.
 Snapshot-based: each command pushes the serialized model onto a history stack. Cheap for
 slide-sized documents; session-only (git is durable history, see [13](13-project-structure.md)).
 
+## Canvas reload preserves view state
+
+The canvas reflects the **on-disk bytes**: after each autosave, undo/redo, or external
+(SSE/Claude) change, the iframe reloads the deck from the server rather than patching the live
+DOM (so relative assets resolve and the canvas matches persisted source — see
+[01](01-architecture.md) data flow). reveal re-initialises on reload and, left alone, returns
+to the **first slide**.
+
+- **Invariant: a same-deck reload must preserve the viewer's current slide.** The current
+  `(h, v)` indices are captured before the reload and restored once reveal is ready again, so
+  committing an edit on slide 5 (e.g. pressing **Enter** to confirm an in-place text edit)
+  leaves you on slide 5 — not slide 1. This applies to every reload cause: autosave,
+  undo/redo, and external changes ([11](11-claude-code-integration.md)).
+- **Only switching decks resets to the first slide** (a new `deck.html`, not a refresh of the
+  current one).
+- The restore happens while the iframe is still hidden, so the intermediate first-slide render
+  is never shown.
+- *Follow-up (under consideration):* pure in-place text commits could persist **without** a
+  full reload (the contenteditable already mutated the live DOM correctly), reserving reloads
+  for structural/external changes — eliminating the reload entirely for typing. Deferred
+  pending confidence that the canvas cannot drift from the on-disk bytes.
+
 ## Panes / layout
 
 Four zones: **Navigator** (slide filmstrip, [06](06-slide-management.md)) · **Canvas**
