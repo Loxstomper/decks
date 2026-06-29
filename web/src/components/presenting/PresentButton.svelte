@@ -28,9 +28,18 @@
 
   let { deckName }: Props = $props();
 
-  /** The URL that will be opened in the new tab. */
+  /**
+   * The URL that will be opened in the new tab.
+   *
+   * Trailing slash is REQUIRED: the deck's asset hrefs are relative
+   * (assets/…, custom.css), so the browser resolves them against the entry
+   * document's base URL. /present/{name} (no slash) has base /present/ →
+   * every asset 404s; /present/{name}/ has base /present/{name}/ → correct.
+   * The backend also 308-redirects the bare form, but we link straight to the
+   * canonical URL to skip the extra round-trip.
+   */
   const presentUrl = $derived(
-    deckName ? `/present/${encodeURIComponent(deckName)}` : '',
+    deckName ? `/present/${encodeURIComponent(deckName)}/` : '',
   );
 
   function handlePresent(): void {

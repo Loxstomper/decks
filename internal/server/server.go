@@ -852,11 +852,15 @@ func (s *Server) handleThemeList(w http.ResponseWriter, r *http.Request) {
 // the on-disk file (spec 10: "present exactly the file").
 //
 // Asset resolution: relative hrefs in deck.html (assets/vendor/reveal/…,
-// custom.css, etc.) resolve against /present/{name}/ because the browser sets
-// the base URL to the URL of the parent document.  Sub-path requests
-// (GET /present/{name}/assets/vendor/reveal/reveal.js) are handled by the same
-// handler and served from the deck folder, so all relative URLs resolve
-// correctly with zero additional config.
+// custom.css, etc.) resolve against the entry document's base URL, which the
+// browser takes as everything up to the last "/" in the address. The bare URL
+// /present/{name} therefore has base /present/ — relative assets would 404.
+// We redirect /present/{name} → /present/{name}/ so the base becomes
+// /present/{name}/ and sub-path requests
+// (GET /present/{name}/assets/vendor/reveal/reveal.js) are served from the
+// deck folder by this same handler. All relative URLs then resolve with zero
+// additional config and no in-document <base> tag (keeping the served bytes
+// identical to the on-disk file, per spec 10).
 func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if !deck.ValidName(name) {
@@ -864,19 +868,33 @@ func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Determine the file to serve within the deck folder.
-	rel := r.PathValue("path")
-	if rel == "" {
-		rel = "deck.html" // /present/{name} → deck entry document
-	}
-	if !fs.ValidPath(rel) {
-		http.Error(w, "invalid path", http.StatusBadRequest)
-		return
-	}
-
+	// Resolve the deck folder up front so an unknown deck 404s before we issue
+	// any redirect — keeps the bare and trailing-slash URLs consistent.
 	deckDir := deck.DeckPath(s.root, name)
 	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
 		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	// Determine the file to serve within the deck folder.
+	rel := r.PathValue("path")
+	if rel == "" {
+		// Entry document. If the URL lacks a trailing slash, redirect so the
+		// browser resolves relative asset paths against /present/{name}/ rather
+		// than /present/. Preserve the query string (e.g. ?print-pdf used by the
+		// PDF exporter, which follows the redirect).
+		if !strings.HasSuffix(r.URL.Path, "/") {
+			target := r.URL.Path + "/"
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusPermanentRedirect)
+			return
+		}
+		rel = "deck.html" // /present/{name}/ → deck entry document
+	}
+	if !fs.ValidPath(rel) {
+		http.Error(w, "invalid path", http.StatusBadRequest)
 		return
 	}
 

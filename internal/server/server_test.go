@@ -794,8 +794,9 @@ func TestPresent_ServesExactDeckHTML(t *testing.T) {
 		t.Fatalf("deck.Read: %v", err)
 	}
 
-	// Fetch via /present/{name}.
-	req := httptest.NewRequest("GET", "/present/pres-deck", nil)
+	// Fetch via /present/{name}/ (trailing slash is the canonical entry URL;
+	// the bare form 308-redirects here — see TestPresent_RedirectsBareURL).
+	req := httptest.NewRequest("GET", "/present/pres-deck/", nil)
 	rr := httptest.NewRecorder()
 	srv.ServeHTTP(rr, req)
 
@@ -844,6 +845,42 @@ func TestPresent_NotFound(t *testing.T) {
 	}
 }
 
+// TestPresent_RedirectsBareURL verifies that the bare /present/{name} entry URL
+// 308-redirects to the trailing-slash form so the browser resolves the deck's
+// relative asset paths against /present/{name}/ instead of /present/. The query
+// string must be preserved so the PDF exporter's ?print-pdf survives the hop.
+func TestPresent_RedirectsBareURL(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "redir-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	for _, tc := range []struct{ in, want string }{
+		{"/present/redir-deck", "/present/redir-deck/"},
+		{"/present/redir-deck?print-pdf", "/present/redir-deck/?print-pdf"},
+	} {
+		req := httptest.NewRequest("GET", tc.in, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+
+		if rr.Code != http.StatusPermanentRedirect {
+			t.Errorf("GET %s: want 308, got %d", tc.in, rr.Code)
+		}
+		if loc := rr.Header().Get("Location"); loc != tc.want {
+			t.Errorf("GET %s: want Location %q, got %q", tc.in, tc.want, loc)
+		}
+	}
+
+	// An unknown deck must still 404 on the bare URL — the existence check runs
+	// before the redirect, so we don't bounce clients to a dead trailing-slash URL.
+	req := httptest.NewRequest("GET", "/present/ghost-deck", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Errorf("bare unknown deck: want 404, got %d", rr.Code)
+	}
+}
+
 // TestPresent_MatchesDeckStaticRoute confirms that /present/{name} and
 // /decks/{name}/deck.html serve identical bytes, proving the present route uses
 // the same file without transformation.
@@ -864,7 +901,7 @@ func TestPresent_MatchesDeckStaticRoute(t *testing.T) {
 		return rr.Body.Bytes()
 	}
 
-	presentBytes := get("/present/compare")
+	presentBytes := get("/present/compare/")
 	staticBytes := get("/decks/compare/deck.html")
 
 	if !bytes.Equal(presentBytes, staticBytes) {
