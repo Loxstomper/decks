@@ -172,6 +172,7 @@ var BundledThemes = []string{
 	"night",
 	"moon",
 	"solarized",
+	"solarized-dark",
 	"dracula",
 	"sky",
 }

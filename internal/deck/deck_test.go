@@ -240,6 +240,53 @@ func TestNew_OfflineGuard_NoExternalURLs(t *testing.T) {
 	}
 }
 
+// TestSolarizedDark_VendoredAndOffline verifies that the solarized-dark reveal
+// theme (P9-9) is (a) vendored into a new deck and (b) contains zero external
+// http(s):// URLs (offline-first invariant, spec 12 X-1).
+func TestSolarizedDark_VendoredAndOffline(t *testing.T) {
+	root := makeWorkspace(t)
+
+	if err := deck.New(root, "sd-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	themeFile := filepath.Join(root, "decks", "sd-test", "assets", "vendor", "reveal", "theme", "solarized-dark.css")
+	css, err := os.ReadFile(themeFile)
+	if err != nil {
+		t.Fatalf("solarized-dark.css not vendored into deck: %v", err)
+	}
+	if len(css) == 0 {
+		t.Error("solarized-dark.css is empty")
+	}
+
+	// Offline guard: the theme CSS must contain no external URLs.
+	re := regexp.MustCompile(`https?://\S+`)
+	if matches := re.FindAll(css, -1); len(matches) > 0 {
+		t.Errorf("solarized-dark.css contains %d external URL(s) — violates offline-first (spec 12):", len(matches))
+		for _, m := range matches {
+			t.Errorf("  %s", m)
+		}
+	}
+
+	// It must be listed in BundledThemes as a distinct entry from "solarized".
+	foundDark := false
+	foundLight := false
+	for _, th := range deck.BundledThemes {
+		if th == "solarized-dark" {
+			foundDark = true
+		}
+		if th == "solarized" {
+			foundLight = true
+		}
+	}
+	if !foundDark {
+		t.Error("BundledThemes missing 'solarized-dark'")
+	}
+	if !foundLight {
+		t.Error("BundledThemes missing 'solarized' (light)")
+	}
+}
+
 // TestVendor_RevendorExistingDeck verifies that Vendor() restores deleted
 // vendor files in an existing deck (the `slides vendor <name>` use-case).
 func TestVendor_RevendorExistingDeck(t *testing.T) {

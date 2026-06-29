@@ -2,6 +2,51 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Workspace chrome themes (spec 09 — editor chrome themes).
+ *
+ * The four chrome colour tokens (surface, surface-raised, surface-overlay,
+ * accent, accent-muted) are CSS custom properties; tailwind.config.js maps
+ * each Tailwind utility to `rgb(var(--token) / <alpha-value>)` so that
+ * opacity modifiers (bg-accent/20, border-surface-overlay, etc.) all work.
+ *
+ * Variables hold space-separated RGB channel triplets, e.g. "233 69 96".
+ *
+ * Three themes:
+ *   :root          — Dark  (default, today's look)
+ *   .theme-light   — Light (softer, grey surfaces)
+ *   .theme-solarized — Solarized dark editor shell
+ *
+ * Switching is a single class swap on <html>; it never touches deck files.
+ */
+
+/* ── Dark (default) ─────────────────────────────────────────────────────────── */
+:root {
+  --surface:         26 26 46;    /* #1a1a2e */
+  --surface-raised:  22 33 62;    /* #16213e */
+  --surface-overlay: 15 52 96;   /* #0f3460 */
+  --accent:          233 69 96;   /* #e94560 */
+  --accent-muted:    83 52 131;   /* #533483 */
+}
+
+/* ── Light ──────────────────────────────────────────────────────────────────── */
+.theme-light {
+  --surface:         38 38 58;    /* #26263a — still legible with white text */
+  --surface-raised:  48 48 72;    /* #303048 */
+  --surface-overlay: 72 72 108;   /* #48486c */
+  --accent:          99 167 255;  /* #63a7ff */
+  --accent-muted:    139 115 219; /* #8b73db */
+}
+
+/* ── Solarized (editor chrome using Solarized dark palette) ─────────────────── */
+.theme-solarized {
+  --surface:         0 43 54;     /* #002b36 base03 */
+  --surface-raised:  7 54 66;     /* #073642 base02 */
+  --surface-overlay: 88 110 117;  /* #586e75 base01 */
+  --accent:          38 139 210;  /* #268bd2 blue */
+  --accent-muted:    108 113 196; /* #6c71c4 violet */
+}
+
 /* Editor chrome base styles */
 @layer base {
   html,

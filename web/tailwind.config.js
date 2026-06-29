@@ -7,15 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Editor chrome colors
+        // Editor chrome colors — backed by CSS custom properties (spec 09).
+        // Variables hold space-separated RGB channel triplets so Tailwind's
+        // opacity modifier syntax (e.g. bg-surface/20) works correctly.
         surface: {
-          DEFAULT: '#1a1a2e',
-          raised: '#16213e',
-          overlay: '#0f3460',
+          DEFAULT: 'rgb(var(--surface) / <alpha-value>)',
+          raised: 'rgb(var(--surface-raised) / <alpha-value>)',
+          overlay: 'rgb(var(--surface-overlay) / <alpha-value>)',
         },
         accent: {
-          DEFAULT: '#e94560',
-          muted: '#533483',
+          DEFAULT: 'rgb(var(--accent) / <alpha-value>)',
+          muted: 'rgb(var(--accent-muted) / <alpha-value>)',
         },
       },
     },

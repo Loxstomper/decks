@@ -37,6 +37,7 @@
   import TransitionPanel from './components/motion/TransitionPanel.svelte';
   import AutoAnimatePanel from './components/motion/AutoAnimatePanel.svelte';
   import ThemingPanel from './components/theming/ThemingPanel.svelte';
+  import WorkspaceThemePicker from './components/theming/WorkspaceThemePicker.svelte';
   // Phase 7 surfaces (present + speaker notes + export):
   //   PresentButton — opens /present/{name} (pure reveal, press S for speaker view).
   //   NotesPanel    — per-slide speaker-notes editor (<aside class="notes">).
@@ -307,6 +308,8 @@
       <!-- Sync status indicator (spec 11 §5 / P8-5): turn-taking handoff state. -->
       <div class="px-1 flex-shrink-0">
         <StatusIndicator />
+        <!-- Workspace chrome theme switcher (P9-10): persists in localStorage. -->
+        <WorkspaceThemePicker />
       </div>
 
       <!-- Deck list -->
