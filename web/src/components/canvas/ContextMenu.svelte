@@ -37,6 +37,8 @@
    */
 
   import { clampMenuPosition, moveFocusIndex } from '$lib/canvas/context-menu.ts';
+  // Self-import for recursive submenu rendering (replaces deprecated <svelte:self>).
+  import ContextMenu from './ContextMenu.svelte';
 
   // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -100,14 +102,21 @@
    * positioning. Indexed parallel to `items`; separators leave their slot as
    * undefined.
    */
-  let itemEls: (HTMLElement | undefined)[] = $state(new Array(items.length).fill(undefined));
+  let itemEls: (HTMLElement | undefined)[] = $state([]);
 
   // ── Position state ────────────────────────────────────────────────────────
 
-  /** Clamped left offset (pane-local px), updated after edge-flip measurement. */
-  let left = $state(x);
-  /** Clamped top offset (pane-local px), updated after edge-flip measurement. */
-  let top = $state(y);
+  /**
+   * Edge-flip result (pane-local px), set once after measurement. Until then
+   * the menu renders at the raw cursor (x, y). Kept as a single nullable state
+   * so `left`/`top` can be derived from the live `x`/`y` props (avoids
+   * capturing only their initial values).
+   */
+  let flip = $state<{ left: number; top: number } | null>(null);
+  /** Clamped left offset (pane-local px); raw `x` until edge-flip measures. */
+  const left = $derived(flip?.left ?? x);
+  /** Clamped top offset (pane-local px); raw `y` until edge-flip measures. */
+  const top = $derived(flip?.top ?? y);
 
   // ── Navigation state ──────────────────────────────────────────────────────
 
@@ -142,8 +151,7 @@
       paneRect.width,
       paneRect.height,
     );
-    left = clamped.left;
-    top = clamped.top;
+    flip = clamped;
 
     // Grab keyboard focus so arrow keys work immediately.
     menuEl.focus();
@@ -316,7 +324,7 @@
       -->
       {#if openSubmenu === idx && item.submenu?.length}
         {@const subPos = getSubmenuPos(idx)}
-        <svelte:self
+        <ContextMenu
           items={item.submenu}
           x={subPos.x}
           y={subPos.y}
