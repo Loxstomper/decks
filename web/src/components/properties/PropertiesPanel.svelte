@@ -56,6 +56,7 @@
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
   import TextColorControl from './TextColorControl.svelte';
+  import AltTextControl from './AltTextControl.svelte';
   import SlideBackgroundControl from './SlideBackgroundControl.svelte';
 
   // ── Component props ────────────────────────────────────────────────────────
@@ -154,6 +155,28 @@
     void deckStore.applyTextColor(selectedEid, value);
   }
 
+  // ── P17-11: per-image alt text (spec 08 "Assets and media") ────────────────
+  //
+  // Shown only when the SELECTED element itself is an img leaf.
+
+  /**
+   * The selected element when it is an img element, else null. Named function
+   * for the same $derived type-inference reason documented above.
+   */
+  function deriveImageLeaf(eid: string | null): ElementNode | null {
+    if (!eid || !deckStore.model) return null;
+    const el = findByEid(deckStore.model, eid);
+    return el && el.tagName.toLowerCase() === 'img' ? el : null;
+  }
+
+  const imageLeaf: ElementNode | null = $derived(deriveImageLeaf(selectedEid));
+  const imageAlt: string | null = $derived(imageLeaf ? (getAttribute(imageLeaf, 'alt') ?? null) : null);
+
+  function onAltChange(value: string): void {
+    if (!selectedEid) return;
+    void deckStore.applyAltText(selectedEid, value);
+  }
+
   // ── Mutation helpers ───────────────────────────────────────────────────────
 
   function applyDelta(delta: Partial<LayoutProps>): void {
@@ -206,6 +229,12 @@
   <!-- ── P9-8: text colour — shown whenever a TEXT leaf is selected ────────── -->
   {#if textLeaf}
     <TextColorControl color={textColor} onColorChange={onTextColorChange} />
+    <div class="separator"></div>
+  {/if}
+
+  <!-- ── P17-11: alt text — shown whenever an IMG leaf is selected ─────────── -->
+  {#if imageLeaf}
+    <AltTextControl alt={imageAlt} {onAltChange} />
     <div class="separator"></div>
   {/if}
 
