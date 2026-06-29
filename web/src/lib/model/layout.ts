@@ -269,6 +269,92 @@ function validatePositiveInt(attr: string, value: number): void {
   }
 }
 
+// ─── P14: Layout-preset marker (data-layout) ────────────────────────────────
+//
+// `data-layout` is a non-authoritative MARKER placed on <section> elements by
+// the preset system (P14).  It records which preset was applied (e.g.
+// "two-column", "title-body") so tooling can re-identify the layout without
+// inspecting the full subtree.  The attribute has NO reflow semantics — it is
+// purely informational.
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go checkElement)
+// accepts any non-empty string for data-layout on <section> and must stay in
+// sync with the attribute name used here.
+
+/**
+ * Return the layout-preset marker (`data-layout`) of a section element, or
+ * `null` if the attribute is absent or empty.
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function getLayoutMarker(section: ElementNode): string | null {
+  const v = getAttribute(section, 'data-layout');
+  return v !== null && v.trim() !== '' ? v : null;
+}
+
+/**
+ * Set or remove the `data-layout` attribute on `section`.
+ *
+ * - `name` — non-empty preset name → sets the attribute and marks dirty.
+ * - `null` → removes the attribute.
+ *
+ * Throws `TypeError` when `name` is an empty string (empty values are
+ * disallowed by the spec; use `null` to clear).
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function setLayoutMarker(section: ElementNode, name: string | null): void {
+  if (name !== null && name.trim() === '') {
+    throw new TypeError('setLayoutMarker: name must be a non-empty string or null');
+  }
+  if (name === null) {
+    removeAttribute(section, 'data-layout');
+  } else {
+    setAttribute(section, 'data-layout', name);
+  }
+}
+
+// ─── P14: Named-slot marker (data-slot) ─────────────────────────────────────
+//
+// `data-slot` is a non-authoritative MARKER placed on any element (typically a
+// layout container) to identify its semantic role within a preset layout (e.g.
+// "content", "sidebar", "header").  Like `data-layout`, it has NO reflow
+// semantics — the CSS layout is entirely driven by `data-lay` and its
+// associated attributes.
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go checkElement)
+// accepts any non-empty string for data-slot on any element and must stay in
+// sync with the attribute name used here.
+
+/**
+ * Return the named-slot marker (`data-slot`) of an element, or `null` if the
+ * attribute is absent or empty.
+ */
+export function getSlot(el: ElementNode): string | null {
+  const v = getAttribute(el, 'data-slot');
+  return v !== null && v.trim() !== '' ? v : null;
+}
+
+/**
+ * Set or remove the `data-slot` attribute on `el`.
+ *
+ * - `name` — non-empty slot name → sets the attribute and marks dirty.
+ * - `null` → removes the attribute.
+ *
+ * Throws `TypeError` when `name` is an empty string (empty values are
+ * disallowed by the spec; use `null` to clear).
+ */
+export function setSlot(el: ElementNode, name: string | null): void {
+  if (name !== null && name.trim() === '') {
+    throw new TypeError('setSlot: name must be a non-empty string or null');
+  }
+  if (name === null) {
+    removeAttribute(el, 'data-slot');
+  } else {
+    setAttribute(el, 'data-slot', name);
+  }
+}
+
 /**
  * Find the nearest ancestor `ElementNode` of the element carrying `eid`.
  *

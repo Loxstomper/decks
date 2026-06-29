@@ -22,6 +22,7 @@
   import { buildSlideTree, navigateToSlide, onSlideChanged } from '$lib/slides';
   import { hasThemeOverride } from '$lib/model/theme-badge';
   import SlideThumbnail from './SlideThumbnail.svelte';
+  import { ensurePresets, layoutPresets } from '$lib/store/layout-presets.svelte';
 
   interface Props {
     /**
@@ -106,9 +107,32 @@
     return null;
   });
 
+  // ── Layout picker (P14-6a) ───────────────────────────────────────────────────
+  //
+  // A small dropdown attached to the "▾" button beside "+ Slide". Fetches
+  // presets from GET /api/templates once and caches them in layoutPresets.
+  // Selecting a preset calls deckStore.addSlideFromLayout; the plain blank
+  // "+ Slide" button skips the picker entirely.
+
+  let layoutPickerOpen = $state(false);
+
+  function toggleLayoutPicker(): void {
+    ensurePresets(); // no-op if already fetched
+    layoutPickerOpen = !layoutPickerOpen;
+  }
+
+  function closeLayoutPicker(): void {
+    layoutPickerOpen = false;
+  }
+
   async function addSlide(): Promise<void> {
     // Add after the selected slide when one is selected, else append.
     await deckStore.addSlide(selectedSlideEid ?? undefined);
+  }
+
+  async function addWithLayout(presetHtml: string): Promise<void> {
+    layoutPickerOpen = false;
+    await deckStore.addSlideFromLayout(presetHtml, selectedSlideEid ?? undefined);
   }
 
   async function duplicate(eid: string | null): Promise<void> {
@@ -263,9 +287,56 @@
 <div class="navigator-root" role="listbox" aria-label="Slides">
   <!-- ── Toolbar (P6-3) ──────────────────────────────────────────────────── -->
   <div class="nav-toolbar">
-    <button class="nav-btn" title="Add slide" aria-label="Add slide" onclick={addSlide}>
-      + Slide
-    </button>
+    <!--
+      Split-button: "＋ Slide" (plain blank) + "▾" dropdown (layout picker).
+      The picker is rendered as a positioned popup below the group (P14-6a).
+    -->
+    <div class="add-slide-group">
+      <button class="nav-btn add-slide-btn" title="Add blank slide" aria-label="Add blank slide" onclick={addSlide}>
+        + Slide
+      </button>
+      <button
+        class="nav-btn add-slide-arrow"
+        title="Add slide from layout"
+        aria-label="Pick layout for new slide"
+        aria-haspopup="listbox"
+        aria-expanded={layoutPickerOpen}
+        onclick={toggleLayoutPicker}
+      >
+        ▾
+      </button>
+      {#if layoutPickerOpen}
+        <!-- Backdrop: closes picker on click-outside. -->
+        <div
+          class="layout-picker-backdrop"
+          aria-hidden="true"
+          onpointerdown={closeLayoutPicker}
+        ></div>
+        <!-- Picker popup. -->
+        <div class="layout-picker-popup" role="listbox" aria-label="Slide layouts">
+          <!-- Blank option (same as the plain "＋ Slide" button). -->
+          <button
+            class="layout-picker-item"
+            role="option"
+            onclick={() => { layoutPickerOpen = false; void addSlide(); }}
+          >
+            Blank
+          </button>
+          {#each layoutPresets.value as preset (preset.name)}
+            <button
+              class="layout-picker-item"
+              role="option"
+              onclick={() => void addWithLayout(preset.html)}
+            >
+              {preset.label}
+            </button>
+          {/each}
+          {#if layoutPresets.value.length === 0}
+            <span class="layout-picker-empty">Loading layouts…</span>
+          {/if}
+        </div>
+      {/if}
+    </div>
     <button
       class="nav-btn"
       title="Duplicate selected slide"
@@ -586,6 +657,80 @@
   }
   .nav-btn.new-deck-btn {
     margin-left: auto; /* push to the right within the toolbar */
+  }
+
+  /* ── Split-button: + Slide / ▾ layout picker (P14-6a) ───────────────────── */
+
+  .add-slide-group {
+    position: relative;
+    display: flex;
+    gap: 1px;
+  }
+
+  .add-slide-btn {
+    /* Square right corners to visually attach to the arrow button. */
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .add-slide-arrow {
+    /* Square left corners to visually attach to the slide button. */
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    padding: 0.2rem 0.3rem;
+    font-size: 0.6rem;
+  }
+
+  /* Full-page transparent backdrop closes the picker on click-outside. */
+  .layout-picker-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 50;
+    cursor: default;
+  }
+
+  /* Picker popup: drops below the split-button group. */
+  .layout-picker-popup {
+    position: absolute;
+    top: calc(100% + 2px);
+    left: 0;
+    z-index: 51;
+    min-width: 130px;
+    padding: 4px;
+    background: rgba(22, 22, 26, 0.97);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.3),
+      0 8px 24px rgba(0, 0, 0, 0.55);
+    backdrop-filter: blur(14px);
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+
+  .layout-picker-item {
+    display: block;
+    width: 100%;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 4px;
+    background: transparent;
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.6875rem;
+    text-align: left;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .layout-picker-item:hover {
+    background: rgba(255, 255, 255, 0.09);
+    color: #fff;
+  }
+
+  .layout-picker-empty {
+    font-size: 0.625rem;
+    color: rgba(255, 255, 255, 0.3);
+    padding: 5px 10px;
   }
 
   /* ── New-deck inline form (P9-12) ────────────────────────────────────── */

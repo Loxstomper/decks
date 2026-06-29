@@ -21,6 +21,9 @@ import {
   verticalChildren,
   isVerticalStack,
   buildSlideTree,
+  parsePresetSection,
+  addSlideFromLayout,
+  changeSlideLayout,
 } from './slides';
 import { buildThumbnailSrcdoc } from './thumbnail';
 
@@ -268,6 +271,167 @@ describe('setSlideHidden (P6-6)', () => {
     expect(out).not.toContain('data-visibility="hidden"');
     // Back to byte-stable original for s2.
     expect(out).toContain(S2);
+  });
+});
+
+// ─── P14: layout presets (new-from-layout / change-layout) ───────────────────
+
+// A representative preset: a section with a nested data-slot="content" container
+// and starter prompt content (mirrors vendor/layouts/two-content.html).
+const PRESET_TWO_CONTENT = `<section data-layout="two-content">
+  <div data-lay="stack" data-gap="32">
+    <h2>Click to add title</h2>
+    <div data-lay="row" data-gap="48" data-slot="content">
+      <div data-lay="stack" data-grow="1"><p>Click to add text</p></div>
+      <div data-lay="stack" data-grow="1"><p>Click to add text</p></div>
+    </div>
+  </div>
+</section>`;
+
+const PRESET_TITLE_BODY = `<section data-layout="title-body">
+  <div data-lay="stack" data-gap="32" data-slot="content">
+    <h2>Click to add title</h2>
+    <p>Click to add body text</p>
+  </div>
+</section>`;
+
+/** Count occurrences of a data-eid value in an HTML string. */
+function eidCount(html: string, eid: string): number {
+  return [...html.matchAll(/data-eid="([^"]+)"/g)].filter((m) => m[1] === eid).length;
+}
+
+/** All data-eids in an HTML string (document order). */
+function allEids(html: string): string[] {
+  return [...html.matchAll(/data-eid="([^"]+)"/g)].map((m) => m[1]);
+}
+
+describe('parsePresetSection (P14)', () => {
+  it('extracts the first <section> subtree carrying its data-layout marker', () => {
+    const section = parsePresetSection(PRESET_TITLE_BODY);
+    expect(section).not.toBeNull();
+    expect(section!.tagName.toLowerCase()).toBe('section');
+    expect(getAttribute(section!, 'data-layout')).toBe('title-body');
+  });
+
+  it('returns null for a snippet with no section', () => {
+    expect(parsePresetSection('<div>nope</div>')).toBeNull();
+  });
+});
+
+describe('addSlideFromLayout (P14-3)', () => {
+  it('inserts the preset structure + starter content after the target slide', () => {
+    const model = parseDeck(DECK);
+    const section = addSlideFromLayout(model, PRESET_TITLE_BODY, 's1');
+    expect(section).not.toBeNull();
+    // No stampEids here: the bare insert keeps every sibling byte-stable.
+    const out = serializeDeck(model);
+
+    // Preset structure + starter prompts are present.
+    expect(out).toContain('data-layout="title-body"');
+    expect(out).toContain('data-slot="content"');
+    expect(out).toContain('Click to add title');
+    expect(out).toContain('Click to add body text');
+    // Inserted immediately after s1, before s2.
+    const order = eidOrder(out, ['s1', 's2']);
+    expect(order).toEqual(['s1', 's2']);
+    const at = out.indexOf('data-layout="title-body"');
+    expect(at).toBeGreaterThan(out.indexOf(S1));
+    expect(at).toBeLessThan(out.indexOf(S2));
+    // Untouched siblings round-trip verbatim (spec 12 #4).
+    expect(out).toContain(S1);
+    expect(out).toContain(S2);
+    expect(out).toContain(S3);
+  });
+
+  it('appends to the end when afterEid is omitted', () => {
+    const model = parseDeck(DECK);
+    addSlideFromLayout(model, PRESET_TITLE_BODY);
+    stampEids(model);
+    const out = serializeDeck(model);
+    expect(out.indexOf('data-layout="title-body"')).toBeGreaterThan(out.indexOf(S3));
+  });
+
+  it('stamps fresh, unique data-eids on every managed element of the new slide', () => {
+    const model = parseDeck(DECK);
+    const section = addSlideFromLayout(model, PRESET_TWO_CONTENT)!;
+    stampEids(model);
+    const out = serializeDeck(model);
+
+    // The new section + its containers + leaves all carry an eid…
+    const newEid = getAttribute(section, 'data-eid');
+    expect(newEid).not.toBeNull();
+    // …and every eid in the whole deck is unique.
+    const eids = allEids(out);
+    expect(new Set(eids).size).toBe(eids.length);
+    // The preset itself shipped with no eids, so the new slide's eids are fresh
+    // (none collide with the fixture's s1/s2/s3).
+    expect(eids.filter((e) => e === 's1')).toHaveLength(1);
+  });
+});
+
+describe('changeSlideLayout (P14-4)', () => {
+  // A slide with MULTIPLE content leaves spread across layout scaffolding.
+  const RICH = `<!doctype html>
+<html>
+<body>
+<div class="reveal">
+<div class="slides">
+<section data-eid="s1"><h1 data-eid="e1">One</h1></section>
+<section data-eid="sx" data-transition="zoom"><div data-eid="c0" data-lay="stack"><h2 data-eid="h">Title</h2><div data-eid="c1" data-lay="row"><p data-eid="p1">Left</p><ul data-eid="u1"><li data-eid="li1">a</li></ul></div><img data-eid="im1" src="x.png"></div></section>
+<section data-eid="s3"><h2 data-eid="e3">Three</h2></section>
+</div>
+</div>
+</body>
+</html>`;
+
+  it('moves ALL existing content leaves into the new content slot (nothing lost)', () => {
+    const model = parseDeck(RICH);
+    const section = changeSlideLayout(model, 'sx', PRESET_TITLE_BODY);
+    expect(section).not.toBeNull();
+    stampEids(model);
+    const out = serializeDeck(model);
+
+    // The new layout marker is applied; the section keeps its identity + attrs.
+    expect(getAttribute(section!, 'data-layout')).toBe('title-body');
+    expect(out).toContain('data-eid="sx"');
+    expect(out).toContain('data-transition="zoom"');
+
+    // Every authored leaf survives (nothing dropped).
+    for (const eid of ['h', 'p1', 'u1', 'li1', 'im1']) {
+      expect(eidCount(out, eid)).toBe(1);
+    }
+    // …and all of them now live inside the data-slot="content" container.
+    const slotStart = out.indexOf('data-slot="content"');
+    expect(slotStart).toBeGreaterThan(-1);
+    const sectionEnd = out.indexOf('</section>', slotStart);
+    const slotRegion = out.slice(slotStart, sectionEnd);
+    for (const eid of ['h', 'p1', 'u1', 'li1', 'im1']) {
+      expect(slotRegion).toContain(`data-eid="${eid}"`);
+    }
+    // The preset's starter prompts in the content slot were replaced.
+    expect(slotRegion).not.toContain('Click to add body text');
+
+    // Position is preserved (sx still between s1 and s3) and siblings byte-stable.
+    expect(eidOrder(out, ['s1', 'sx', 's3'])).toEqual(['s1', 'sx', 's3']);
+    expect(out).toContain('<section data-eid="s1"><h1 data-eid="e1">One</h1></section>');
+    expect(out).toContain('<section data-eid="s3"><h2 data-eid="e3">Three</h2></section>');
+  });
+
+  it('keeps the preset prompts when the slide has no content to move', () => {
+    const empty = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1"><div data-eid="c" data-lay="stack"></div></section>
+</div></div></body></html>`;
+    const model = parseDeck(empty);
+    changeSlideLayout(model, 's1', PRESET_TITLE_BODY);
+    stampEids(model);
+    const out = serializeDeck(model);
+    expect(out).toContain('Click to add body text');
+  });
+
+  it('returns null for an unknown section eid', () => {
+    const model = parseDeck(DECK);
+    expect(changeSlideLayout(model, 'nope', PRESET_TITLE_BODY)).toBeNull();
   });
 });
 

@@ -286,6 +286,37 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 			"black|white|league|beige|night|moon|solarized|solarized-dark|dracula|sky", line, eid))
 	}
 
+	// data-layout (P14): layout-preset MARKER on <section> elements.
+	// Intentionally NOT enum-restricted — the value is the preset name (e.g.
+	// "title-body", "two-column") chosen from the preset list, but that list is
+	// open-ended and must not be encoded here to avoid coupling. Any non-empty
+	// string is valid; the marker has no reflow semantics of its own.
+	// Dual-encoded: also see getLayoutMarker/setLayoutMarker in
+	// web/src/lib/model/layout.ts (keep in sync on attribute name).
+	if v, ok := attrs["data-layout"]; ok && name == "section" && strings.TrimSpace(v) == "" {
+		issues = append(issues, Issue{
+			Code:    "invalid-attr",
+			Message: "data-layout on <section> must be a non-empty string (preset name)",
+			Line:    line,
+			EID:     eid,
+		})
+	}
+
+	// data-slot (P14): named-slot MARKER on any element.
+	// Identifies the semantic role of a container within a preset layout (e.g.
+	// "content", "sidebar"). Any non-empty string is valid; the attribute has no
+	// reflow semantics of its own — it is purely informational for preset tooling.
+	// Dual-encoded: also see getSlot/setSlot in web/src/lib/model/layout.ts
+	// (keep in sync on attribute name).
+	if v, ok := attrs["data-slot"]; ok && strings.TrimSpace(v) == "" {
+		issues = append(issues, Issue{
+			Code:    "invalid-attr",
+			Message: "data-slot must be a non-empty string (slot name)",
+			Line:    line,
+			EID:     eid,
+		})
+	}
+
 	// (a) numeric attributes. gap/pad/grow are non-negative integers; span is a
 	// positive integer (>=1). These are the documented integer attributes of the
 	// layout contract.

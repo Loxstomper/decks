@@ -74,6 +74,7 @@
   import { domRectToLogical } from '$lib/canvas/overlay-geometry.ts';
   import { menuItemsFor, type MenuSelection } from '$lib/canvas/context-menu.ts';
   import { isSlideHidden } from '$lib/slides';
+  import { ensurePresets, layoutPresets } from '$lib/store/layout-presets.svelte';
   import {
     classify,
     findByEid,
@@ -116,6 +117,9 @@
       // The empty state is the correct fallback.
     }
     if (decks.length > 0) await deckStore.load(decks[0]);
+    // Pre-fetch layout presets so they are ready by the time the user opens a
+    // context menu or the navigator layout picker (P14-6a / P14-6b).
+    ensurePresets();
     window.addEventListener('keydown', handleKeydown);
   });
 
@@ -335,6 +339,24 @@
     if (!slideEid || !deckStore.model) return [];
     const section = findByEid(deckStore.model, slideEid);
     const hidden = section ? isSlideHidden(section) : false;
+
+    // "Change layout" submenu (P14-6b): one entry per preset fetched from
+    // GET /api/templates (layoutPresets is reactive — populated once the cache
+    // resolves). When not yet loaded, show the item as disabled so the user
+    // can see the option exists; opening the menu again after load will show
+    // the full submenu.
+    const presets = layoutPresets.value;
+    const changeLayoutItem: MenuItem =
+      presets.length > 0
+        ? {
+            label: 'Change layout',
+            submenu: presets.map((p) => ({
+              label: p.label,
+              run: () => void deckStore.changeSlideLayout(slideEid, p.html),
+            })),
+          }
+        : { label: 'Change layout', disabled: true };
+
     return [
       { label: 'Insert slide', run: () => void deckStore.addSlide(slideEid) },
       { label: 'Duplicate slide', run: () => void deckStore.duplicateSlide(slideEid) },
@@ -342,6 +364,7 @@
         label: hidden ? 'Show slide' : 'Hide slide',
         run: () => void deckStore.setSlideHidden(slideEid, !hidden),
       },
+      changeLayoutItem,
       { label: '', separator: true },
       { label: 'Delete slide', danger: true, run: () => void deckStore.deleteSlide(slideEid) },
     ];

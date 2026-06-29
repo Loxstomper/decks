@@ -122,6 +122,10 @@ func (s *Server) routes(staticFS fs.FS) {
 	// Per-theme background colours (P10-1): name → --r-background-color.
 	s.mux.HandleFunc("GET /api/themes/backgrounds", s.handleThemeBackgrounds)
 
+	// Slide-layout templates (P14-2): bundled presets + user snippets from the
+	// workspace templates/ dir.
+	s.mux.HandleFunc("GET /api/templates", s.handleTemplateList)
+
 	// Shared library (P5-5)
 	s.mux.HandleFunc("GET /api/shared", s.handleSharedList)
 	s.mux.HandleFunc("POST /api/shared/{filename}/copy", s.handleSharedCopy)
@@ -898,6 +902,65 @@ func (s *Server) handleThemeList(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleThemeBackgrounds(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(deck.ThemeBackgrounds())
+}
+
+// ── Slide-layout templates (P14-2) ────────────────────────────────────────────
+
+// handleTemplateList returns the slide-layout presets the editor offers when
+// inserting a new slide (Phase 14, Google-Slides-style layouts).
+//
+//	GET /api/templates
+//
+// Response: [{"name":"title","label":"Title","html":"<section …>…</section>"}, …]
+//
+// The list is the binary's BundledLayouts() followed by any user snippets
+// dropped into the workspace templates/ dir (templates/*.html, each mapped to
+// {name: filename-without-ext, label, html}). User snippets are appended after
+// the built-ins; a user file whose name collides with a built-in overrides it.
+//
+// Offline + traversal-safe: only *.html files directly inside templates/ are
+// read (subdirectories and other extensions ignored), so no path component can
+// escape the workspace.
+func (s *Server) handleTemplateList(w http.ResponseWriter, r *http.Request) {
+	templates := deck.BundledLayouts()
+
+	// index built-ins by name so a user override replaces rather than duplicates.
+	index := make(map[string]int, len(templates))
+	for i, t := range templates {
+		index[t.Name] = i
+	}
+
+	dir := filepath.Join(s.root, "templates")
+	if entries, err := os.ReadDir(dir); err == nil {
+		for _, e := range entries {
+			if e.IsDir() || !strings.HasSuffix(e.Name(), ".html") {
+				continue
+			}
+			name := strings.TrimSuffix(e.Name(), ".html")
+			// Skip names that are not safe single path components.
+			if name == "" || !deck.ValidName(name) {
+				continue
+			}
+			data, err := os.ReadFile(filepath.Join(dir, e.Name()))
+			if err != nil {
+				continue
+			}
+			preset := deck.LayoutPreset{
+				Name:  name,
+				Label: name,
+				HTML:  string(data),
+			}
+			if i, ok := index[name]; ok {
+				templates[i] = preset
+			} else {
+				index[name] = len(templates)
+				templates = append(templates, preset)
+			}
+		}
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(templates)
 }
 
 // ── Present route (P7-1) ─────────────────────────────────────────────────────

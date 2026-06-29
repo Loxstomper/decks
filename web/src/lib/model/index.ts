@@ -51,6 +51,10 @@ export {
   findParentOf,
   resolveContainerForEid,
   findNearestContainerAncestor,
+  getLayoutMarker,
+  setLayoutMarker,
+  getSlot,
+  setSlot,
 } from './layout';
 export type { ElementClass } from './classify';
 export type {

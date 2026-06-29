@@ -22,6 +22,10 @@ import {
   findParentOf,
   findNearestContainerAncestor,
   resolveContainerForEid,
+  getLayoutMarker,
+  setLayoutMarker,
+  getSlot,
+  setSlot,
   type LayoutProps,
   type AlignValue,
   type JustifyValue,
@@ -530,3 +534,154 @@ function findElByEid(model: DeckModel, eid: string): ElementNode | null {
   });
   return found;
 }
+
+// ─── 10. P14: getLayoutMarker / setLayoutMarker ──────────────────────────────
+//
+// data-layout is a non-authoritative MARKER on <section> elements that records
+// the applied preset name. Any non-empty string is valid; the attribute has no
+// reflow semantics (layout is driven by data-lay subtree).
+//
+// Dual-encoded: Go validator (internal/validate/validate.go) must stay in sync
+// on attribute name and the non-empty contract.
+
+describe('getLayoutMarker() + setLayoutMarker() — P14', () => {
+  it('returns null when data-layout is absent', () => {
+    const el = createElement('section', {});
+    expect(getLayoutMarker(el)).toBeNull();
+  });
+
+  it('returns the marker string when data-layout is set', () => {
+    const el = createElement('section', { 'data-layout': 'two-column' });
+    expect(getLayoutMarker(el)).toBe('two-column');
+  });
+
+  it('returns null when data-layout is an empty string', () => {
+    const el = createElement('section', { 'data-layout': '' });
+    expect(getLayoutMarker(el)).toBeNull();
+  });
+
+  it('sets data-layout and marks the element dirty', () => {
+    const el = createElement('section', {});
+    el.dirty = false;
+    setLayoutMarker(el, 'title-body');
+    expect(getAttribute(el, 'data-layout')).toBe('title-body');
+    expect(el.dirty).toBe(true);
+  });
+
+  it('removes data-layout when null is passed', () => {
+    const el = createElement('section', { 'data-layout': 'two-column' });
+    setLayoutMarker(el, null);
+    expect(getAttribute(el, 'data-layout')).toBeNull();
+  });
+
+  it('round-trips via get after set', () => {
+    const el = createElement('section', {});
+    setLayoutMarker(el, 'blank');
+    expect(getLayoutMarker(el)).toBe('blank');
+  });
+
+  it('is byte-stable: setting the same value is idempotent', () => {
+    const el = createElement('section', { 'data-layout': 'two-column' });
+    el.dirty = false;
+    setLayoutMarker(el, 'two-column');
+    // value is still present after a redundant set
+    expect(getAttribute(el, 'data-layout')).toBe('two-column');
+  });
+
+  it('throws TypeError when an empty string is passed (use null to clear)', () => {
+    const el = createElement('section', {});
+    expect(() => setLayoutMarker(el, '')).toThrow(TypeError);
+  });
+
+  it('does not disturb other attributes on the section', () => {
+    const el = createElement('section', { 'data-eid': 's1', 'data-theme': 'moon' });
+    setLayoutMarker(el, 'two-column');
+    expect(getAttribute(el, 'data-eid')).toBe('s1');
+    expect(getAttribute(el, 'data-theme')).toBe('moon');
+  });
+});
+
+// ─── 11. P14: getSlot / setSlot ──────────────────────────────────────────────
+//
+// data-slot is a non-authoritative MARKER on any element that names its
+// semantic role within a preset layout (e.g. "content", "sidebar"). Any
+// non-empty string is valid; the attribute has no reflow semantics.
+//
+// Dual-encoded: Go validator (internal/validate/validate.go) must stay in sync
+// on attribute name and the non-empty contract.
+
+describe('getSlot() + setSlot() — P14', () => {
+  it('returns null when data-slot is absent', () => {
+    const el = createElement('div', {});
+    expect(getSlot(el)).toBeNull();
+  });
+
+  it('returns the slot name when data-slot is set', () => {
+    const el = createElement('div', { 'data-slot': 'content' });
+    expect(getSlot(el)).toBe('content');
+  });
+
+  it('returns null when data-slot is an empty string', () => {
+    const el = createElement('div', { 'data-slot': '' });
+    expect(getSlot(el)).toBeNull();
+  });
+
+  it('sets data-slot and marks the element dirty', () => {
+    const el = createElement('div', {});
+    el.dirty = false;
+    setSlot(el, 'sidebar');
+    expect(getAttribute(el, 'data-slot')).toBe('sidebar');
+    expect(el.dirty).toBe(true);
+  });
+
+  it('removes data-slot when null is passed', () => {
+    const el = createElement('div', { 'data-slot': 'content' });
+    setSlot(el, null);
+    expect(getAttribute(el, 'data-slot')).toBeNull();
+  });
+
+  it('round-trips via get after set', () => {
+    const el = createElement('div', {});
+    setSlot(el, 'header');
+    expect(getSlot(el)).toBe('header');
+  });
+
+  it('works on any element tag (section, div, p, h2)', () => {
+    for (const tag of ['section', 'div', 'p', 'h2']) {
+      const el = createElement(tag, {});
+      setSlot(el, 'content');
+      expect(getSlot(el)).toBe('content');
+    }
+  });
+
+  it('throws TypeError when an empty string is passed (use null to clear)', () => {
+    const el = createElement('div', {});
+    expect(() => setSlot(el, '')).toThrow(TypeError);
+  });
+
+  it('does not disturb other layout attributes', () => {
+    const el = createElement('div', { 'data-lay': 'stack', 'data-gap': '32' });
+    setSlot(el, 'content');
+    expect(getAttribute(el, 'data-lay')).toBe('stack');
+    expect(getAttribute(el, 'data-gap')).toBe('32');
+  });
+
+  it('data-layout on section + data-slot on children round-trip cleanly via model', () => {
+    const html = `<!DOCTYPE html><html><body><div class="reveal"><div class="slides">
+      <section data-eid="s1" data-layout="two-column">
+        <div data-lay="row" data-eid="row1">
+          <div data-lay="stack" data-eid="col1" data-slot="content"><h2 data-eid="t1">Main</h2></div>
+          <div data-lay="stack" data-eid="col2" data-slot="sidebar"><p data-eid="p1">Side</p></div>
+        </div>
+      </section>
+    </div></div></body></html>`;
+    const model = parseDeck(html);
+    const section = findElByEid(model, 's1')!;
+    const col1 = findElByEid(model, 'col1')!;
+    const col2 = findElByEid(model, 'col2')!;
+
+    expect(getLayoutMarker(section)).toBe('two-column');
+    expect(getSlot(col1)).toBe('content');
+    expect(getSlot(col2)).toBe('sidebar');
+  });
+});

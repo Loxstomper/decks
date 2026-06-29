@@ -39,6 +39,11 @@ import {
   appendChild,
   walk,
   cloneSubtreeStripEids,
+  parseDeck,
+  classify,
+  getSlot,
+  getLayoutMarker,
+  setLayoutMarker,
   type DeckModel,
   type ElementNode,
   type SlideNode,
@@ -429,4 +434,169 @@ export function setSlideHidden(model: DeckModel, eid: string, hidden: boolean): 
   if (hidden) setAttribute(found.section, 'data-visibility', 'hidden');
   else removeAttribute(found.section, 'data-visibility');
   return true;
+}
+
+// ── Layout presets (P14, spec 14) ────────────────────────────────────────────
+//
+// A "layout preset" is a self-contained `<section data-layout="…">` snippet (the
+// bundled vendor/layouts/*.html, served via GET /api/templates). It composes the
+// data-lay layout primitives with starter prompt content and marks its primary
+// content region with a single `data-slot="content"` container. These ops parse
+// such a snippet into a section subtree so the store can insert it as a new slide
+// (P14-3) or re-flow an existing slide into it (P14-4).
+
+/**
+ * P14: Parse a preset `<section>…</section>` snippet into a single, detached
+ * section ElementNode (the first `<section>` in document order). Returns null
+ * when the snippet contains no section element. The returned subtree carries the
+ * preset's `data-layout` marker, its `data-slot` containers, and the starter
+ * prompt content verbatim; it has NO `data-eid`s yet (the caller stamps them).
+ */
+export function parsePresetSection(presetHtml: string): ElementNode | null {
+  const { nodes } = parseDeck(presetHtml);
+  return nodes.find(isSection) ?? null;
+}
+
+/**
+ * Pre-order search for the FIRST descendant element of `root` carrying
+ * `data-slot="<name>"`. Returns null when none is found. (The root itself is not
+ * considered — a preset's slot is always a descendant container of its section.)
+ */
+function findSlotContainer(root: ElementNode, name: string): ElementNode | null {
+  for (const child of root.children) {
+    if (child.type !== 'element') continue;
+    if (getSlot(child) === name) return child;
+    const nested = findSlotContainer(child, name);
+    if (nested) return nested;
+  }
+  return null;
+}
+
+/**
+ * Collect the CONTENT UNITS of `section`: the outermost non-layout elements in
+ * document order. We recurse THROUGH layout containers (a `data-lay` div or a
+ * nested `<section>`) — which are pure scaffolding being replaced — but treat
+ * every other element (leaf, free, or passthrough such as `<aside>` notes) as an
+ * atomic unit and do NOT descend into it. The returned nodes are the live model
+ * nodes (the caller re-parents them), so nothing the user authored is dropped.
+ */
+function collectContentUnits(section: ElementNode): ElementNode[] {
+  const units: ElementNode[] = [];
+  const visit = (node: ElementNode): void => {
+    for (const child of node.children) {
+      if (child.type !== 'element') continue;
+      const kind = classify(child);
+      const tag = child.tagName.toLowerCase();
+      // A layout container (data-lay div) or a nested section is scaffolding:
+      // descend so its content units are lifted out. A `free` element may also
+      // carry data-lay, but classify() ranks it `free` first → kept atomic.
+      if (kind === 'container' && (tag === 'section' || getAttribute(child, 'data-lay') !== null)) {
+        visit(child);
+      } else {
+        units.push(child);
+      }
+    }
+  };
+  visit(section);
+  return units;
+}
+
+/** Leading + trailing indentation strings inferred from `container`'s children. */
+function slotIndentation(container: ElementNode): { child: string; close: string } {
+  let child = '\n  ';
+  let close = '\n';
+  const firstEl = container.children.find((c) => c.type === 'element');
+  if (firstEl) {
+    const i = container.children.indexOf(firstEl);
+    if (i > 0 && isWhitespaceText(container.children[i - 1])) {
+      child = (container.children[i - 1] as TextNode).value;
+    }
+  }
+  for (let i = container.children.length - 1; i >= 0; i--) {
+    if (isWhitespaceText(container.children[i])) {
+      close = (container.children[i] as TextNode).value;
+      break;
+    }
+  }
+  return { child, close };
+}
+
+/**
+ * P14-3: Build a new slide from a layout preset. Parses `presetHtml` into a
+ * section subtree and inserts it (cleanly indented) immediately after the
+ * top-level slide carrying `afterEid`, or appended when omitted / unknown.
+ * Returns the new (unstamped) section node, or null when the deck has no slides
+ * container or the snippet has no `<section>`.
+ */
+export function addSlideFromLayout(
+  model: DeckModel,
+  presetHtml: string,
+  afterEid?: string,
+): ElementNode | null {
+  const container = findSlidesContainer(model);
+  if (!container) return null;
+  const section = parsePresetSection(presetHtml);
+  if (!section) return null;
+
+  let after: ElementNode | null = null;
+  if (afterEid) {
+    const found = findTopLevel(model, afterEid);
+    if (found) after = found.section;
+  }
+  insertSectionAfter(container, after, section);
+  return section;
+}
+
+/**
+ * P14-4: Change the layout of the slide carrying `sectionEid` to `presetHtml`,
+ * preserving the slide's identity + position (we mutate the EXISTING section node
+ * in place — keeping its `data-eid` and every non-layout attribute) and moving
+ * ALL of its content units into the new layout's `data-slot="content"` container.
+ *
+ * DROP NOTHING: every content unit the user authored (leaves, free elements,
+ * notes) is relocated into the content slot, REPLACING the preset's starter
+ * prompts there. The preset's prompts are kept only when the slide had no content
+ * to move (so a blank slide still shows a prompt). When the new layout exposes
+ * several `data-slot="content"` containers the FIRST (document order) is used.
+ *
+ * Returns the (re-flowed) section node, or null when the eid is unknown or the
+ * snippet has no `<section>`. Byte-stable undo is the store's responsibility
+ * (its source-snapshot stack restores the prior bytes exactly).
+ */
+export function changeSlideLayout(
+  model: DeckModel,
+  sectionEid: string,
+  presetHtml: string,
+): ElementNode | null {
+  const found = findSectionAndParent(model, sectionEid);
+  if (!found) return null;
+  const preset = parsePresetSection(presetHtml);
+  if (!preset) return null;
+  const { section } = found;
+
+  // Lift the user's content out of the old scaffolding (nothing dropped).
+  const units = collectContentUnits(section);
+
+  // Move them into the new layout's primary content slot, replacing the preset's
+  // starter prompts. If there is no slot or nothing to move, the preset's own
+  // content (its prompts) is left intact.
+  const slot = findSlotContainer(preset, 'content');
+  if (slot && units.length > 0) {
+    const { child, close } = slotIndentation(slot);
+    const next: SlideNode[] = [];
+    for (const unit of units) {
+      next.push(createText(child), unit);
+    }
+    next.push(createText(close));
+    slot.children = next;
+    slot.dirty = true;
+  }
+
+  // Adopt the preset's inner structure into the existing section node so the
+  // slide keeps its position + identity. Copy ONLY the data-layout marker across
+  // (every other section attribute — data-eid, transitions, visibility — stays).
+  section.children = preset.children;
+  setLayoutMarker(section, getLayoutMarker(preset));
+  section.dirty = true;
+  return section;
 }
