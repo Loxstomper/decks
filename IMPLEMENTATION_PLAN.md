@@ -191,26 +191,33 @@ dependencies are noted inline.
 > - **⚠️ Needs:** Chrome to exercise PDF (only 503 path verified here — `server_test.go` has a conditional Chrome test); browser to confirm speaker window + present visual + new tabs.
 > - **[opt]** add a `chrome` flag to `/api/capabilities` so ExportPanel can disable the PDF button proactively (instead of HEAD-probe). **[perf]** FE bundle ~698 kB (>500 kB warning) — code-split candidate.
 
+> **Phase 8 STATUS (done, tag 0.0.9 — completes milestone M4 & the whole plan):** P8-1..P8-7 complete; **P8-8 (MCP) intentionally deferred** per the plan. 3 lanes + Opus integration; verified (FE 1001 vitest tests, svelte-check 0/0, Go green; CLI add-slide/validate exercised: clean→exit 0, dup-eid/bad-enum/missing-asset/external-url→exit 1 with diagnostics).
+> - **Go:** `slides add-slide <deck>` (byte-stable append); `internal/validate` (independent re-impl of the spec-03 contract — enum/numeric values, unique eids, asset existence + traversal, well-formedness via `x/net/html`, X-1 external-URL guard) wired as `slides validate <deck>` CLI + `POST /api/decks/{name}/validate` (validates on-disk or supplied bytes). _Dep added: `golang.org/x/net`._ Keep `validate.go` allowed-sets in sync with the TS `layout.ts` enums.
+> - **FE:** validate-on-save (client guard + remote validate, surfaces errors via `ValidationBanner`, no clobber); `StatusIndicator` (synced/unsaved/saving/external/error); `ConflictPrompt` dirty-guard (`decideExternalChange` echo/adopt/conflict + LCS line diff); `ChangeHighlightOverlay` (post-SSE-reload `data-eid` diff via `diffModels`, flashes changed/added in the iframe).
+> - **Authoring:** `.claude/skills/slides-authoring/SKILL.md` (the Claude Code skill) + `docs/AUTHORING.md` (full contract reference) — accurate to the live `data-*` contract; CLAUDE.md links them.
+> - **⚠️ Needs browser confirmation:** ConflictPrompt UX, change-highlight flashing, StatusIndicator transitions, ValidationBanner.
+> - **[deferred] P8-8 MCP** — expose CLI ops as MCP tools (`add_slide`/`set_layout`/`insert_image`); not started, per plan.
+
 ## Phase 8 — Claude Code integration
 > Goal: the AI authoring layer + safe handoff. Spec: [11](specs/11-claude-code-integration.md).
 
-- [ ] **P8-1 — `slides add-slide <deck>` CLI.** Append a starter `<section>`. _Done when:_ command adds a valid slide. (Spec 11)
-- [ ] **P8-2 — `slides validate <deck>` CLI.** Check `data-lay` validity, unique eids, asset existence, parse+round-trip. _Done when:_ returns non-zero with diagnostics on a malformed deck. (Spec 11, 12)
-- [ ] **P8-3 — Validate on save.** Editor save path runs validation. _Done when:_ a save that would break the model is surfaced, not silently applied. (Spec 12)
-- [ ] **P8-4 — Conventions doc + skill.** Write the Claude Code skill (vocabulary, folder layout, turn-taking, offline rules). _Done when:_ skill is installed and Claude Code can author a valid deck from it. (Spec 11)
-- [ ] **P8-5 — Turn-taking status indicator.** Show `synced / external change / unsaved`. _Done when:_ indicator reflects each state. (Spec 11)
-- [ ] **P8-6 — Dirty-guard conflict prompt.** On external change while dirty, prompt instead of clobbering. _Done when:_ concurrent edit triggers the prompt. (Spec 11)
-- [ ] **P8-7 — Highlight external changes.** After an SSE reload, highlight elements Claude changed (by `data-eid` diff). _Done when:_ changed elements are visually marked. (Spec 02, 11)
+- [x] **P8-1 — `slides add-slide <deck>` CLI.** Append a starter `<section>`. _Done when:_ command adds a valid slide. (Spec 11)
+- [x] **P8-2 — `slides validate <deck>` CLI.** Check `data-lay` validity, unique eids, asset existence, parse+round-trip. _Done when:_ returns non-zero with diagnostics on a malformed deck. (Spec 11, 12)
+- [x] **P8-3 — Validate on save.** Editor save path runs validation. _Done when:_ a save that would break the model is surfaced, not silently applied. (Spec 12)
+- [x] **P8-4 — Conventions doc + skill.** Write the Claude Code skill (vocabulary, folder layout, turn-taking, offline rules). _Done when:_ skill is installed and Claude Code can author a valid deck from it. (Spec 11)
+- [x] **P8-5 — Turn-taking status indicator.** Show `synced / external change / unsaved`. _Done when:_ indicator reflects each state. (Spec 11)
+- [x] **P8-6 — Dirty-guard conflict prompt.** On external change while dirty, prompt instead of clobbering. _Done when:_ concurrent edit triggers the prompt. (Spec 11)
+- [x] **P8-7 — Highlight external changes.** After an SSE reload, highlight elements Claude changed (by `data-eid` diff). _Done when:_ changed elements are visually marked. (Spec 02, 11)
 - [ ] **P8-8 — (Later) MCP layer.** Expose CLI ops as MCP tools. _Done when:_ an MCP client can `add_slide`/`set_layout`/`insert_image`. (Spec 11 — deferred)
 
 ---
 
 ## Cross-cutting (maintain throughout)
 
-- [ ] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
-- [ ] **X-2 — Round-trip corpus grows.** Add any odd HTML encountered to the golden-file corpus (P1-6). (Spec 12)
-- [ ] **X-3 — Never-destroy badge.** Passthrough/partially-editable elements show a "source only" badge wherever surfaced. (Spec 02, 12)
-- [ ] **X-4 — Secrets hygiene.** Provider keys only via env/gitignored config; never written to `config.toml` or decks. (Spec 12, 13)
+- [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
+- [x] **X-2 — Round-trip corpus grows.** Add any odd HTML encountered to the golden-file corpus (P1-6). (Spec 12)
+- [x] **X-3 — Never-destroy badge.** Passthrough/partially-editable elements show a "source only" badge wherever surfaced. (Spec 02, 12)
+- [x] **X-4 — Secrets hygiene.** Provider keys only via env/gitignored config; never written to `config.toml` or decks. (Spec 12, 13)
 
 ## Suggested milestones
 

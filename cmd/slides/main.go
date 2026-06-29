@@ -5,6 +5,8 @@
 //	slides [serve]           start the HTTP server (default action)
 //	slides new <name>        scaffold a new deck
 //	slides vendor <name>     (re)vendor reveal.js into an existing deck
+//	slides add-slide <deck>  append a starter <section> to a deck (P8-1)
+//	slides validate <deck>   check a deck against the spec rules (P8-2)
 package main
 
 import (
@@ -20,6 +22,7 @@ import (
 	"slides-builder/internal/provider/giphy"
 	"slides-builder/internal/provider/unsplash"
 	"slides-builder/internal/server"
+	"slides-builder/internal/validate"
 	"slides-builder/internal/watch"
 	slideweb "slides-builder/web"
 )
@@ -42,8 +45,18 @@ func main() {
 			fatalf("usage: slides vendor <name>")
 		}
 		runVendor(args[1])
+	case len(args) >= 1 && args[0] == "add-slide":
+		if len(args) < 2 || args[1] == "" {
+			fatalf("usage: slides add-slide <deck>")
+		}
+		runAddSlide(args[1])
+	case len(args) >= 1 && args[0] == "validate":
+		if len(args) < 2 || args[1] == "" {
+			fatalf("usage: slides validate <deck>")
+		}
+		runValidate(args[1])
 	default:
-		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>\n  slides vendor <name>", args[0])
+		fatalf("unknown command %q\nUsage:\n  slides [serve]\n  slides new <name>\n  slides vendor <name>\n  slides add-slide <deck>\n  slides validate <deck>", args[0])
 	}
 }
 
@@ -133,6 +146,58 @@ func runVendor(name string) {
 	}
 	fmt.Printf("Vendored reveal.js into deck %q at %s\n", name,
 		filepath.Join(deckDir, "assets", "vendor", "reveal"))
+}
+
+// runAddSlide appends a starter <section> to an existing deck (P8-1, spec 11).
+func runAddSlide(name string) {
+	root := workspaceRoot()
+
+	deckDir := deck.DeckPath(root, name)
+	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
+		fatalf("deck %q not found at %s", name, deckDir)
+	}
+
+	if err := deck.AddSlide(root, name); err != nil {
+		log.Fatalf("add-slide: %v", err)
+	}
+	fmt.Printf("Added a slide to deck %q (%s)\n", name, filepath.Join(deckDir, "deck.html"))
+}
+
+// runValidate validates a deck against the spec rules (P8-2, spec 11/12) and
+// prints readable diagnostics.  It exits NON-ZERO when the deck is malformed so
+// CI / Claude Code can gate on the result; zero when the deck is clean.
+func runValidate(name string) {
+	root := workspaceRoot()
+
+	deckDir := deck.DeckPath(root, name)
+	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
+		fatalf("deck %q not found at %s", name, deckDir)
+	}
+
+	res, err := validate.Deck(deckDir)
+	if err != nil {
+		log.Fatalf("validate: %v", err)
+	}
+
+	if res.OK {
+		fmt.Printf("ok: deck %q is valid (%d issues)\n", name, 0)
+		return
+	}
+
+	// Human-readable diagnostics on stderr, one per line, with line/eid context.
+	fmt.Fprintf(os.Stderr, "deck %q has %d validation error(s):\n", name, len(res.Errors))
+	for _, e := range res.Errors {
+		loc := ""
+		if e.Line > 0 {
+			loc = fmt.Sprintf(" (line %d)", e.Line)
+		}
+		eid := ""
+		if e.EID != "" {
+			eid = fmt.Sprintf(" [eid=%s]", e.EID)
+		}
+		fmt.Fprintf(os.Stderr, "  %s: %s%s%s\n", e.Code, e.Message, loc, eid)
+	}
+	os.Exit(1)
 }
 
 // workspaceRoot returns the directory where the binary is run (cwd).

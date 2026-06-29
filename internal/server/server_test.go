@@ -1104,3 +1104,88 @@ func TestExportPDF_WithChrome(t *testing.T) {
 		t.Errorf("export.pdf: response does not start with %%PDF- magic (got %q)", preview)
 	}
 }
+
+// ── Validation endpoint (P8-2) ─────────────────────────────────────────────────
+
+// TestValidate_CleanDeck verifies POST /api/decks/{name}/validate returns
+// {ok:true,errors:[]} for a freshly scaffolded deck.
+func TestValidate_CleanDeck(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "clean"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	req := httptest.NewRequest("POST", "/api/decks/clean/validate", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rr.Code, rr.Body.String())
+	}
+	var res struct {
+		OK     bool `json:"ok"`
+		Errors []struct {
+			Code    string `json:"code"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &res); err != nil {
+		t.Fatalf("decode JSON: %v; body=%s", err, rr.Body.String())
+	}
+	if !res.OK || len(res.Errors) != 0 {
+		t.Fatalf("expected ok with no errors, got %+v", res)
+	}
+}
+
+// TestValidate_BadBody verifies the endpoint validates a supplied candidate
+// document and reports structured errors with code/message/line.
+func TestValidate_BadBody(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "checkme"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	bad := `<section data-eid="x" data-lay="diagonal"><p data-eid="x">dup</p></section>`
+	req := httptest.NewRequest("POST", "/api/decks/checkme/validate", strings.NewReader(bad))
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 (validation failure is not a transport error)", rr.Code)
+	}
+	var res struct {
+		OK     bool `json:"ok"`
+		Errors []struct {
+			Code string `json:"code"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(rr.Body.Bytes(), &res); err != nil {
+		t.Fatalf("decode JSON: %v", err)
+	}
+	if res.OK {
+		t.Fatalf("expected ok=false for bad body")
+	}
+	var sawEnum, sawDup bool
+	for _, e := range res.Errors {
+		switch e.Code {
+		case "invalid-enum":
+			sawEnum = true
+		case "duplicate-eid":
+			sawDup = true
+		}
+	}
+	if !sawEnum || !sawDup {
+		t.Fatalf("expected invalid-enum and duplicate-eid, got %+v", res.Errors)
+	}
+}
+
+// TestValidate_DeckNotFound verifies a missing deck yields 404.
+func TestValidate_DeckNotFound(t *testing.T) {
+	srv, _ := newTestServer(t)
+	req := httptest.NewRequest("POST", "/api/decks/ghost/validate", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rr.Code)
+	}
+}

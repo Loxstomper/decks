@@ -14,6 +14,11 @@ operational only (commands, gotchas).
 - Run server: `./slides` (or `go run ./cmd/slides`). Default port **3000** (override in `config.toml`: `port = 8080`).
 - Scaffold a deck: `./slides new <name>` → `decks/<name>/{deck.html,custom.css,assets/}` (created **workspace-relative to CWD**, with reveal.js vendored offline into `assets/vendor/reveal/`).
 - Re-vendor reveal into an existing deck: `./slides vendor <name>`.
+- Append a starter slide: `./slides add-slide <name>`.
+- Validate a deck (layout contract, unique eids, asset existence, well-formedness, offline guard): `./slides validate <name>` (exit 0 = clean, non-zero + diagnostics = invalid). **Run after editing a deck by hand or with Claude Code.**
+
+## Deck authoring (for Claude Code)
+When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`.claude/skills/slides-authoring/SKILL.md`) and the full contract reference (`docs/AUTHORING.md`): the `data-*` layout vocabulary, `data-eid` rules, offline-first (no external URLs), and turn-taking. Always finish with `./slides validate <name>`.
 
 ## Dev
 - `cd web && npm run dev` (Vite on :5173). Vite proxies `/api` and `/events` to the Go backend on **:3000** (override with `GO_PORT`). Run the Go server separately.

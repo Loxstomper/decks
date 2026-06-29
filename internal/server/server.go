@@ -7,6 +7,7 @@
 //	GET  /api/decks/{name}                    → deck.html contents
 //	PUT  /api/decks/{name}                    → write deck.html atomically
 //	POST /api/decks/{name}/assets             → upload asset (multipart or raw body)
+//	POST /api/decks/{name}/validate           → validate deck → {ok,errors} (P8-2)
 //	GET  /api/decks/{name}/custom.css         → read custom.css (P6-11)
 //	PUT  /api/decks/{name}/custom.css         → write custom.css atomically (P6-11)
 //	POST /api/decks/{name}/fonts              → localize a Google Font offline (P6-13)
@@ -44,6 +45,7 @@ import (
 	"slides-builder/internal/assets"
 	"slides-builder/internal/deck"
 	"slides-builder/internal/provider"
+	"slides-builder/internal/validate"
 	"slides-builder/internal/watch"
 )
 
@@ -94,6 +96,10 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Asset upload (P5-3, P5-14)
 	s.mux.HandleFunc("POST /api/decks/{name}/assets", s.handleAssetUpload)
+
+	// Validation (P8-2, spec 11/12): check a deck against the layout contract,
+	// eid uniqueness, asset existence, well-formedness, and the offline guard.
+	s.mux.HandleFunc("POST /api/decks/{name}/validate", s.handleValidate)
 
 	// Custom CSS (P6-11): read and atomic write of per-deck custom.css.
 	// GET is redundant with the static /decks/{name}/custom.css route but
@@ -333,6 +339,62 @@ func max(a, b int) int {
 		return a
 	}
 	return b
+}
+
+// ── Validation (P8-2, spec 11/12) ─────────────────────────────────────────────
+
+// handleValidate validates a deck against the spec rules and returns JSON.
+//
+//	POST /api/decks/{name}/validate
+//
+// Request body (optional):
+//   - empty            → validate the on-disk decks/<name>/deck.html.
+//   - raw HTML bytes   → validate those bytes against decks/<name>/ for asset
+//     resolution.  This lets the editor's save path validate a candidate
+//     document BEFORE writing it (spec 12: validation gates the save path).
+//
+// Response: {"ok":bool,"errors":[{"code","message","line"?,"eid"?}]}
+//
+// WHY 200 even when ok=false: validation FAILURE is a normal, expected result
+// the client must inspect, not a transport error.  Only a missing deck (404) or
+// an unreadable file (500) is an HTTP-level error.
+func (s *Server) handleValidate(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	deckDir := deck.DeckPath(s.root, name)
+	if info, err := os.Stat(deckDir); err != nil || !info.IsDir() {
+		http.Error(w, "deck not found", http.StatusNotFound)
+		return
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "failed to read body", http.StatusBadRequest)
+		return
+	}
+
+	var res validate.Result
+	if len(body) > 0 {
+		// Validate the supplied candidate document; resolve assets against the deck.
+		res = validate.Bytes(body, deckDir)
+	} else {
+		res, err = validate.Deck(deckDir)
+		if err != nil {
+			http.Error(w, "validate: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+	}
+
+	// Ensure errors marshals as [] (not null) for a stable client contract.
+	if res.Errors == nil {
+		res.Errors = []validate.Issue{}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(res)
 }
 
 // ── Shared library (P5-5) ────────────────────────────────────────────────────

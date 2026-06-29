@@ -56,10 +56,14 @@ import {
   findParentOf,
   getSlideNotes,
   setSlideNotes as setSlideNotesOp,
+  diffModels,
+  validateSource,
+  normalizeRemote,
   type DeckModel,
   type ElementNode,
   type LayoutProps,
   type LogicalRect,
+  type ValidationError,
 } from '$lib/model';
 import {
   addSlide as addSlideOp,
@@ -72,6 +76,8 @@ import {
   setSlideHidden as setSlideHiddenOp,
 } from '$lib/slides';
 import { undoStore } from './undo.svelte';
+import { highlightStore } from './highlight.svelte';
+import { decideExternalChange, lineDiff, type DiffLine } from './conflict';
 import { selectionStore } from '$lib/canvas/selection.svelte';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
@@ -102,6 +108,22 @@ const SYNC_DEBOUNCE_MS = 400;
  */
 export type DeckStatus = 'empty' | 'synced' | 'unsaved' | 'saving' | 'external' | 'error';
 
+/**
+ * Read a 422 PUT response body into validation errors (P8-3). The Go save path
+ * returns the same JSON shape as POST .../validate; normalizeRemote tolerates
+ * shape drift. Falls back to a single generic error when the body is not JSON.
+ */
+async function readValidationErrors(res: Response): Promise<ValidationError[]> {
+  try {
+    const data: unknown = await res.json();
+    const result = normalizeRemote(data);
+    if (result && result.errors.length > 0) return result.errors;
+  } catch {
+    // Non-JSON body — fall through to the generic message.
+  }
+  return [{ code: 'server', message: 'Server rejected the deck as invalid (HTTP 422).' }];
+}
+
 /** Parse without throwing; callers keep the previous model on failure. */
 function safeParse(html: string): DeckModel | null {
   try {
@@ -130,6 +152,22 @@ class DeckStore {
    * reloads the iframe so the canvas mirrors persisted bytes.
    */
   reloadNonce = $state(0);
+
+  /**
+   * P8-3: validation problems from the most recent save attempt. Non-empty means
+   * the last save was BLOCKED (we did not PUT) because persisting `source` would
+   * break the model. The ValidationBanner surfaces these; the user keeps editing.
+   * Cleared on a clean save / fresh load.
+   */
+  validationErrors = $state<ValidationError[]>([]);
+
+  /**
+   * P8-6: an unresolved turn-taking conflict. Set when an external (Claude Code)
+   * write arrives WHILE we have unsaved edits — adopting it would clobber the
+   * user's work. `theirs` holds the incoming disk bytes; the ConflictPrompt lets
+   * the user keep-mine / take-theirs / view-diff. Null when there is no conflict.
+   */
+  conflict = $state<{ theirs: string } | null>(null);
 
   /** Last bytes known to be on disk — distinguishes "unsaved" from "synced". */
   #savedSource = '';
@@ -173,6 +211,10 @@ class DeckStore {
    * change is the new ground state — the user cannot undo "past" it.
    */
   #adoptDisk(html: string): void {
+    // Adopting disk truth resolves any pending conflict and clears stale
+    // validation problems — this html is, by definition, the accepted state.
+    this.conflict = null;
+    this.validationErrors = [];
     // Disk truth is whatever bytes we just read.
     this.#savedSource = html;
 
@@ -870,6 +912,74 @@ class DeckStore {
     await this.commitCommand();
   }
 
+  // ── External change adoption + highlight (P8-7) ───────────────────────────
+
+  /**
+   * Adopt an external write AND flash what changed (P8-7).
+   *
+   * We snapshot the CURRENT model first, then #adoptDisk re-parses the incoming
+   * bytes (and stamps eids). Both models are eid-stamped, so diffModels matches
+   * elements across the reload and yields added/removed/changed eids, which we
+   * hand to the highlight store. The canvas overlay + outline then flash them so
+   * the human can see exactly what Claude Code changed (spec 11).
+   */
+  #adoptExternal(html: string): void {
+    const prev = this.model;
+    this.#adoptDisk(html);
+    highlightStore.flash(diffModels(prev, this.model));
+  }
+
+  // ── Conflict resolution (P8-6) ────────────────────────────────────────────
+
+  /**
+   * P8-6 "take theirs": discard local edits and adopt the external version.
+   * Highlights what changed (P8-7). No-op when there is no active conflict.
+   */
+  resolveTakeTheirs(): void {
+    const c = this.conflict;
+    if (!c) return;
+    // #adoptExternal clears `conflict` (via #adoptDisk); capture bytes first.
+    this.#adoptExternal(c.theirs);
+    this.status = 'synced';
+  }
+
+  /**
+   * P8-6 "keep mine": reject the external version and keep local edits.
+   *
+   * The disk currently holds THEIRS, so we treat that as the new baseline: this
+   * makes our in-memory source register as a pending change (mine !== theirs)
+   * that the immediate save() then PUTs, overwriting their write so the human
+   * wins this turn. If mine is invalid, save() surfaces it and does not persist
+   * (the conflict is still considered resolved — the user chose their side).
+   */
+  resolveKeepMine(): void {
+    const c = this.conflict;
+    if (!c) return;
+    this.#savedSource = c.theirs;
+    this.conflict = null;
+    this.status = 'unsaved';
+    void this.save();
+  }
+
+  /** True while a conflict awaits the user's decision. */
+  get hasConflict(): boolean {
+    return this.conflict !== null;
+  }
+
+  /**
+   * P8-6 "view diff": a line-level diff between MINE (in-memory source) and
+   * THEIRS (incoming disk bytes) for the conflict prompt. Empty when no conflict.
+   */
+  get conflictDiff(): DiffLine[] {
+    if (!this.conflict) return [];
+    return lineDiff(this.source, this.conflict.theirs);
+  }
+
+  /** Dismiss the validation banner without saving (problems persist in source). */
+  dismissValidation(): void {
+    this.validationErrors = [];
+  }
+
   #scheduleSync(): void {
     if (this.#syncTimer) clearTimeout(this.#syncTimer);
     this.#syncTimer = setTimeout(() => {
@@ -893,6 +1003,23 @@ class DeckStore {
       if (this.status !== 'external') this.status = 'synced';
       return;
     }
+
+    // P8-3 VALIDATE-ON-SAVE (client guard): never persist bytes that would break
+    // the model. This fast, offline-first guard runs parse + round-trip + the
+    // layout contract BEFORE we touch the network. On failure we surface the
+    // errors and keep the user's edits in memory rather than clobbering disk with
+    // malformed markup (spec 11 "caught instead of silently breaking the canvas";
+    // "show the errors and let the user decide"). The Go endpoint remains the
+    // single source of truth: the PUT below is the server's validate-on-write
+    // seam, and an explicit re-check is available via validateRemote().
+    const local = validateSource(body);
+    if (!local.ok) {
+      this.validationErrors = local.errors;
+      if (this.status !== 'external') this.status = 'unsaved';
+      return;
+    }
+    this.validationErrors = [];
+
     this.status = 'saving';
     try {
       const res = await fetch(`/api/decks/${encodeURIComponent(this.name)}`, {
@@ -900,7 +1027,18 @@ class DeckStore {
         headers: { 'Content-Type': 'text/html; charset=utf-8' },
         body,
       });
-      if (!res.ok) throw new Error(`save failed: HTTP ${res.status}`);
+      if (!res.ok) {
+        // 422 Unprocessable Entity == server-side validation rejected the bytes
+        // (the Go save path's own "slides validate"). Surface those problems
+        // instead of a generic error, and DO NOT advance the saved baseline.
+        if (res.status === 422) {
+          this.validationErrors = await readValidationErrors(res);
+          // We set status='saving' just above, so it cannot be 'external' here.
+          this.status = 'unsaved';
+          return;
+        }
+        throw new Error(`save failed: HTTP ${res.status}`);
+      }
       this.#savedSource = body;
       // Canvas now reflects persisted bytes — reload it.
       this.reloadNonce++;
@@ -924,19 +1062,30 @@ class DeckStore {
       if (!res.ok) return;
       const html = await res.text();
 
-      if (html === this.source) {
-        // No real divergence (commonly the fsnotify echo of our own PUT).
-        this.#savedSource = html;
-        if (this.status !== 'saving') this.status = 'synced';
-        return;
+      // Pure turn-taking decision (spec 11 §4-5) — keeps the rule testable.
+      const decision = decideExternalChange({
+        current: this.source,
+        saved: this.#savedSource,
+        incoming: html,
+      });
+      switch (decision.kind) {
+        case 'echo':
+          // No real divergence (commonly the fsnotify echo of our own PUT).
+          this.#savedSource = html;
+          if (this.status !== 'saving') this.status = 'synced';
+          return;
+        case 'conflict':
+          // P8-6 dirty guard: do NOT clobber in-progress local edits — stash the
+          // incoming bytes and prompt (keep mine / take theirs / view diff).
+          this.conflict = { theirs: decision.html };
+          this.status = 'external';
+          return;
+        case 'adopt':
+          // Clean: adopt the external version and flash what changed (P8-7).
+          this.#adoptExternal(decision.html);
+          this.status = 'synced';
+          return;
       }
-      if (this.dirty) {
-        // Turn-taking conflict: do not destroy in-progress local edits.
-        this.status = 'external';
-        return;
-      }
-      this.#adoptDisk(html);
-      this.status = 'synced';
     } catch {
       // Transient fetch error — leave state unchanged; SSE will fire again.
     }

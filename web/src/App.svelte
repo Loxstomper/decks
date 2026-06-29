@@ -44,8 +44,17 @@
   import PresentButton from './components/presenting/PresentButton.svelte';
   import NotesPanel from './components/presenting/NotesPanel.svelte';
   import ExportPanel from './components/presenting/ExportPanel.svelte';
+  // Phase 8 surfaces (turn-taking + validation + change-highlight):
+  //   StatusIndicator        — accessible sync/conflict/blocked badge (P8-5).
+  //   ConflictPrompt         — dirty-guard modal: keep-mine / take-theirs (P8-6).
+  //   ValidationBanner       — surfaces blocked-save validation errors (P8-3).
+  //   ChangeHighlightOverlay — flashes eids Claude changed after reload (P8-7).
+  import StatusIndicator from './components/status/StatusIndicator.svelte';
+  import ConflictPrompt from './components/status/ConflictPrompt.svelte';
+  import ValidationBanner from './components/status/ValidationBanner.svelte';
+  import ChangeHighlightOverlay from './components/canvas/ChangeHighlightOverlay.svelte';
   import { createSseClient } from '$lib/sse';
-  import { deckStore, type DeckStatus } from '$lib/store/deck.svelte.ts';
+  import { deckStore } from '$lib/store/deck.svelte.ts';
   import { customCssStore } from '$lib/store/customCss.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
   import { gridStore } from '$lib/canvas/grid.svelte.ts';
@@ -232,16 +241,9 @@
     else void deckStore.undo();
   }
 
-  // Human-readable status label + colour for the indicator (spec 11 §5).
-  const STATUS_META: Record<DeckStatus, { label: string; class: string }> = {
-    empty:    { label: 'No deck',        class: 'text-white/30' },
-    synced:   { label: 'Synced',         class: 'text-emerald-400/80' },
-    unsaved:  { label: 'Unsaved…',  class: 'text-amber-400/80' },
-    saving:   { label: 'Saving…',   class: 'text-sky-400/80' },
-    external: { label: 'External change', class: 'text-accent' },
-    error:    { label: 'Error',          class: 'text-red-400' },
-  };
-  const statusMeta = $derived(STATUS_META[deckStore.status]);
+  // Status badge mapping now lives in StatusIndicator (P8-5), which owns the
+  // synced / unsaved / saving / external / error + conflict + 'Save blocked'
+  // states and renders an accessible role=status live region.
 
   // ── Phase 6: custom.css lifecycle (Lane C) ──────────────────────────────────
   // The custom.css document is a separate file (decks/<name>/custom.css) served
@@ -292,10 +294,9 @@
       slide is reflected back.
     -->
     <div class="flex flex-col h-full min-h-0 gap-2">
-      <!-- Sync status indicator (spec 11 §5) -->
-      <div class="flex items-center gap-2 px-1 flex-shrink-0">
-        <span class="inline-block w-2 h-2 rounded-full {statusMeta.class}" style="background-color: currentColor;"></span>
-        <span class="text-xs {statusMeta.class}">{statusMeta.label}</span>
+      <!-- Sync status indicator (spec 11 §5 / P8-5): turn-taking handoff state. -->
+      <div class="px-1 flex-shrink-0">
+        <StatusIndicator />
       </div>
 
       <!-- Deck list -->
@@ -349,6 +350,15 @@
         transform={canvasTransform}
         reloadNonce={deckStore.reloadNonce}
       />
+
+      <!--
+        Change-highlight overlay (P8-7): flashes amber (changed) / emerald (added)
+        outlines inside the reveal iframe for the eids Claude Code just touched,
+        after an adopted external change. It owns no DOM of its own (it injects a
+        one-off stylesheet into the same-origin iframe) and re-applies on
+        reloadNonce so the flash lands on the freshly-rendered adopted document.
+      -->
+      <ChangeHighlightOverlay iframe={canvasIframe} reloadNonce={deckStore.reloadNonce} />
 
       <!--
         Snap-grid overlay (P3-8): drawn beneath the drag overlay (z-index:1),
@@ -639,6 +649,18 @@
   hijacking text-editing contexts (inputs / contenteditable / CodeMirror).
 -->
 <NudgeController />
+
+<!--
+  Phase 8 turn-taking surfaces, mounted once at the shell root (both self-gate on
+  deckStore state, rendering nothing until needed):
+    • ValidationBanner — appears when a save was blocked by validation errors
+      (P8-3); lists the problems with a dismiss action.
+    • ConflictPrompt — modal that appears when an external (Claude Code) write
+      lands while we have unsaved edits (P8-6 dirty-guard); the user resolves via
+      keep-mine / take-theirs / view-diff before the canvas adopts disk truth.
+-->
+<ValidationBanner />
+<ConflictPrompt />
 
 <style>
   /*
