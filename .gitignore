@@ -1,0 +1,28 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Secrets & local config (spec 12 — secrets hygiene)
+.env
+.env.*
+*.local
+config.local.toml
+
+# Node / frontend
+node_modules/
+web/node_modules/
+web/dist/
+*.log
+npm-debug.log*
+
+# Go build output
+/slides-builder
+/decks
+*.test
+*.out
+coverage.*
+
+# Editors
+.idea/
+.vscode/
+*.swp
