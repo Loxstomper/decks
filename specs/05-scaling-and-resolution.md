@@ -26,6 +26,32 @@ ratio differs). Therefore:
 - **Aspect ratio is configurable** via presets + custom.
 - Config lives **in the reveal init script inside `deck.html`** — single source of truth;
   Claude Code edits it naturally. No sidecar.
+- **`center: false` and `margin: 0` are required** (see "Logical-canvas coordinate identity").
+
+## Logical-canvas coordinate identity (load-bearing)
+
+For the editor overlays and the rendered deck to share **one** coordinate system (the WYSIWYG
+promise above), a slide's `<section>` must *be* the full logical canvas at its origin —
+`(0,0)` top-left, `width × height` exactly. That requires two reveal options the template
+**must** set (they are not reveal's defaults):
+
+- **`center: false`** — reveal's default `center: true` vertically/horizontally centers each
+  section's content box, giving a short section a non-zero `top`. The **layout vocabulary**
+  ([03](03-layout-vocabulary.md)) already owns alignment (a `stack` centers via
+  `justify-content`), so reveal centering is redundant *and* conflicting.
+- **`margin: 0`** — reveal's default `margin: 0.04` insets the usable area by 4% and rescales,
+  so the rendered origin/scale no longer equals the raw logical canvas.
+
+With these, **free `data-x/y/w/h` are true logical-canvas coordinates**: an element at
+`data-x=0,data-y=0` renders at the canvas origin, free-overlay handles align with the element,
+and smart-guide snapping to canvas center/edges is correct. Without them, anything that reads
+`data-x/y` as canvas coordinates (the free-transform overlay, guides) is offset by the
+centering/margin delta — while overlays that *measure* the element (the structured selection
+box) still track it, which is why the mismatch shows up **only in free mode**.
+
+> Implication for existing decks: the requirement is enforced in the scaffold template; decks
+> authored before it carry the old `Reveal.initialize` and need their config rewritten (a
+> `slides upgrade`-style migration — `slides vendor` does not rewrite `deck.html`).
 
 ### Aspect presets
 

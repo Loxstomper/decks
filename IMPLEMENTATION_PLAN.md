@@ -363,6 +363,24 @@ dependencies are noted inline.
 - [ ] **P14-6 — Layout picker UI.** A picker (new-slide dropdown + a "Change layout" item in the slide context menu, Phase 13) showing the presets; selecting runs P14-3 (new) or P14-4 (existing). _Done when:_ both entry points apply a layout from the picker. (Spec 06, 04)
 - [ ] **P14-7 — Tests + e2e.** Unit: builders/remap (content preserved, byte-stable). Playwright: new-slide-from-layout and change-layout-preserves-content; a `templates/` user snippet shows in the picker. _Done when:_ suites green. (Spec 06, 12)
 
+## Phase 15 — Free-position coordinate identity (bug fix)
+> Goal: free-element overlays/handles align with the element, and free `data-x/y` are true
+> logical-canvas coordinates. Spec: [05](specs/05-scaling-and-resolution.md) "Logical-canvas
+> coordinate identity". **Land together with Phase 11** — the drag-release reload-to-slide-1
+> (P11-1) makes free dragging hard to test until fixed.
+>
+> Root cause: the deck template's `Reveal.initialize` omits `center`/`margin`, so reveal applies
+> `center:true` + `margin:0.04`. Sections are centered/inset, so a free element positioned
+> `absolute; left:data-x; top:data-y` renders offset from the logical-canvas origin the
+> free-transform overlay assumes (the structured overlay measures the real rect, so it aligns —
+> hence the mismatch is free-only).
+
+- [ ] **P15-1 — Template: `center:false, margin:0`.** Add both to the scaffold `Reveal.initialize` so the section is the full logical canvas at origin. Verify a `stack` slide still appears centered (the layout vocabulary's `justify-content`, not reveal). _Done when:_ new decks set both; structured content still looks right. (Spec 05, 03)
+- [ ] **P15-2 — Full-canvas section containing block.** Ensure `.reveal .slides > section` is a positioned, full `width×height` containing block at origin (in `slides-layout.css` or via the config), so absolute free children resolve against true canvas coords. _Done when:_ a free element at `data-x=0,data-y=0` renders at the canvas top-left in the iframe. (Spec 05, 03)
+- [ ] **P15-3 — Free overlay alignment verified (+ optional measure fallback).** With P15-1/2, the free-transform box/handles (from `data-x/y/w/h`) align with the element at any zoom/aspect. Optionally also draw the display box from the measured rect (like the selection overlay) for content-sized/rotated robustness. _Done when:_ the draggable box tracks the element; drag→drop writes correct logical coords; smart guides snap to canvas center/edges. (Spec 04, 05)
+- [ ] **P15-4 — Migration for existing decks.** A `slides upgrade <deck>` (or fold into `slides vendor`) that rewrites an existing deck's `Reveal.initialize` to set `center:false, margin:0` (byte-stable otherwise). _Done when:_ an old deck gets the corrected config without other diffs. (Spec 05, 13)
+- [ ] **P15-5 — e2e.** Playwright: select a free element, assert the overlay box rect matches the element's measured rect within tolerance; after a drag the element's on-disk `data-x/y` reflect the move. _Done when:_ the spec passes (requires P11-1 so the reload no longer resets the slide). (Spec 05, 12)
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)
