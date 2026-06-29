@@ -20,7 +20,7 @@
  * We never touch rawOpen/rawClose — only the subtree that changes goes dirty.
  */
 
-import { getAttribute, setAttribute, removeAttribute, walk } from './edit';
+import { getAttribute, setAttribute, removeAttribute, hasAttribute, walk } from './edit';
 import type { DeckModel, ElementNode } from './types';
 import { classify } from './classify';
 
@@ -352,6 +352,47 @@ export function setSlot(el: ElementNode, name: string | null): void {
     removeAttribute(el, 'data-slot');
   } else {
     setAttribute(el, 'data-slot', name);
+  }
+}
+
+// ─── P17-18: Per-slide footer opt-out (data-footer-hidden) ──────────────────
+//
+// `data-footer-hidden` is a BOOLEAN marker on a `<section>` opting that slide out
+// of the deck-level footer overlay. The footer is a managed custom.css rule keyed
+// off `section:not([data-footer-hidden])`, so the attribute's mere PRESENCE (any
+// value, including the empty boolean form) suppresses the footer on that slide.
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go) recognises
+// `data-footer-hidden` as a presence-only marker and must stay in sync on the
+// attribute name.
+
+/**
+ * Return whether a section opts out of the deck footer (`data-footer-hidden`
+ * present). Presence-only: any value (incl. empty) counts as hidden.
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function getFooterHidden(section: ElementNode): boolean {
+  return hasAttribute(section, 'data-footer-hidden');
+}
+
+/**
+ * Set or clear the `data-footer-hidden` boolean marker on `section`.
+ *
+ * - `true` → adds `data-footer-hidden` (empty boolean form) and marks dirty.
+ * - `false` → removes the attribute.
+ *
+ * Byte-stable: setting the value already in effect is a no-op (setAttribute /
+ * removeAttribute only dirty the node when something actually changes).
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function setFooterHidden(section: ElementNode, hidden: boolean): void {
+  if (hidden) {
+    // null → bare boolean attribute (`data-footer-hidden`, no ="" value).
+    setAttribute(section, 'data-footer-hidden', null);
+  } else {
+    removeAttribute(section, 'data-footer-hidden');
   }
 }
 

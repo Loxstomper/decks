@@ -17,6 +17,7 @@ import {
   nestSlide,
   promoteSlide,
   setSlideHidden,
+  setSlideFooterHidden,
   topLevelSlides,
   verticalChildren,
   isVerticalStack,
@@ -271,6 +272,28 @@ describe('setSlideHidden (P6-6)', () => {
     expect(out).not.toContain('data-visibility="hidden"');
     // Back to byte-stable original for s2.
     expect(out).toContain(S2);
+  });
+});
+
+describe('setSlideFooterHidden (P17-18)', () => {
+  it('adds and removes the data-footer-hidden boolean marker; byte-stable', () => {
+    const model = parseDeck(DECK);
+    expect(setSlideFooterHidden(model, 's2', true)).toBe(true);
+    let out = serializeDeck(model);
+    expect(out).toContain('data-footer-hidden');
+    // Boolean form (no ="" value).
+    expect(out).not.toContain('data-footer-hidden=');
+
+    expect(setSlideFooterHidden(model, 's2', false)).toBe(true);
+    out = serializeDeck(model);
+    expect(out).not.toContain('data-footer-hidden');
+    // Round-trips back to the original s2 bytes.
+    expect(out).toContain(S2);
+  });
+
+  it('returns false for an unknown eid', () => {
+    const model = parseDeck(DECK);
+    expect(setSlideFooterHidden(model, 'nope', true)).toBe(false);
   });
 });
 

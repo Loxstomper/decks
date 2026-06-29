@@ -21,6 +21,7 @@ export {
   nestSlide,
   promoteSlide,
   setSlideHidden,
+  setSlideFooterHidden,
   parsePresetSection,
   addSlideFromLayout,
   changeSlideLayout,

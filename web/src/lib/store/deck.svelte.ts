@@ -83,6 +83,7 @@ import {
   nestSlide as nestSlideOp,
   promoteSlide as promoteSlideOp,
   setSlideHidden as setSlideHiddenOp,
+  setSlideFooterHidden as setSlideFooterHiddenOp,
   addSlideFromLayout as addSlideFromLayoutOp,
   changeSlideLayout as changeSlideLayoutOp,
 } from '$lib/slides';
@@ -632,6 +633,43 @@ class DeckStore {
     if (next === this.source) return;
     this.updateFromSource(next);
     await this.commitCommand();
+  }
+
+  /**
+   * P17-17: Set the DECK-LEVEL slide-number config (`slideNumber`) in
+   * Reveal.initialize. `enabled` false writes `slideNumber: false`; true writes
+   * `slideNumber: '<format>'` ('c' = current, 'c/t' = current/total). This lives
+   * inside the opaque reveal-init <script>, so it is applied server-side via POST
+   * /api/decks/{name}/slide-number (a byte-stable rewrite of deck.html) rather
+   * than through the model. We flush any pending model edits first (save) so the
+   * server rewrites current bytes, then re-adopt disk truth via load(). Returns
+   * true on success.
+   */
+  async applyDeckSlideNumber(enabled: boolean, format: string): Promise<boolean> {
+    if (!this.name) return false;
+    // Flush pending edits so the server-side rewrite operates on current bytes
+    // and load() below doesn't clobber unsaved work.
+    await this.save();
+    try {
+      const res = await fetch(
+        `/api/decks/${encodeURIComponent(this.name)}/slide-number`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled, format }),
+        },
+      );
+      if (!res.ok) {
+        this.error = `slide-number update failed: HTTP ${res.status}`;
+        return false;
+      }
+    } catch (e) {
+      this.error = e instanceof Error ? e.message : String(e);
+      return false;
+    }
+    // Re-read the rewritten deck.html so model + canvas reflect disk truth.
+    await this.load(this.name);
+    return true;
   }
 
   // ── Per-slide theming (P10-3 / P10-4, spec 16) ────────────────────────────
@@ -1268,6 +1306,18 @@ class DeckStore {
   async setSlideHidden(eid: string, hidden: boolean): Promise<boolean> {
     if (!this.model) return false;
     if (!setSlideHiddenOp(this.model, eid, hidden)) return false;
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P17-18: Opt the slide `eid` in/out of the deck-level footer overlay by
+   * setting/removing the boolean `data-footer-hidden` marker on its `<section>`.
+   * One undo entry + one autosave, byte-stable. Returns true on success.
+   */
+  async setSlideFooterHidden(eid: string, hidden: boolean): Promise<boolean> {
+    if (!this.model) return false;
+    if (!setSlideFooterHiddenOp(this.model, eid, hidden)) return false;
     await this.#commitStructure();
     return true;
   }

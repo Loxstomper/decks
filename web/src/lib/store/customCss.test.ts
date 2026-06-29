@@ -8,7 +8,13 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { setCssVar } from './customCss.svelte.ts';
+import {
+  setCssVar,
+  setFooterBlock,
+  clearFooterBlock,
+  buildFooterBlock,
+  parseFooterBlock,
+} from './customCss.svelte.ts';
 
 describe('setCssVar', () => {
   // ── Creates :root block when absent ──────────────────────────────────────
@@ -131,5 +137,86 @@ describe('setCssVar', () => {
     expect(result).toContain('@import url("assets/fonts/inter/font-face.css");');
     expect(result).toContain('--r-main-color: red;');
     expect(result).not.toContain('--r-main-color: #fff;');
+  });
+});
+
+// ── P17-18: managed footer block ───────────────────────────────────────────
+
+const USER_CSS = `:root {
+  --r-main-color: #fff;
+}
+
+.reveal h1 { color: hotpink; }
+`;
+
+describe('setFooterBlock / clearFooterBlock (P17-18)', () => {
+  it('inserts a managed footer block keyed off :not([data-footer-hidden])', () => {
+    const out = setFooterBlock(USER_CSS, 'Acme Inc — Confidential');
+    expect(out).toContain('/* slides-builder:footer */');
+    expect(out).toContain('/* /slides-builder:footer */');
+    expect(out).toContain('.reveal .slides section:not([data-footer-hidden])::after');
+    expect(out).toContain('content: "Acme Inc — Confidential";');
+    // User CSS + :root block preserved verbatim.
+    expect(out).toContain('--r-main-color: #fff;');
+    expect(out).toContain('.reveal h1 { color: hotpink; }');
+  });
+
+  it('is idempotent — re-setting the same footer yields byte-identical CSS', () => {
+    const once = setFooterBlock(USER_CSS, 'Footer');
+    const twice = setFooterBlock(once, 'Footer');
+    expect(twice).toBe(once);
+  });
+
+  it('replaces (not duplicates) an existing footer block on text change', () => {
+    const a = setFooterBlock(USER_CSS, 'Old');
+    const b = setFooterBlock(a, 'New');
+    expect(b).toContain('content: "New";');
+    expect(b).not.toContain('content: "Old";');
+    expect((b.match(/slides-builder:footer \*\//g) ?? []).length).toBe(2); // open + close once
+  });
+
+  it('clears the footer block and restores the user CSS', () => {
+    const withFooter = setFooterBlock(USER_CSS, 'Bye');
+    const cleared = clearFooterBlock(withFooter);
+    expect(cleared).not.toContain('slides-builder:footer');
+    expect(cleared).toContain('--r-main-color: #fff;');
+    expect(cleared).toContain('.reveal h1 { color: hotpink; }');
+  });
+
+  it('clear is a no-op when no footer block is present', () => {
+    expect(clearFooterBlock(USER_CSS)).toBe(USER_CSS);
+  });
+
+  it('round-trips set → clear back to a footer-free state idempotently', () => {
+    const cleared1 = clearFooterBlock(setFooterBlock(USER_CSS, 'x'));
+    const cleared2 = clearFooterBlock(setFooterBlock(cleared1, 'x'));
+    expect(cleared2).toBe(cleared1);
+  });
+
+  it('emits a local logo rule and ignores external/data URLs (offline-first)', () => {
+    const local = buildFooterBlock('Co', 'assets/logo.png');
+    expect(local).toContain('background-image: url("assets/logo.png");');
+    expect(local).toContain('::before');
+
+    const remote = buildFooterBlock('Co', 'https://evil.example/logo.png');
+    expect(remote).not.toContain('background-image');
+    expect(remote).not.toContain('::before');
+
+    const data = buildFooterBlock('Co', 'data:image/png;base64,AAAA');
+    expect(data).not.toContain('background-image');
+  });
+
+  it('CSS-escapes quotes and backslashes in the footer text', () => {
+    const out = buildFooterBlock('a "quote" and \\ slash');
+    expect(out).toContain('content: "a \\"quote\\" and \\\\ slash";');
+  });
+
+  it('parseFooterBlock round-trips text and logo', () => {
+    const css = setFooterBlock(USER_CSS, 'My "Deck"', 'assets/logo.svg');
+    const parsed = parseFooterBlock(css);
+    expect(parsed).not.toBeNull();
+    expect(parsed?.text).toBe('My "Deck"');
+    expect(parsed?.logoSrc).toBe('assets/logo.svg');
+    expect(parseFooterBlock(USER_CSS)).toBeNull();
   });
 });

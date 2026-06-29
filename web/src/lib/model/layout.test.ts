@@ -26,6 +26,8 @@ import {
   setLayoutMarker,
   getSlot,
   setSlot,
+  getFooterHidden,
+  setFooterHidden,
   type LayoutProps,
   type AlignValue,
   type JustifyValue,
@@ -683,5 +685,45 @@ describe('getSlot() + setSlot() — P14', () => {
     expect(getLayoutMarker(section)).toBe('two-column');
     expect(getSlot(col1)).toBe('content');
     expect(getSlot(col2)).toBe('sidebar');
+  });
+});
+
+// ─── 12. P17-18: getFooterHidden / setFooterHidden ───────────────────────────
+//
+// data-footer-hidden is a presence-only BOOLEAN marker on a <section> opting it
+// out of the deck footer overlay. Dual-encoded with internal/validate/validate.go.
+
+describe('getFooterHidden() + setFooterHidden() — P17-18', () => {
+  it('returns false when the marker is absent', () => {
+    const el = createElement('section', {});
+    expect(getFooterHidden(el)).toBe(false);
+  });
+
+  it('returns true for the bare boolean marker and any value form', () => {
+    expect(getFooterHidden(createElement('section', { 'data-footer-hidden': '' }))).toBe(true);
+    expect(getFooterHidden(createElement('section', { 'data-footer-hidden': 'true' }))).toBe(true);
+  });
+
+  it('sets the bare boolean marker (no ="" value) and marks dirty', () => {
+    const el = createElement('section', {});
+    el.dirty = false;
+    setFooterHidden(el, true);
+    expect(getFooterHidden(el)).toBe(true);
+    expect(getAttribute(el, 'data-footer-hidden')).toBe(''); // boolean attr decodes to ''
+    expect(el.dirty).toBe(true);
+  });
+
+  it('removes the marker when set to false', () => {
+    const el = createElement('section', { 'data-footer-hidden': '' });
+    setFooterHidden(el, false);
+    expect(getFooterHidden(el)).toBe(false);
+  });
+
+  it('round-trips via get after set', () => {
+    const el = createElement('section', {});
+    setFooterHidden(el, true);
+    expect(getFooterHidden(el)).toBe(true);
+    setFooterHidden(el, false);
+    expect(getFooterHidden(el)).toBe(false);
   });
 });

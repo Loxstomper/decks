@@ -49,6 +49,21 @@ func TestValidate_CleanPasses(t *testing.T) {
 	}
 }
 
+// TestValidate_FooterHiddenAccepted (P17-18): the boolean data-footer-hidden
+// marker on a <section> is presence-only and must validate clean (any value form).
+func TestValidate_FooterHiddenAccepted(t *testing.T) {
+	for _, c := range []string{
+		`<section data-footer-hidden><p>x</p></section>`,
+		`<section data-footer-hidden=""><p>x</p></section>`,
+		`<section data-footer-hidden="true"><p>x</p></section>`,
+	} {
+		res := Bytes([]byte(c), "")
+		if !res.OK {
+			t.Fatalf("expected data-footer-hidden to validate clean for %q, got: %+v", c, res.Errors)
+		}
+	}
+}
+
 func TestValidate_DuplicateEID(t *testing.T) {
 	html := `<section data-eid="dup"><p data-eid="dup">x</p></section>`
 	res := Bytes([]byte(html), "")

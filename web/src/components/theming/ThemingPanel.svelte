@@ -46,7 +46,7 @@
    */
 
   import { deckStore } from '$lib/store/deck.svelte.ts';
-  import { customCssStore } from '$lib/store/customCss.svelte.ts';
+  import { customCssStore, parseFooterBlock } from '$lib/store/customCss.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte';
   import { buildSlideTree } from '$lib/slides';
   import { findByEid } from '$lib/model';
@@ -116,6 +116,75 @@
     }
     customCssStore.source = css;
     customCssStore.applyVar('--r-main-font', `"${result.family}", sans-serif`);
+  }
+
+  // ── Deck-level slide numbers (P17-17) ────────────────────────────────────────
+  //
+  // The slideNumber config lives inside the opaque Reveal.initialize <script>, so
+  // we READ current state by regex over deckStore.source and WRITE via
+  // deckStore.applyDeckSlideNumber (POST /api/decks/{name}/slide-number →
+  // byte-stable deck.html rewrite → reload). Reading from source keeps the
+  // controls in sync after the reload with no local mirror to drift.
+
+  /** Current slideNumber format token ('' = off). */
+  const slideNumberFormat = $derived.by<string>(() => {
+    const m = /slideNumber:\s*'([^']*)'/.exec(deckStore.source);
+    return m ? m[1] : '';
+  });
+  const slideNumberEnabled = $derived(slideNumberFormat !== '');
+
+  let slideNumberBusy = $state(false);
+
+  async function applyDeckSlideNumber(enabled: boolean, format: string): Promise<void> {
+    if (slideNumberBusy) return;
+    slideNumberBusy = true;
+    try {
+      await deckStore.applyDeckSlideNumber(enabled, format);
+    } finally {
+      slideNumberBusy = false;
+    }
+  }
+
+  function onSlideNumberToggle(e: Event): void {
+    const on = (e.currentTarget as HTMLInputElement).checked;
+    void applyDeckSlideNumber(on, on ? slideNumberFormat || 'c/t' : '');
+  }
+
+  function onSlideNumberFormat(e: Event): void {
+    const fmt = (e.currentTarget as HTMLSelectElement).value;
+    void applyDeckSlideNumber(true, fmt);
+  }
+
+  // ── Deck footer (P17-18, managed custom.css block) ───────────────────────────
+  //
+  // The footer is a managed region in custom.css. We READ it back from
+  // customCssStore.source via parseFooterBlock and WRITE via setFooter/clearFooter
+  // (idempotent block ops). Per-slide opt-out is in the Properties panel.
+
+  const footer = $derived(parseFooterBlock(customCssStore.source));
+  const footerText = $derived(footer?.text ?? '');
+  const footerLogo = $derived(footer?.logoSrc ?? '');
+
+  function onFooterTextInput(e: Event): void {
+    const text = (e.currentTarget as HTMLInputElement).value;
+    if (text.trim() === '' && !footerLogo) {
+      customCssStore.clearFooter();
+    } else {
+      customCssStore.setFooter(text, footerLogo || null);
+    }
+  }
+
+  function onFooterLogoInput(e: Event): void {
+    const logo = (e.currentTarget as HTMLInputElement).value.trim();
+    if (footerText.trim() === '' && logo === '') {
+      customCssStore.clearFooter();
+    } else {
+      customCssStore.setFooter(footerText, logo || null);
+    }
+  }
+
+  function onClearFooter(): void {
+    customCssStore.clearFooter();
   }
 
   // ── Per-slide theming (P10-5) ────────────────────────────────────────────────
@@ -286,6 +355,79 @@
           disabled={!isOpen}
           {onFontApplied}
         />
+
+        <div class="separator"></div>
+
+        <!-- ── Slide numbers (P17-17) ──────────────────────────────────── -->
+        <div class="slide-theme-section">
+          <div class="section-title">Slide numbers</div>
+          <div class="control-row">
+            <label class="control-label" for="deck-slide-number">Show</label>
+            <input
+              id="deck-slide-number"
+              type="checkbox"
+              disabled={!isOpen || slideNumberBusy}
+              checked={slideNumberEnabled}
+              onchange={onSlideNumberToggle}
+            />
+          </div>
+          {#if slideNumberEnabled}
+            <div class="control-row">
+              <label class="control-label" for="deck-slide-number-format">Format</label>
+              <select
+                id="deck-slide-number-format"
+                class="picker-select"
+                disabled={!isOpen || slideNumberBusy}
+                value={slideNumberFormat}
+                onchange={onSlideNumberFormat}
+              >
+                <option value="c">1</option>
+                <option value="c/t">current / total</option>
+              </select>
+            </div>
+          {/if}
+        </div>
+
+        <div class="separator"></div>
+
+        <!-- ── Deck footer (P17-18) ────────────────────────────────────── -->
+        <div class="slide-theme-section">
+          <div class="section-title">Footer</div>
+          <div class="control-row">
+            <label class="control-label" for="deck-footer-text">Text</label>
+            <input
+              id="deck-footer-text"
+              class="picker-select"
+              type="text"
+              placeholder="(none)"
+              disabled={!isOpen}
+              value={footerText}
+              onchange={onFooterTextInput}
+            />
+          </div>
+          <div class="control-row">
+            <label class="control-label" for="deck-footer-logo">Logo</label>
+            <input
+              id="deck-footer-logo"
+              class="picker-select"
+              type="text"
+              placeholder="assets/logo.png"
+              disabled={!isOpen}
+              value={footerLogo}
+              onchange={onFooterLogoInput}
+            />
+          </div>
+          {#if footerText || footerLogo}
+            <button
+              type="button"
+              class="clear-btn"
+              onclick={onClearFooter}
+              title="Remove the deck footer"
+            >
+              Clear footer
+            </button>
+          {/if}
+        </div>
 
       {:else}
         <!-- ── Per-slide theming (P10-5) ───────────────────────────────── -->

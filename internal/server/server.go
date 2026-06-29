@@ -108,6 +108,9 @@ func (s *Server) routes(staticFS fs.FS) {
 	s.mux.HandleFunc("GET /api/decks/{name}/custom.css", s.handleCustomCSSRead)
 	s.mux.HandleFunc("PUT /api/decks/{name}/custom.css", s.handleCustomCSSWrite)
 
+	// Slide numbers (P17-17): set the deck-level slideNumber in Reveal.initialize.
+	s.mux.HandleFunc("POST /api/decks/{name}/slide-number", s.handleSlideNumber)
+
 	// Font localization (P6-13): download a Google Font into assets/fonts/.
 	s.mux.HandleFunc("POST /api/decks/{name}/fonts", s.handleFontLocalize)
 
@@ -810,6 +813,54 @@ func (s *Server) handleCustomCSSWrite(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := deck.WriteCustomCSS(s.root, name, body); err != nil {
+		if isNotExist(err) {
+			http.Error(w, "deck not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// allowedSlideNumberFormats is the whitelist of reveal slideNumber format tokens
+// the editor exposes. Restricting the set keeps the value safe to splice into the
+// single-quoted JS literal (no escaping needed) and the editor UI in sync.
+var allowedSlideNumberFormats = map[string]bool{
+	"c":   true, // current slide number only
+	"c/t": true, // current/total
+}
+
+// handleSlideNumber sets the deck-level slide-number config (P17-17).
+//
+//	POST /api/decks/{name}/slide-number
+//	Body: {"enabled": true, "format": "c/t"}
+//
+// Rewrites deck.html's Reveal.initialize so it carries `slideNumber: false` (off)
+// or `slideNumber: '<format>'` (on). The rewrite is byte-stable: a deck already in
+// the requested state is left untouched on disk. Mirrors the custom.css write
+// handler's shape. The watcher → SSE → editor reload picks up the change.
+func (s *Server) handleSlideNumber(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	var reqBody struct {
+		Enabled bool   `json:"enabled"`
+		Format  string `json:"format"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if reqBody.Enabled && reqBody.Format != "" && !allowedSlideNumberFormats[reqBody.Format] {
+		http.Error(w, "unsupported slideNumber format", http.StatusBadRequest)
+		return
+	}
+
+	if err := deck.SetSlideNumber(s.root, name, reqBody.Enabled, reqBody.Format); err != nil {
 		if isNotExist(err) {
 			http.Error(w, "deck not found", http.StatusNotFound)
 			return

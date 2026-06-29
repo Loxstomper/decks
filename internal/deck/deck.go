@@ -416,6 +416,114 @@ func upgradeInitialize(html string) (string, bool) {
 	return b.String(), true
 }
 
+// initLineRE matches an entire `key: value,` line of the Reveal.initialize({…})
+// config object (key at line start after indentation, through the newline). Used
+// by setInitKey to replace a single key's line idempotently.
+func initLineRE(key string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(key) + `[ \t]*:[^\n]*\n`)
+}
+
+// setInitKey upserts (value != "") or removes (value == "") exactly one key in
+// the first Reveal.initialize({…}) object. `value` is the raw JS literal placed
+// after the colon (e.g. "false" or "'c/t'"). Pure, idempotent and byte-stable: if
+// the desired state already holds the input is returned unchanged (changed=false),
+// so re-running produces no diff. New keys are inserted at the top of the object
+// (right after the `{` line) with the surrounding indentation; the always-present
+// trailing comma is safe there. Returns the (possibly rewritten) HTML + changed.
+//
+// NOTE: Phase 17 Lane H is expected to introduce an identical setInitKey/initLineRE
+// pair in this file. They are NOT present on this lane's base commit (7e3cb96), so
+// this lane adds them; the two definitions match byte-for-byte to merge cleanly.
+func setInitKey(html, key, value string) (string, bool) {
+	const marker = "Reveal.initialize({"
+	mi := strings.Index(html, marker)
+	if mi < 0 {
+		return html, false
+	}
+	loc := initLineRE(key).FindStringIndex(html[mi:])
+
+	if value == "" {
+		// Remove the line if present; otherwise nothing to do.
+		if loc == nil {
+			return html, false
+		}
+		s, e := mi+loc[0], mi+loc[1]
+		return html[:s] + html[e:], true
+	}
+
+	desired := key + ": " + value + ","
+	if loc != nil {
+		// Replace the existing line, preserving its indentation + trailing newline.
+		s, e := mi+loc[0], mi+loc[1]
+		line := html[s:e]
+		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+		newLine := indent + desired + "\n"
+		if newLine == line {
+			return html, false
+		}
+		return html[:s] + newLine + html[e:], true
+	}
+
+	// Insert after the marker's line, copying indentation from the next line.
+	after := mi + len(marker)
+	nl := strings.IndexByte(html[after:], '\n')
+	if nl < 0 {
+		return html, false
+	}
+	insertAt := after + nl + 1
+	indent := ""
+	for _, r := range html[insertAt:] {
+		if r == ' ' || r == '\t' {
+			indent += string(r)
+			continue
+		}
+		break
+	}
+	return html[:insertAt] + indent + desired + "\n" + html[insertAt:], true
+}
+
+// setSlideNumber sets the deck-level slide-number config in Reveal.initialize:
+// `slideNumber: false` (off) or `slideNumber: '<format>'` (e.g. 'c/t' for
+// current/total, 'c' for current). The key is always KEPT present (set to `false`
+// when disabled) rather than removed, matching the scaffold which ships
+// `slideNumber: false`, so a freshly scaffolded deck toggled off is byte-stable.
+// Pure, idempotent and byte-stable: a deck already in the requested state is
+// returned unchanged. `format` is the raw token placed inside single quotes —
+// callers must restrict it to a safe whitelist (the endpoint does) so no quote
+// escaping is required.
+func setSlideNumber(html string, enabled bool, format string) (string, bool) {
+	val := "false"
+	if enabled {
+		f := format
+		if f == "" {
+			f = "c/t"
+		}
+		val = "'" + f + "'"
+	}
+	return setInitKey(html, "slideNumber", val)
+}
+
+// SetSlideNumber rewrites decks/<name>/deck.html under root so Reveal.initialize
+// carries the requested deck-level slide-number config (P17-17). When `enabled`
+// is false the key is set to `false`; otherwise to the quoted `format` token. The
+// rewrite is byte-stable: when the deck already holds the requested config the
+// file is left untouched (no atomic write at all). Uses the same temp-file +
+// os.Rename atomic pattern as Write.
+func SetSlideNumber(root, name string, enabled bool, format string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	html, err := Read(root, name)
+	if err != nil {
+		return err
+	}
+	out, changed := setSlideNumber(string(html), enabled, format)
+	if !changed {
+		return nil
+	}
+	return Write(root, name, []byte(out))
+}
+
 // slideThemesLinkRE detects an existing slides-slide-themes.css <link> so the
 // injection is idempotent (matches any quoting/whitespace around the href).
 var slideThemesLinkRE = regexp.MustCompile(`<link[^>]+slides-slide-themes\.css`)
