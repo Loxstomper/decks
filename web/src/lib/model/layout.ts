@@ -314,6 +314,53 @@ export function setLayoutMarker(section: ElementNode, name: string | null): void
   }
 }
 
+// ─── P17-20: Per-slide auto-advance (data-autoslide) ────────────────────────
+//
+// `data-autoslide` is a reveal-native attribute on a `<section>`: the number of
+// milliseconds reveal waits before auto-advancing past that slide. It overrides
+// the deck-level `autoSlide` config for that one slide. A non-negative integer;
+// `0` pauses auto-advance on the slide. We model it as `number | null` where
+// `null` means "no override" (attribute absent → inherit the deck default).
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go) accepts
+// `data-autoslide` as a non-negative integer and must stay in sync.
+
+/**
+ * Return the per-slide auto-advance interval (`data-autoslide`, in ms) of a
+ * section, or `null` when the attribute is absent or not a non-negative
+ * integer.
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function getAutoslide(section: ElementNode): number | null {
+  const v = getAttribute(section, 'data-autoslide');
+  if (v === null) return null;
+  const t = v.trim();
+  if (!/^\d+$/.test(t)) return null;
+  return parseInt(t, 10);
+}
+
+/**
+ * Set or remove the `data-autoslide` attribute on `section`.
+ *
+ * - `ms` — non-negative integer → sets the attribute and marks dirty.
+ * - `null` → removes the attribute (inherit the deck default).
+ *
+ * Throws `TypeError` when `ms` is negative or not an integer.
+ *
+ * @param section — must be a `<section>` ElementNode (caller's responsibility).
+ */
+export function setAutoslide(section: ElementNode, ms: number | null): void {
+  if (ms !== null && (!Number.isInteger(ms) || ms < 0)) {
+    throw new TypeError('setAutoslide: ms must be a non-negative integer or null');
+  }
+  if (ms === null) {
+    removeAttribute(section, 'data-autoslide');
+  } else {
+    setAttribute(section, 'data-autoslide', String(ms));
+  }
+}
+
 // ─── P14: Named-slot marker (data-slot) ─────────────────────────────────────
 //
 // `data-slot` is a non-authoritative MARKER placed on any element (typically a

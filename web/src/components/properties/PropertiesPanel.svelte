@@ -52,7 +52,7 @@
     type AlignValue,
     type JustifyValue,
   } from '$lib/model/layout';
-  import { getAttribute, findByEid, isTextLeaf, getInlineColor } from '$lib/model';
+  import { getAttribute, findByEid, isTextLeaf, getInlineColor, getAutoslide } from '$lib/model';
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
   import TextColorControl from './TextColorControl.svelte';
@@ -125,6 +125,24 @@
   const containerEid: string | null = $derived(deriveContainerEid(container));
   const containerKind: string = $derived(deriveKind(container, layoutProps));
   const isGrid: boolean = $derived(layoutProps?.lay === 'grid');
+
+  // ── P17-20: per-slide auto-advance override (data-autoslide, ms) ────────────
+  /** Current data-autoslide on the resolved Slide section, or null (inherit). */
+  const slideAutoslide: number | null = $derived(
+    containerKind === 'Slide' && container ? getAutoslide(container) : null,
+  );
+
+  function onAutoslideInput(e: Event): void {
+    if (!containerEid) return;
+    const raw = (e.currentTarget as HTMLInputElement).value.trim();
+    if (raw === '') {
+      void deckStore.setSlideAutoslide(containerEid, null);
+      return;
+    }
+    const ms = parseInt(raw, 10);
+    if (!Number.isFinite(ms) || ms < 0) return;
+    void deckStore.setSlideAutoslide(containerEid, ms);
+  }
   /** True when something is selected but no editable container could be found. */
   const isPassthrough: boolean = $derived(!!selectedEid && !container);
 
@@ -332,6 +350,28 @@
     {#if containerKind === 'Slide' && containerEid}
       <div class="separator"></div>
       <SlideBackgroundControl slideEid={containerEid} />
+
+      <!-- ── P17-20: per-slide auto-advance override (data-autoslide, ms) ── -->
+      <div class="separator"></div>
+      <div class="prop-section">
+        <div class="section-sublabel">Auto-advance</div>
+        <div class="prop-row">
+          <label class="prop-label" for="slide-autoslide">Delay</label>
+          <div class="input-with-unit">
+            <input
+              id="slide-autoslide"
+              class="prop-input"
+              type="number"
+              min="0"
+              step="500"
+              placeholder="inherit"
+              value={slideAutoslide ?? ''}
+              onchange={onAutoslideInput}
+            />
+            <span class="unit">ms</span>
+          </div>
+        </div>
+      </div>
     {/if}
 
   {/if}

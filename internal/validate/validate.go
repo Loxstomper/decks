@@ -344,6 +344,10 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 		min  int
 	}{
 		{"data-gap", 0}, {"data-pad", 0}, {"data-grow", 0}, {"data-span", 1},
+		// data-autoslide (P17-20): reveal-native per-slide auto-advance, in ms.
+		// Non-negative integer (0 = pause on this slide). Only emitted on
+		// <section> by the editor, but validated wherever present.
+		{"data-autoslide", 0},
 	} {
 		if v, ok := attrs[n.attr]; ok {
 			if iv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil || iv < n.min {

@@ -18,6 +18,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -414,6 +415,117 @@ func upgradeInitialize(html string) (string, bool) {
 	}
 	b.WriteString(html[insertAt:])
 	return b.String(), true
+}
+
+// initLineRE matches an entire `key: value,` line of the Reveal.initialize({…})
+// config object (key at line start after indentation, through the newline). Used
+// by setInitKey to replace or remove a single key's line idempotently.
+func initLineRE(key string) *regexp.Regexp {
+	return regexp.MustCompile(`(?m)^[ \t]*` + regexp.QuoteMeta(key) + `[ \t]*:[^\n]*\n`)
+}
+
+// setInitKey upserts (value != "") or removes (value == "") exactly one key in
+// the first Reveal.initialize({…}) object. `value` is the raw JS literal placed
+// after the colon (e.g. "3000" or "true"). Pure, idempotent and byte-stable: if
+// the desired state already holds the input is returned unchanged (changed=false),
+// so re-running produces no diff. New keys are inserted at the top of the object
+// (right after the `{` line) with the surrounding indentation; the always-present
+// trailing comma is safe there. Returns the (possibly rewritten) HTML + changed.
+func setInitKey(html, key, value string) (string, bool) {
+	const marker = "Reveal.initialize({"
+	mi := strings.Index(html, marker)
+	if mi < 0 {
+		return html, false
+	}
+	loc := initLineRE(key).FindStringIndex(html[mi:])
+
+	if value == "" {
+		// Remove the line if present; otherwise nothing to do.
+		if loc == nil {
+			return html, false
+		}
+		s, e := mi+loc[0], mi+loc[1]
+		return html[:s] + html[e:], true
+	}
+
+	desired := key + ": " + value + ","
+	if loc != nil {
+		// Replace the existing line, preserving its indentation + trailing newline.
+		s, e := mi+loc[0], mi+loc[1]
+		line := html[s:e]
+		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+		newLine := indent + desired + "\n"
+		if newLine == line {
+			return html, false
+		}
+		return html[:s] + newLine + html[e:], true
+	}
+
+	// Insert after the marker's line, copying indentation from the next line.
+	after := mi + len(marker)
+	nl := strings.IndexByte(html[after:], '\n')
+	if nl < 0 {
+		return html, false
+	}
+	insertAt := after + nl + 1
+	indent := ""
+	for _, r := range html[insertAt:] {
+		if r == ' ' || r == '\t' {
+			indent += string(r)
+			continue
+		}
+		break
+	}
+	return html[:insertAt] + indent + desired + "\n" + html[insertAt:], true
+}
+
+// setRevealAutoSlide sets the deck-level auto-advance config in Reveal.initialize:
+// `autoSlide: <ms>` (milliseconds between automatic advances) and `loop: true`.
+// `ms <= 0` removes the `autoSlide` key (auto-advance off); `loop == false`
+// removes the `loop` key. Pure, idempotent and byte-stable — a deck already in
+// the requested state is returned unchanged so saving the same setting twice
+// yields no diff. Implemented as a focused helper (not a generalization of other
+// lanes' init rewrites) to keep this lane's edit localized.
+func setRevealAutoSlide(html string, ms int, loop bool) (string, bool) {
+	changed := false
+
+	autoVal := ""
+	if ms > 0 {
+		autoVal = strconv.Itoa(ms)
+	}
+	if out, c := setInitKey(html, "autoSlide", autoVal); c {
+		html, changed = out, true
+	}
+
+	loopVal := ""
+	if loop {
+		loopVal = "true"
+	}
+	if out, c := setInitKey(html, "loop", loopVal); c {
+		html, changed = out, true
+	}
+
+	return html, changed
+}
+
+// SetAutoSlide rewrites decks/<name>/deck.html under root so Reveal.initialize
+// carries the requested deck-level auto-advance default (`autoSlide`, ms) and
+// `loop` flag (P17-20). The rewrite is byte-stable: when the deck already has
+// the requested config the file is left untouched (no atomic write at all).
+// Uses the same temp-file + os.Rename atomic pattern as Write.
+func SetAutoSlide(root, name string, ms int, loop bool) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	html, err := Read(root, name)
+	if err != nil {
+		return err
+	}
+	out, changed := setRevealAutoSlide(string(html), ms, loop)
+	if !changed {
+		return nil
+	}
+	return Write(root, name, []byte(out))
 }
 
 // slideThemesLinkRE detects an existing slides-slide-themes.css <link> so the

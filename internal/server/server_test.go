@@ -938,8 +938,11 @@ func TestFontLocalize_Offline503(t *testing.T) {
 
 // ── Present route (P7-1) ──────────────────────────────────────────────────────
 
-// TestPresent_ServesExactDeckHTML verifies that GET /present/{name} returns the
-// same bytes as the on-disk deck.html — "present exactly the file" (spec 10).
+// TestPresent_ServesExactDeckHTML verifies that GET /present/{name} serves the
+// on-disk deck.html verbatim plus the ephemeral present-only annotation/laser
+// plugins injected before </body> (P17-19). The deck's own bytes appear
+// unchanged in the response (everything up to </body> is preserved); only the
+// plugin block is appended. The on-disk file itself is NEVER modified (spec 10).
 func TestPresent_ServesExactDeckHTML(t *testing.T) {
 	srv, root := newTestServer(t)
 	if err := deck.New(root, "pres-deck"); err != nil {
@@ -962,10 +965,27 @@ func TestPresent_ServesExactDeckHTML(t *testing.T) {
 		t.Fatalf("present: want 200, got %d: %s", rr.Code, rr.Body.String())
 	}
 
-	// The response body must be byte-identical to the on-disk file.
-	if !bytes.Equal(diskBytes, rr.Body.Bytes()) {
-		t.Errorf("present: response not byte-identical to disk file (disk=%d bytes, http=%d bytes)",
-			len(diskBytes), rr.Body.Bytes())
+	// The deck's own bytes up to </body> must be preserved verbatim — present
+	// augments, it does not transform the deck content.
+	bodyIdx := bytes.LastIndex(diskBytes, []byte("</body>"))
+	if bodyIdx < 0 {
+		t.Fatalf("scaffold deck.html has no </body>")
+	}
+	if !bytes.Contains(rr.Body.Bytes(), diskBytes[:bodyIdx]) {
+		t.Errorf("present: deck content (up to </body>) not preserved verbatim in response")
+	}
+	// The ephemeral present-only plugins must be present in the response.
+	if !strings.Contains(rr.Body.String(), "assets/vendor/chalkboard/plugin.js") {
+		t.Errorf("present: expected injected chalkboard plugin in response")
+	}
+
+	// The on-disk file must be unchanged after the present fetch.
+	afterBytes, err := deck.Read(root, "pres-deck")
+	if err != nil {
+		t.Fatalf("deck.Read (after): %v", err)
+	}
+	if !bytes.Equal(diskBytes, afterBytes) {
+		t.Errorf("present: on-disk deck.html changed (must stay byte-stable)")
 	}
 
 	// Must declare text/html content type.
@@ -1039,9 +1059,11 @@ func TestPresent_RedirectsBareURL(t *testing.T) {
 	}
 }
 
-// TestPresent_MatchesDeckStaticRoute confirms that /present/{name} and
-// /decks/{name}/deck.html serve identical bytes, proving the present route uses
-// the same file without transformation.
+// TestPresent_MatchesDeckStaticRoute confirms the present route serves the same
+// underlying deck file as the static /decks/ route, differing only by the
+// ephemeral present-only plugin block (P17-19): the static (on-disk) bytes up to
+// </body> appear verbatim in the present response, and only the present route
+// carries the chalkboard/laser plugins.
 func TestPresent_MatchesDeckStaticRoute(t *testing.T) {
 	srv, root := newTestServer(t)
 	if err := deck.New(root, "compare"); err != nil {
@@ -1062,9 +1084,21 @@ func TestPresent_MatchesDeckStaticRoute(t *testing.T) {
 	presentBytes := get("/present/compare/")
 	staticBytes := get("/decks/compare/deck.html")
 
-	if !bytes.Equal(presentBytes, staticBytes) {
-		t.Errorf("/present/ and /decks/.../deck.html returned different bytes (%d vs %d)",
-			len(presentBytes), len(staticBytes))
+	// The static route serves the file unmodified; its content (up to </body>)
+	// must appear verbatim in the present response.
+	bodyIdx := bytes.LastIndex(staticBytes, []byte("</body>"))
+	if bodyIdx < 0 {
+		t.Fatalf("static deck.html has no </body>")
+	}
+	if !bytes.Contains(presentBytes, staticBytes[:bodyIdx]) {
+		t.Errorf("present response does not contain the static deck content verbatim")
+	}
+	// The static route must NOT carry the present-only plugins.
+	if bytes.Contains(staticBytes, []byte("assets/vendor/chalkboard/plugin.js")) {
+		t.Errorf("static /decks/ route unexpectedly contains the present-only plugin block")
+	}
+	if !bytes.Contains(presentBytes, []byte("assets/vendor/chalkboard/plugin.js")) {
+		t.Errorf("present route missing the present-only plugin block")
 	}
 }
 
@@ -1382,5 +1416,96 @@ func TestValidate_DeckNotFound(t *testing.T) {
 	srv.ServeHTTP(rr, req)
 	if rr.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rr.Code)
+	}
+}
+
+// TestPresentRoute_InjectsPluginsByteStable verifies the present route serves a
+// deck.html augmented with the chalkboard + laser plugins (P17-19) while the
+// on-disk deck.html stays byte-identical (annotations are ephemeral, spec 10).
+func TestPresentRoute_InjectsPluginsByteStable(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "talk"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+	deckPath := filepath.Join(root, "decks", "talk", "deck.html")
+	before, err := os.ReadFile(deckPath)
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+
+	// Trailing slash so the handler serves the entry document (no redirect).
+	req := httptest.NewRequest("GET", "/present/talk/", nil)
+	rr := httptest.NewRecorder()
+	srv.ServeHTTP(rr, req)
+	if rr.Code != http.StatusOK {
+		t.Fatalf("present status = %d, want 200", rr.Code)
+	}
+	served := rr.Body.String()
+	for _, want := range []string{
+		"assets/vendor/chalkboard/plugin.js",
+		"assets/vendor/laser/plugin.js",
+		"Reveal.registerPlugin(RevealChalkboard)",
+	} {
+		if !strings.Contains(served, want) {
+			t.Errorf("present HTML missing %q", want)
+		}
+	}
+
+	// On-disk deck.html must be unchanged after the present fetch.
+	after, err := os.ReadFile(deckPath)
+	if err != nil {
+		t.Fatalf("re-read deck.html: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("present route mutated on-disk deck.html (must be byte-stable)")
+	}
+}
+
+// TestAutoSlideEndpoint sets the deck-level auto-advance via the API and asserts
+// Reveal.initialize carries autoSlide/loop, then that re-POSTing the same values
+// is byte-stable (no diff).
+func TestAutoSlideEndpoint(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "talk"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+	deckPath := filepath.Join(root, "decks", "talk", "deck.html")
+
+	post := func(body string) int {
+		req := httptest.NewRequest("POST", "/api/decks/talk/autoslide", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	if code := post(`{"ms":3000,"loop":true}`); code != http.StatusNoContent {
+		t.Fatalf("autoslide POST status = %d, want 204", code)
+	}
+	html, _ := os.ReadFile(deckPath)
+	if !strings.Contains(string(html), "autoSlide: 3000,") {
+		t.Errorf("deck.html missing autoSlide: 3000\n%s", html)
+	}
+	if !strings.Contains(string(html), "loop: true,") {
+		t.Errorf("deck.html missing loop: true")
+	}
+
+	// Idempotent: re-POST identical values → byte-identical file.
+	before, _ := os.ReadFile(deckPath)
+	if code := post(`{"ms":3000,"loop":true}`); code != http.StatusNoContent {
+		t.Fatalf("second autoslide POST status = %d, want 204", code)
+	}
+	after, _ := os.ReadFile(deckPath)
+	if !bytes.Equal(before, after) {
+		t.Errorf("re-POSTing identical autoslide values changed the file (not byte-stable)")
+	}
+
+	// Disabling: ms=0 + loop=false removes both keys.
+	if code := post(`{"ms":0,"loop":false}`); code != http.StatusNoContent {
+		t.Fatalf("disable autoslide status = %d, want 204", code)
+	}
+	html, _ = os.ReadFile(deckPath)
+	if strings.Contains(string(html), "autoSlide:") || strings.Contains(string(html), "loop:") {
+		t.Errorf("disabling should remove autoSlide/loop keys\n%s", html)
 	}
 }

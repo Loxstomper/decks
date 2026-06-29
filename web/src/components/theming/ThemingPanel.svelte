@@ -118,6 +118,43 @@
     customCssStore.applyVar('--r-main-font', `"${result.family}", sans-serif`);
   }
 
+  // ── Deck-level auto-advance (P17-20) ─────────────────────────────────────────
+  //
+  // The autoSlide/loop config lives inside the opaque Reveal.initialize <script>,
+  // so we READ the current values by regex over deckStore.source and WRITE via
+  // deckStore.applyDeckAutoslide (POST /api/decks/{name}/autoslide → byte-stable
+  // deck.html rewrite → reload). Reading from source keeps the controls in sync
+  // after the reload with no local mirror to drift.
+
+  const deckAutoslideMs = $derived.by<number>(() => {
+    const m = /autoSlide:\s*(\d+)/.exec(deckStore.source);
+    return m ? parseInt(m[1], 10) : 0;
+  });
+  const deckLoop = $derived(/\bloop:\s*true\b/.test(deckStore.source));
+
+  let autoslideBusy = $state(false);
+
+  async function applyDeckAutoslide(ms: number, loop: boolean): Promise<void> {
+    if (autoslideBusy) return;
+    autoslideBusy = true;
+    try {
+      await deckStore.applyDeckAutoslide(ms, loop);
+    } finally {
+      autoslideBusy = false;
+    }
+  }
+
+  function onDeckAutoslideInput(e: Event): void {
+    const raw = (e.currentTarget as HTMLInputElement).value.trim();
+    const ms = raw === '' ? 0 : parseInt(raw, 10);
+    if (!Number.isFinite(ms) || ms < 0) return;
+    void applyDeckAutoslide(ms, deckLoop);
+  }
+
+  function onDeckLoopToggle(e: Event): void {
+    void applyDeckAutoslide(deckAutoslideMs, (e.currentTarget as HTMLInputElement).checked);
+  }
+
   // ── Per-slide theming (P10-5) ────────────────────────────────────────────────
 
   const slideThemeProps = $derived.by(() => {
@@ -286,6 +323,37 @@
           disabled={!isOpen}
           {onFontApplied}
         />
+
+        <div class="separator"></div>
+
+        <!-- ── Deck-level auto-advance (P17-20) ─────────────────────────── -->
+        <div class="slide-theme-section">
+          <div class="section-title">Auto-advance</div>
+          <div class="control-row">
+            <label class="control-label" for="deck-autoslide">Default (ms)</label>
+            <input
+              id="deck-autoslide"
+              class="picker-select"
+              type="number"
+              min="0"
+              step="500"
+              placeholder="off"
+              disabled={!isOpen || autoslideBusy}
+              value={deckAutoslideMs || ''}
+              onchange={onDeckAutoslideInput}
+            />
+          </div>
+          <div class="control-row">
+            <label class="control-label" for="deck-loop">Loop deck</label>
+            <input
+              id="deck-loop"
+              type="checkbox"
+              disabled={!isOpen || autoslideBusy}
+              checked={deckLoop}
+              onchange={onDeckLoopToggle}
+            />
+          </div>
+        </div>
 
       {:else}
         <!-- ── Per-slide theming (P10-5) ───────────────────────────────── -->

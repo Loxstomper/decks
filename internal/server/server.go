@@ -29,6 +29,7 @@ package server
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -107,6 +108,9 @@ func (s *Server) routes(staticFS fs.FS) {
 	// provided here for symmetry and to allow JSON error responses.
 	s.mux.HandleFunc("GET /api/decks/{name}/custom.css", s.handleCustomCSSRead)
 	s.mux.HandleFunc("PUT /api/decks/{name}/custom.css", s.handleCustomCSSWrite)
+
+	// Auto-advance (P17-20): set the deck-level autoSlide/loop in Reveal.initialize.
+	s.mux.HandleFunc("POST /api/decks/{name}/autoslide", s.handleAutoSlide)
 
 	// Font localization (P6-13): download a Google Font into assets/fonts/.
 	s.mux.HandleFunc("POST /api/decks/{name}/fonts", s.handleFontLocalize)
@@ -820,6 +824,46 @@ func (s *Server) handleCustomCSSWrite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleAutoSlide sets the deck-level auto-advance default (P17-20).
+//
+//	POST /api/decks/{name}/autoslide
+//	Body: {"ms": 3000, "loop": true}
+//
+// Rewrites deck.html's Reveal.initialize so it carries `autoSlide: <ms>` and
+// `loop: <bool>` (ms <= 0 or loop=false remove the respective key). The rewrite
+// is byte-stable: a deck already in the requested state is left untouched on
+// disk. Mirrors the custom.css write handler's shape.
+func (s *Server) handleAutoSlide(w http.ResponseWriter, r *http.Request) {
+	name := r.PathValue("name")
+	if !deck.ValidName(name) {
+		http.Error(w, "invalid deck name", http.StatusBadRequest)
+		return
+	}
+
+	var reqBody struct {
+		MS   int  `json:"ms"`
+		Loop bool `json:"loop"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&reqBody); err != nil {
+		http.Error(w, "invalid JSON body: "+err.Error(), http.StatusBadRequest)
+		return
+	}
+	if reqBody.MS < 0 {
+		http.Error(w, "ms must be a non-negative integer", http.StatusBadRequest)
+		return
+	}
+
+	if err := deck.SetAutoSlide(s.root, name, reqBody.MS, reqBody.Loop); err != nil {
+		if isNotExist(err) {
+			http.Error(w, "deck not found", http.StatusNotFound)
+			return
+		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // ── Font localization (P6-13) ──────────────────────────────────────────────────
 
 // handleFontLocalize downloads a Google Font and localizes it into the deck's
@@ -1024,10 +1068,76 @@ func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The entry document is served with the present-only annotation/laser
+	// plugins injected in-memory (P17-19). The on-disk deck.html is NEVER
+	// modified — present-mode annotations are ephemeral (spec 10) — so we read
+	// the bytes, augment a COPY, and serve that. Asset sub-paths fall through to
+	// the plain file server below.
+	if rel == "deck.html" {
+		raw, err := os.ReadFile(filepath.Join(deckDir, rel))
+		if err != nil {
+			http.Error(w, "deck not found", http.StatusNotFound)
+			return
+		}
+		out := injectPresentPlugins(raw)
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		// Present mode is dynamic (in-memory augmentation); avoid stale caches.
+		w.Header().Set("Cache-Control", "no-store")
+		w.Write(out)
+		return
+	}
+
 	// os.DirFS confines access to deckDir; identical security model to
 	// handleDeckStatic.  ServeFileFS sets correct Content-Type and handles
 	// conditional / range requests.
 	http.ServeFileFS(w, r, os.DirFS(deckDir), rel)
+}
+
+// presentPluginMarker is a substring unique to the injected block; its presence
+// makes injectPresentPlugins idempotent.
+const presentPluginMarker = "assets/vendor/chalkboard/plugin.js"
+
+// presentPluginBlock is injected just before </body> on the present route only.
+//
+// WHY post-init Reveal.registerPlugin (not a plugins:[] array rewrite): the
+// vendored reveal.js 5.x registerPlugin() immediately calls plugin.init(Reveal)
+// when the deck is already "loaded" (verified in internal/deck/vendor/reveal/
+// reveal.js: `"loaded"===this.state && ... e.init(this.Reveal)`). The block runs
+// AFTER the existing reveal-init <script> (which sits just before </body>), so
+// `Reveal` exists and is loaded — registering here boots both plugins without
+// touching the deck's plugins:[] config. That keeps the injection a pure append
+// and the on-disk deck.html byte-identical.
+//
+// Offline-first: every src/href is deck-relative (the present route already
+// serves assets/vendor/{chalkboard,laser}/...); zero external URLs are
+// introduced. The chalkboard plugin resolves its cursor images relative to its
+// own script src (assets/vendor/chalkboard/img/...), which is vendored.
+const presentPluginBlock = "" +
+	`  <link rel="stylesheet" href="assets/vendor/chalkboard/style.css" />` + "\n" +
+	`  <script src="assets/vendor/chalkboard/plugin.js"></script>` + "\n" +
+	`  <script src="assets/vendor/laser/plugin.js"></script>` + "\n" +
+	"  <script>\n" +
+	"    if (window.Reveal && window.RevealChalkboard) Reveal.registerPlugin(RevealChalkboard);\n" +
+	"    if (window.Reveal && window.RevealLaser) Reveal.registerPlugin(RevealLaser);\n" +
+	"  </script>\n"
+
+// injectPresentPlugins returns a COPY of the deck HTML with the chalkboard +
+// laser plugin tags appended just before </body> (P17-19). Pure and idempotent:
+// HTML that already carries the block (marker present) is returned unchanged, as
+// is HTML with no </body> to anchor against. The input slice is never mutated.
+func injectPresentPlugins(html []byte) []byte {
+	if bytes.Contains(html, []byte(presentPluginMarker)) {
+		return html
+	}
+	idx := bytes.LastIndex(html, []byte("</body>"))
+	if idx < 0 {
+		return html
+	}
+	out := make([]byte, 0, len(html)+len(presentPluginBlock))
+	out = append(out, html[:idx]...)
+	out = append(out, presentPluginBlock...)
+	out = append(out, html[idx:]...)
+	return out
 }
 
 // ── PDF export (P7-3) ─────────────────────────────────────────────────────────

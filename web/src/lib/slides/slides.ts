@@ -44,6 +44,7 @@ import {
   getSlot,
   getLayoutMarker,
   setLayoutMarker,
+  setAutoslide,
   type DeckModel,
   type ElementNode,
   type SlideNode,
@@ -433,6 +434,21 @@ export function setSlideHidden(model: DeckModel, eid: string, hidden: boolean): 
   if (!found) return false;
   if (hidden) setAttribute(found.section, 'data-visibility', 'hidden');
   else removeAttribute(found.section, 'data-visibility');
+  return true;
+}
+
+/**
+ * P17-20: Set / clear the per-slide auto-advance interval on the slide carrying
+ * `eid`. `ms` (a non-negative integer) writes `data-autoslide="<ms>"` — a
+ * reveal-native override that auto-advances past that slide after `ms`
+ * milliseconds; `null` removes the attribute (the slide inherits the deck-level
+ * `autoSlide` default). Byte-stable: re-setting the same value is a no-op diff.
+ * Returns true on success, false when the eid is unknown.
+ */
+export function setSlideAutoslide(model: DeckModel, eid: string, ms: number | null): boolean {
+  const found = findSectionAndParent(model, eid);
+  if (!found) return false;
+  setAutoslide(found.section, ms);
   return true;
 }
 
