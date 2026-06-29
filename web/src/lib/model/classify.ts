@@ -97,3 +97,28 @@ export function classify(el: ElementNode): ElementClass {
   // Rule 4 — passthrough: everything else.
   return 'passthrough';
 }
+
+/**
+ * Text-bearing leaf tags the editor's per-element colour control applies to
+ * (P9-8 / spec 09 "Text appearance": heading / paragraph / list / text leaf).
+ * Media/embed leaves (img, video, svg, iframe, table cells aside) carry no
+ * directly-coloured text, so they are intentionally excluded.
+ */
+const TEXT_LEAF_TAGS = new Set<string>([
+  'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
+  'p',
+  'blockquote',
+  'ul', 'ol', 'li',
+  'figcaption',
+  'th', 'td',
+]);
+
+/**
+ * True when `el` is a TEXT leaf — a leaf (per {@link classify}) whose content is
+ * directly-coloured text. Drives whether the inspector shows the text-colour
+ * control (spec 09). Pure; never mutates.
+ */
+export function isTextLeaf(el: ElementNode): boolean {
+  if (classify(el) !== 'leaf') return false;
+  return TEXT_LEAF_TAGS.has(el.tagName.toLowerCase());
+}

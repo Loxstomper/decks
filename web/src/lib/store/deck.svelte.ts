@@ -56,6 +56,7 @@ import {
   findParentOf,
   getSlideNotes,
   setSlideNotes as setSlideNotesOp,
+  setInlineColor,
   diffModels,
   validateSource,
   normalizeRemote,
@@ -79,6 +80,7 @@ import { undoStore } from './undo.svelte';
 import { highlightStore } from './highlight.svelte';
 import { decideExternalChange, lineDiff, type DiffLine } from './conflict';
 import { selectionStore } from '$lib/canvas/selection.svelte';
+import { deleteElement as deleteElementOp } from '$lib/canvas/structure-ops';
 import { applyTextEditToModel } from '$lib/canvas/writeback';
 import { setFreePosition } from '$lib/canvas/free-position';
 import {
@@ -658,6 +660,53 @@ class DeckStore {
     }
     await this.#commitStructure();
     return true;
+  }
+
+  /**
+   * P9-7: Delete one or more elements (by eid) as ONE undo entry + ONE autosave
+   * (spec 04 "Deleting elements"). Used by the Delete/Backspace keyboard handler,
+   * which passes the current selection set (multi-select deletes all).
+   *
+   * Each eid is removed via deleteElementOp (structure-ops): a leaf drops the
+   * node, a container drops it and its subtree, passthrough goes whole-or-nothing,
+   * and slide <section>s are refused (whole-slide deletion lives in the navigator).
+   * Only the affected parents go dirty, so every untouched sibling round-trips
+   * byte-for-byte (spec 12 #4) and undo restores the deleted markup verbatim.
+   *
+   * Unknown / non-removable eids are skipped. Returns true when at least one
+   * element was removed (the selection is then cleared); false when nothing
+   * changed (a safe no-op for a stale selection after an external reload).
+   */
+  async deleteElements(eids: string[]): Promise<boolean> {
+    if (!this.model) return false;
+    let changed = false;
+    for (const eid of eids) {
+      if (deleteElementOp(this.model, eid)) changed = true;
+    }
+    if (!changed) return false;
+    // The deleted subtrees' eids no longer resolve — drop the whole selection.
+    selectionStore.clear();
+    await this.#commitStructure();
+    return true;
+  }
+
+  /**
+   * P9-8: Set (or clear, when `color` is null) the inline `style="color: …"` on
+   * the TEXT leaf with `eid` as ONE undo entry + ONE autosave (spec 09 "Text
+   * appearance" — the single deliberate appearance exception).
+   *
+   * Whole-element scope (no sub-string runs): setInlineColor mutates only this
+   * element's `style` attribute, so it goes dirty and serializes canonically
+   * while every other element round-trips byte-for-byte (spec 12 #4). Unknown
+   * eid is a safe no-op (stale selection after an external reload).
+   */
+  async applyTextColor(eid: string, color: string | null): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setInlineColor(el, color);
+    this.updateFromModel();
+    await this.commitCommand();
   }
 
   /**

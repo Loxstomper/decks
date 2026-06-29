@@ -23,7 +23,7 @@ import {
   walk,
   findByEid,
 } from './index';
-import { classify, type ElementClass } from './classify';
+import { classify, isTextLeaf, type ElementClass } from './classify';
 import { stampEids, nextEid } from './eid';
 import type { ElementNode } from './types';
 
@@ -49,6 +49,29 @@ function classifyAll(html: string): Map<ElementNode, ElementClass> {
   for (const el of allElements(html)) out.set(el, classify(el));
   return out;
 }
+
+/** First element matching `tag` in `html`. */
+function firstEl(html: string, tag: string): ElementNode {
+  return allElements(html).find((e) => e.tagName.toLowerCase() === tag)!;
+}
+
+// ─── P9-8: isTextLeaf ─────────────────────────────────────────────────────────
+
+describe('isTextLeaf() — P9-8 text-colour eligibility', () => {
+  it('is true for headings, paragraphs, and list items', () => {
+    expect(isTextLeaf(firstEl('<h2>x</h2>', 'h2'))).toBe(true);
+    expect(isTextLeaf(firstEl('<p>x</p>', 'p'))).toBe(true);
+    expect(isTextLeaf(firstEl('<ul><li>x</li></ul>', 'li'))).toBe(true);
+    expect(isTextLeaf(firstEl('<blockquote>x</blockquote>', 'blockquote'))).toBe(true);
+  });
+
+  it('is false for media leaves, containers, and passthrough', () => {
+    expect(isTextLeaf(firstEl('<img src="a.png">', 'img'))).toBe(false);
+    expect(isTextLeaf(firstEl('<section><p>x</p></section>', 'section'))).toBe(false);
+    expect(isTextLeaf(firstEl('<div data-lay="stack"></div>', 'div'))).toBe(false);
+    expect(isTextLeaf(firstEl('<span>inline</span>', 'span'))).toBe(false);
+  });
+});
 
 // ─── P2-1: classify ───────────────────────────────────────────────────────────
 

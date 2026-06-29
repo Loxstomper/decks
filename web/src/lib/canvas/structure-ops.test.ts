@@ -5,6 +5,7 @@ import {
   reparentChildByEid,
   findChildAndParent,
   elementChildren,
+  deleteElement,
 } from './structure-ops.ts';
 
 /** Order of element eids inside the first container, by source position. */
@@ -107,3 +108,73 @@ function attrEid(el: { attributes: { name: string; value: string | null }[] }): 
   const a = el.attributes.find((x) => x.name.toLowerCase() === 'data-eid');
   return a ? a.value : null;
 }
+
+// ── P9-7: deleteElement ──────────────────────────────────────────────────────
+
+const NESTED_DECK = `<section data-eid="s1">
+  <div data-lay="stack" data-eid="box">
+    <h1 data-eid="a">A</h1>
+    <p data-eid="b">B</p>
+  </div>
+  <ul data-eid="list">
+    <li data-eid="li1">one</li>
+    <li data-eid="li2">two</li>
+  </ul>
+  <!-- raw comment, passthrough -->
+  <footer data-eid="ft">notes</footer>
+</section>`;
+
+describe('deleteElement (P9-7)', () => {
+  it('removes a LEAF node and leaves siblings byte-identical', () => {
+    const model = parseDeck(NESTED_DECK);
+    expect(deleteElement(model, 'a')).toBe(true);
+    const out = serializeDeck(model);
+    expect(out).not.toContain('data-eid="a"');
+    // Sibling 'b' round-trips verbatim (only the parent re-renders to drop 'a').
+    expect(out).toContain('<p data-eid="b">B</p>');
+    // The parent re-serializes WITHOUT the removed child but still exists.
+    expect(out).toContain('data-eid="box"');
+    expect(out).toContain('data-lay="stack"');
+  });
+
+  it('removes a CONTAINER and its entire subtree', () => {
+    const model = parseDeck(NESTED_DECK);
+    expect(deleteElement(model, 'box')).toBe(true);
+    const out = serializeDeck(model);
+    expect(out).not.toContain('data-eid="box"');
+    expect(out).not.toContain('data-eid="a"'); // descendant gone too
+    expect(out).not.toContain('data-eid="b"');
+    // Untouched later siblings survive verbatim.
+    expect(out).toContain('<ul data-eid="list">');
+  });
+
+  it('deletes a PASSTHROUGH element whole', () => {
+    const model = parseDeck(NESTED_DECK);
+    // <footer> is not a leaf/container → passthrough, but still removable whole.
+    expect(deleteElement(model, 'ft')).toBe(true);
+    const out = serializeDeck(model);
+    expect(out).not.toContain('data-eid="ft"');
+    expect(out).not.toContain('notes');
+  });
+
+  it('refuses to delete a slide <section> (navigator owns slide deletion)', () => {
+    const model = parseDeck(NESTED_DECK);
+    expect(deleteElement(model, 's1')).toBe(false);
+    expect(serializeDeck(model)).toContain('data-eid="s1"');
+  });
+
+  it('returns false for an unknown eid', () => {
+    const model = parseDeck(NESTED_DECK);
+    expect(deleteElement(model, 'nope')).toBe(false);
+  });
+
+  it('leaves the rest of the deck byte-stable (spec 12 #4)', () => {
+    const model = parseDeck(NESTED_DECK);
+    deleteElement(model, 'li1');
+    const out = serializeDeck(model);
+    expect(out).not.toContain('data-eid="li1"');
+    // Remaining list item and its bytes are preserved exactly.
+    expect(out).toContain('<li data-eid="li2">two</li>');
+    expect(out).toContain('<ul data-eid="list">');
+  });
+});

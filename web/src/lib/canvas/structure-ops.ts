@@ -165,6 +165,38 @@ export function reparentChild(
   return true;
 }
 
+/**
+ * P9-7: Delete the element carrying `eid` from its parent (spec 04 "Deleting
+ * elements").
+ *
+ * Removing a node removes its entire subtree by construction, so this one op
+ * covers every class:
+ *   • LEAF        → the node is removed.
+ *   • CONTAINER   → the node and all its descendants are removed.
+ *   • PASSTHROUGH → removed whole-or-nothing (never partially mangled, spec 04).
+ *
+ * The single immediately-preceding whitespace text node (indentation) goes with
+ * it via {@link detach}, so no orphaned blank line is left behind. The parent is
+ * marked dirty so it re-serializes WITHOUT the removed child, while every
+ * remaining sibling round-trips byte-for-byte (spec 12 #4).
+ *
+ * SLIDE GUARD: whole-slide deletion lives in the navigator (spec 04), not here.
+ * A `<section>` is a slide root, so deleting one through the element-level path
+ * is refused (returns false) — the navigator's deleteSlide owns that.
+ *
+ * Returns true on success, false when the eid is unknown, is not removable (a
+ * top-level node with no element parent), or is a slide section.
+ */
+export function deleteElement(model: DeckModel, eid: string): boolean {
+  const found = findChildAndParent(model, eid);
+  if (!found) return false;
+  if (found.child.tagName.toLowerCase() === 'section') return false;
+  const block = detach(found.parent, found.child);
+  if (!block) return false;
+  found.parent.dirty = true; // parent re-renders without the removed child
+  return true;
+}
+
 // ── eid-addressable convenience wrappers (used by the store command layer) ─────
 
 /** Resolve eids then {@link moveChild}. Returns false if the child/parent is unknown. */

@@ -1,36 +1,60 @@
 <script lang="ts">
   /**
-   * NudgeController.svelte — Keyboard nudge of the selection (P3-9 / spec 04
-   * "Keyboard nudge: arrows = 1 logical unit; Shift+arrows = 10").
+   * NudgeController.svelte — Keyboard manipulation of the selection: nudge
+   * (P3-9 / spec 04 "Keyboard nudge: arrows = 1 logical unit; Shift+arrows = 10")
+   * and delete (P9-7 / spec 04 "Deleting elements").
    *
    * WHY THIS EXISTS:
    * ================
-   * Arrow keys move the current selection in LOGICAL units. Selection lives in the
-   * PARENT document (selectionStore), so the listener lives here on the parent
-   * window — NOT inside the keyboard-isolated iframe. For a FREE element this
-   * adjusts data-x/data-y; for a STRUCTURED element it reorders ±1 among siblings
-   * (structure-commands.nudgeCommand decides which, via classify()).
+   * Arrow keys move the current selection in LOGICAL units; Delete/Backspace
+   * removes it. Selection lives in the PARENT document (selectionStore), so the
+   * listener lives here on the parent window — NOT inside the keyboard-isolated
+   * iframe. This is also why delete works whether the element was selected on the
+   * canvas OR highlighted in the outline panel: both drive the same selectionStore
+   * and the same window-level listener.
    *
-   * GUARD (spec 04): we must NOT hijack arrow keys while the user is typing — in a
+   * For a FREE element an arrow adjusts data-x/data-y; for a STRUCTURED element it
+   * reorders ±1 among siblings (structure-commands.nudgeCommand decides which, via
+   * classify()). Delete/Backspace routes the whole selection set through
+   * deckStore.deleteElements (multi-select deletes all) — one undo entry + one
+   * autosave, byte-stable.
+   *
+   * GUARD (spec 04): we must NOT hijack these keys while the user is typing — in a
    * P2-5 in-place edit, a native form input, any contenteditable, or the
-   * CodeMirror source pane. nudge.isEditingContext() encodes exactly that test.
-   * When guarded, we let the event through so the caret moves normally.
+   * CodeMirror source pane. nudge.isEditingContext() encodes exactly that test, so
+   * Delete/Backspace never swallows a character while editing text. When guarded,
+   * we let the event through so the caret moves / deletes normally.
    *
    * INTEGRATION: mount once anywhere in the editor shell (it renders nothing). It
    * reads selectionStore + deckStore directly, so no props are required.
    */
 
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
+  import { deckStore } from '$lib/store/deck.svelte.ts';
   import { isArrowKey, isEditingContext } from '$lib/canvas/nudge.ts';
   import { nudgeCommand } from '$lib/canvas/structure-commands.ts';
 
   function onKeyDown(e: KeyboardEvent): void {
+    const target = (e.target instanceof Element ? e.target : null) ?? document.activeElement;
+
+    // ── Delete / Backspace → remove the current selection (P9-7) ──────────────
+    if (e.key === 'Delete' || e.key === 'Backspace') {
+      const eids = selectionStore.eids;
+      if (eids.length === 0) return;
+      // Never swallow a keystroke while typing in a text-editing surface.
+      if (isEditingContext(target, selectionStore.editing)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      void deckStore.deleteElements(eids);
+      return;
+    }
+
+    // ── Arrow keys → nudge / reorder (P3-9) ───────────────────────────────────
     if (!isArrowKey(e.key)) return;
     const eid = selectionStore.eid;
     if (!eid) return;
 
     // Don't steal arrows from text editing / inputs / CodeMirror.
-    const target = (e.target instanceof Element ? e.target : null) ?? document.activeElement;
     if (isEditingContext(target, selectionStore.editing)) return;
 
     // A handled nudge consumes the event so the page/panes don't also scroll.

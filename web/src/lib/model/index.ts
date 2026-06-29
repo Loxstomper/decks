@@ -31,7 +31,8 @@ export {
   appendChild,
 } from './edit';
 export { decodeEntities, encodeAttr, encodeText } from './entities';
-export { classify } from './classify';
+export { classify, isTextLeaf } from './classify';
+export { getInlineColor, setInlineColor } from './style';
 export { stampEids, nextEid } from './eid';
 export { setFree, toggleFree } from './free';
 export { getSlideNotes, setSlideNotes } from './notes';
