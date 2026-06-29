@@ -210,7 +210,35 @@ dependencies are noted inline.
 - [x] **P8-7 — Highlight external changes.** After an SSE reload, highlight elements Claude changed (by `data-eid` diff). _Done when:_ changed elements are visually marked. (Spec 02, 11)
 - [ ] **P8-8 — (Later) MCP layer.** Expose CLI ops as MCP tools. _Done when:_ an MCP client can `add_slide`/`set_layout`/`insert_image`. (Spec 11 — deferred)
 
----
+## Phase 9 — Workspace polish & e2e
+> Goal: a more adjustable editor shell, element-level editing affordances, more themes,
+> browser-side deck creation, and an end-to-end test layer. Specs: [04](specs/04-canvas-interaction.md), [06](specs/06-slide-management.md), [09](specs/09-theming-and-styles.md), [12](specs/12-principles-and-invariants.md).
+>
+> Built post-M4 from user feature requests. Tasks are grouped (layout / editing / themes /
+> deck lifecycle / testing); the e2e harness (P9-1) lands first so every later task ships with
+> a passing browser test. Implemented via worktrees + workflow subagents.
+
+### Testing foundation
+- [ ] **P9-1 — Playwright harness.** Add Playwright e2e wired to run against the **built binary** (embedded FE + Go API + a temp workspace deck), using the host's official `mcr.microsoft.com/playwright` image; an npm/make script builds then runs. _Done when:_ a smoke spec opens a deck in a real browser and asserts the canvas renders, green in the container. (Spec 12)
+- [ ] **P9-2 — e2e offline-guard assertion.** During an e2e run, assert no external (`http(s)://`) URL is requested by any loaded page (editor + present route). _Done when:_ the suite fails if a deck or the shell loads a remote URL (promotes X-1 to a live check). (Spec 12, X-1)
+
+### Pane layout & chrome (spec 04)
+- [ ] **P9-3 — Collapsible side panels.** Chevron collapses the left navigator and the right panel to a thin rail; click restores previous width; state + width persist. _Done when:_ both sides collapse/restore and survive reload; e2e covers it. (Spec 04)
+- [ ] **P9-4 — Collapsible source pane.** Source pane (right-panel bottom) collapses/expands independently via a header toggle; last height remembered. _Done when:_ collapsing frees the height for outline/properties and restores to prior size. (Spec 04)
+- [ ] **P9-5 — Per-pane resize + persistence.** Extend `Splitter` so all boundaries (nav↔canvas, canvas↔right, outline/properties↕source) are individually draggable within min/max; persist sizes. _Done when:_ each split drags and sizes survive reload. (Spec 04)
+- [ ] **P9-6 — Source ↔ selection jump.** On selection, if the source pane is visible, scroll/reveal that element's `data-eid` in CodeMirror; never steals an active edit's focus. _Done when:_ selecting an element scrolls the source to its `data-eid`; e2e asserts the visible range. (Spec 04, 02)
+
+### Element editing
+- [ ] **P9-7 — Delete element (Delete/Backspace).** Generic `deleteElement(eid)` model op (leaf or container+subtree), bound to Delete/Backspace from canvas selection and outline highlight, guarded against text-editing focus; one undo + one autosave; multi-select deletes all. _Done when:_ pressing Delete on a selected element removes it from source (not while editing text); undo restores it. (Spec 04, 02)
+- [ ] **P9-8 — Text color control.** Inspector control writing whole-element inline `style="color: …"` on a selected text leaf; one undo + one autosave; passes validation + round-trip. _Done when:_ setting a color writes inline style, persists byte-stable, and undoes cleanly. (Spec 09)
+
+### Themes (spec 09)
+- [ ] **P9-9 — Solarized Dark slide theme.** Vendor a Solarized Dark reveal theme into the binary + per-deck copy, add it to the theme picker as a distinct entry. _Done when:_ selecting it restyles the deck to a dark Solarized palette, offline, zero external URLs. (Spec 09, 12)
+- [ ] **P9-10 — Workspace chrome themes.** Convert hardcoded chrome tokens (`surface*`, `accent`) to CSS variables; add Dark / Light / Solarized editor themes with a switcher; persist the choice (editor pref, never touches decks). _Done when:_ switching restyles the editor shell only, persists across reload, and leaves deck files untouched. (Spec 09)
+
+### Deck lifecycle (spec 06)
+- [ ] **P9-11 — Create-deck API.** `POST /api/decks/{name}` runs the same scaffold as `slides new` (validated name via `deck.ValidName`, 409 on existing, offline vendored reveal). _Done when:_ POST creates a valid openable deck folder; duplicate name is rejected. (Spec 06, 01, 13)
+- [ ] **P9-12 — Create-deck UI.** "+ New deck" in the navigator: name prompt → P9-11 → open the new deck. _Done when:_ a user creates and lands in a new deck without the CLI; e2e covers create→edit. (Spec 06)
 
 ## Cross-cutting (maintain throughout)
 
@@ -225,3 +253,5 @@ dependencies are noted inline.
 - **M2 (rich):** through Phase 5 — full content + assets.
 - **M3 (complete):** through Phase 7 — motion, theming, present, export.
 - **M4 (AI-native):** Phase 8 — Claude Code skill + safe handoff.
+- **M5 (polished):** Phase 9 — adjustable/collapsible chrome, element delete + text color,
+  more themes, browser-side deck creation, end-to-end test coverage.

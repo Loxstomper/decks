@@ -7,6 +7,16 @@
 Creating, organizing, and navigating slides — including reveal's 2D (vertical slides)
 structure. All operations are DOM operations on `<section>` elements.
 
+## Creating a deck (from the browser)
+
+- A deck can be created **from the editor UI**, not only the `slides new` CLI — a "**+ New
+  deck**" affordance in the navigator prompts for a name and creates the deck.
+- It is the **same scaffold** as the CLI: a `POST /api/decks/{name}` runs the identical
+  `slides new` logic server-side (`decks/<name>/{deck.html, custom.css, assets/}` with
+  reveal vendored offline, see [13](13-project-structure.md)), then the editor opens it.
+- Name validation reuses `deck.ValidName`; creating an existing name is rejected (no clobber).
+  Creation is offline and writes no external URLs.
+
 ## Slide navigator
 
 - A **sortable filmstrip** of slide thumbnails; click to jump, drag to reorder.

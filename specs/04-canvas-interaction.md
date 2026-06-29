@@ -38,6 +38,20 @@ This is the first thing to prototype — everything visual depends on it.
   `<section>` → containers → leaves. Click to select, drag to reparent, toggle visibility.
 - Marquee (drag-select) for multi-select.
 
+## Deleting elements
+
+- **Delete / Backspace** removes the current selection — works whether the element was
+  selected on the canvas or highlighted in the outline panel. Multi-selection deletes all.
+- **Guarded by editing context:** the key is intercepted only when no text-editing surface
+  has focus (not while in-place `contenteditable`, the source pane, or any input), so typing
+  is never swallowed.
+- One delete = one undo entry = one autosave (consistent with every other command).
+- Deleting a **leaf** removes the node; deleting a **container** removes it and its subtree
+  (the outline makes the scope visible before you commit). Whole-slide deletion stays in the
+  navigator ([06](06-slide-management.md)); this is element-level deletion *within* a slide.
+- **Passthrough** elements ([02](02-document-model.md)) can be deleted but never silently
+  mangled — they go as a whole or not at all.
+
 ## Two drag semantics
 
 | Element kind | Drag means |
@@ -65,6 +79,33 @@ slide-sized documents; session-only (git is durable history, see [13](13-project
 Four zones: **Navigator** (slide filmstrip, [06](06-slide-management.md)) · **Canvas**
 (iframe + overlay) · **Outline + Properties** · **Source** (CodeMirror 6, toggle/split with
 properties). The source pane and canvas stay synced ([02](02-document-model.md)).
+
+### Collapsible & resizable chrome
+
+The editor shell is the user's workspace, so its panes are adjustable and stay out of the
+way when not needed:
+
+- **Collapsible side panels.** The left navigator and the right (outline/properties/source)
+  panel each collapse to a thin rail via a **chevron**; clicking the rail (or chevron)
+  restores them to their previous width. Collapse state and last width persist across reloads.
+- **Collapsible source pane.** The source pane collapses independently (it is the bottom of
+  the right panel), so the outline/properties can use the full right-panel height. A toggle
+  in the source pane header collapses/expands it; its last height is remembered.
+- **Per-pane resizing.** Every boundary is a drag handle (extending the existing `Splitter`):
+  the two vertical splits (nav↔canvas, canvas↔right) and the horizontal split inside the
+  right panel (outline/properties ↕ source) are all individually draggable, within sane
+  min/max bounds. Sizes persist.
+
+### Source ↔ selection sync
+
+Selection is two-way with the source pane, not just the canvas and outline:
+
+- **Jump-to-source on select.** When an element is selected and the source pane is visible,
+  the pane **scrolls to and reveals that element's `data-eid`** in the HTML, so the inspector,
+  canvas, and source always point at the same node. (Coarse, attribute-anchored scroll — it
+  finds the `data-eid="…"` occurrence; it is not a full source-map.)
+- It is a convenience, not a mode: it never steals focus from an active edit, and an
+  un-stamped or passthrough element simply doesn't scroll.
 
 ## Related
 

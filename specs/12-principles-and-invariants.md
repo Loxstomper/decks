@@ -35,6 +35,23 @@ Cross-cutting rules every other spec depends on.
 - `slides validate` ([11](11-claude-code-integration.md)) gates both Claude Code edits and the
   editor's save path. Malformed decks are surfaced, not silently broken.
 
+## Testing
+
+Three tiers, each catching what the one below can't:
+
+- **Unit** — Go (`go test ./...`) and frontend (vitest): model, layout, slide/motion ops,
+  coordinate math, stores. Fast, pure, the bulk of coverage.
+- **Golden round-trip** — the byte-stability corpus above (a tested invariant, not just a
+  suite).
+- **End-to-end (Playwright)** — a browser drives the **built binary** (embedded frontend +
+  real Go API + real deck files), exercising the flows units can't reach: select → inspect →
+  edit → autosave, delete via keyboard, pane collapse/resize, source↔selection sync, create
+  deck, theme switching, present/export. Uses the official `mcr.microsoft.com/playwright`
+  image already on the host. **Runs offline** (no external URLs loaded) — an e2e assertion
+  doubles as a live offline-guard over real loaded pages (promotes X-1 from a template test).
+  e2e is the layer that confirms the "needs visual/browser verification" items the unit suites
+  have always had to leave open.
+
 ## Secrets
 
 - API keys (Unsplash / Giphy / Gemini) come from **env vars or a gitignored local config** —

@@ -30,7 +30,7 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
 ┌─────────────────────────────────────────────────────────┐
 │ Go backend (single binary)                               │
 │  • static server (embedded Svelte app)                   │
-│  • deck/file API: read, write, list, asset upload        │
+│  • deck/file API: list, create, read, write, asset upload│
 │  • fsnotify watcher → SSE "file changed" events          │
 │  • headless-Chrome driver for PDF export                  │
 │  • CLI subcommands (slides new / add-slide / validate)   │
@@ -62,6 +62,9 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
 - **Dev:** Vite dev server (HMR for editor code) + Go API; Vite proxies API/SSE to Go.
 - **Prod:** `go build` with the Vite build output embedded via `go:embed`; one binary serves
   everything.
+- **Testing:** Go (`go test`) and frontend unit tests (vitest) plus an **end-to-end suite
+  (Playwright)** that drives a real browser against the **built binary**, covering the editing
+  flows units can't (see [12](12-principles-and-invariants.md#testing)).
 
 ## Related
 
