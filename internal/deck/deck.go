@@ -63,8 +63,8 @@ var highlightVendor embed.FS
 var mathVendor embed.FS
 
 // notesVendor holds the reveal.js speaker-notes plugin (P7-2):
-//   - vendor/notes/plugin.js       — UMD bundle that exports RevealNotes
-//   - vendor/notes/notes.js        — core notes logic (loaded by plugin.js)
+//   - vendor/notes/notes.js        — UMD bundle that exports RevealNotes (load this)
+//   - vendor/notes/plugin.js       — unbundled ESM source (NOT browser-loadable as a classic script)
 //   - vendor/notes/speaker-view.html — the popup speaker window document
 //
 // Pressing 'S' during a presentation opens the speaker window with notes,
@@ -127,7 +127,7 @@ const deckHTML = `<!doctype html>
   <!-- Math/KaTeX plugin – renders LaTeX inside $ … $ and $$ … $$ (P5-10) -->
   <script src="assets/vendor/math/plugin.js"></script>
   <!-- Notes plugin – press 'S' to open the speaker window (P7-2, offline-local) -->
-  <script src="assets/vendor/notes/plugin.js"></script>
+  <script src="assets/vendor/notes/notes.js"></script>
   <script>
     Reveal.initialize({
       // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
