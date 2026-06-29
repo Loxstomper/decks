@@ -15,8 +15,15 @@ web/dist/
 *.log
 npm-debug.log*
 
+# Playwright output (generated at runtime, not committed)
+web/test-results/
+web/playwright-report/
+# e2e runtime state file (written by global-setup, removed by teardown)
+web/e2e/.e2e-state.json
+
 # Go build output
 /slides-builder
+/slides
 /decks
 *.test
 *.out
