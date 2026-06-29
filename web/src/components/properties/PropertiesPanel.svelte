@@ -52,9 +52,10 @@
     type AlignValue,
     type JustifyValue,
   } from '$lib/model/layout';
-  import { getAttribute } from '$lib/model';
+  import { getAttribute, findByEid, isTextLeaf, getInlineColor } from '$lib/model';
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
+  import TextColorControl from './TextColorControl.svelte';
 
   // ── Component props ────────────────────────────────────────────────────────
 
@@ -126,6 +127,32 @@
   /** True when something is selected but no editable container could be found. */
   const isPassthrough: boolean = $derived(!!selectedEid && !container);
 
+  // ── P9-8: per-element text colour (spec 09 "Text appearance") ──────────────
+  //
+  // Shown only when the SELECTED element itself is a text leaf (heading /
+  // paragraph / list / leaf) — independent of the resolved layout container. The
+  // colour is read from / written to that exact element's inline style.
+
+  /**
+   * The selected element when it is a text leaf, else null. Named function for
+   * the same $derived type-inference reason documented above.
+   */
+  function deriveTextLeaf(eid: string | null): ElementNode | null {
+    if (!eid || !deckStore.model) return null;
+    const el = findByEid(deckStore.model, eid);
+    return el && isTextLeaf(el) ? el : null;
+  }
+
+  const textLeaf: ElementNode | null = $derived(deriveTextLeaf(selectedEid));
+  const textColor: string | null = $derived(textLeaf ? getInlineColor(textLeaf) : null);
+
+  function onTextColorChange(value: string | null): void {
+    if (!selectedEid) return;
+    // Panel already depends on deckStore (model reads); call the command directly
+    // so wiring needs no new prop on the shell (App.svelte stays untouched).
+    void deckStore.applyTextColor(selectedEid, value);
+  }
+
   // ── Mutation helpers ───────────────────────────────────────────────────────
 
   function applyDelta(delta: Partial<LayoutProps>): void {
@@ -174,6 +201,12 @@
 
 <!-- ── Panel root ──────────────────────────────────────────────────────────── -->
 <div class="properties-panel">
+
+  <!-- ── P9-8: text colour — shown whenever a TEXT leaf is selected ────────── -->
+  {#if textLeaf}
+    <TextColorControl color={textColor} onColorChange={onTextColorChange} />
+    <div class="separator"></div>
+  {/if}
 
   {#if !selectedEid}
     <!-- Empty state: nothing selected -->
