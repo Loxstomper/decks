@@ -20,6 +20,7 @@
   import { deckStore } from '$lib/store/deck.svelte';
   import { selectionStore } from '$lib/canvas/selection.svelte';
   import { buildSlideTree, navigateToSlide, onSlideChanged } from '$lib/slides';
+  import { hasThemeOverride } from '$lib/model/theme-badge';
   import SlideThumbnail from './SlideThumbnail.svelte';
 
   interface Props {
@@ -379,6 +380,9 @@
             {#if slide.hidden}
               <span class="hidden-badge" title="Hidden when presenting">🚫</span>
             {/if}
+            {#if hasThemeOverride(slide.section)}
+              <span class="theme-badge" title="Per-slide theme override">◑</span>
+            {/if}
           </div>
           <!-- Per-slide actions -->
           <div class="slide-actions">
@@ -474,6 +478,9 @@
                     {/if}
                     {#if vert.hidden}
                       <span class="hidden-badge" title="Hidden when presenting">🚫</span>
+                    {/if}
+                    {#if hasThemeOverride(vert.section)}
+                      <span class="theme-badge" title="Per-slide theme override">◑</span>
                     {/if}
                   </div>
                   <div class="slide-actions">
@@ -685,7 +692,8 @@
   }
 
   .stack-badge,
-  .hidden-badge {
+  .hidden-badge,
+  .theme-badge {
     position: absolute;
     top: 2px;
     font-size: 0.7rem;
@@ -699,6 +707,13 @@
   }
   .hidden-badge {
     left: 2px;
+  }
+  .theme-badge {
+    /* Position below stack-badge so they don't overlap when both present. */
+    right: 2px;
+    top: 18px;
+    color: rgba(139, 195, 255, 0.9);
+    font-size: 0.65rem;
   }
 
   .slide-actions {

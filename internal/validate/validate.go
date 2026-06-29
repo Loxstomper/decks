@@ -60,10 +60,21 @@ type Result struct {
 // Allowed enum sets — the layout contract (spec 03). These mirror the TS
 // LayValue / AlignValue / JustifyValue unions in web/src/lib/model/layout.ts,
 // kept in sync by hand (see package doc on why duplication is intentional).
+//
+// allowedTheme mirrors THEME_NAMES in web/src/lib/model/theme.ts (P10).
+// Both lists must stay identical — they are independent re-implementations of
+// the same spec contract (same reason as layout: catch drift in either).
 var (
 	allowedLay     = map[string]bool{"stack": true, "row": true, "grid": true, "layers": true}
 	allowedAlign   = map[string]bool{"start": true, "center": true, "end": true, "stretch": true}
 	allowedJustify = map[string]bool{"start": true, "center": true, "end": true, "between": true, "around": true}
+	// allowedTheme — bundled reveal.js theme names (spec P10). Keep in sync with
+	// THEME_NAMES in web/src/lib/model/theme.ts.
+	allowedTheme = map[string]bool{
+		"black": true, "white": true, "league": true, "beige": true,
+		"night": true, "moon": true, "solarized": true, "solarized-dark": true,
+		"dracula": true, "sky": true,
+	}
 )
 
 // voidElements never have an end tag (HTML5 void elements). They are skipped by
@@ -264,6 +275,15 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 		// Only data-visibility="hidden" is defined (the slide-hide flag, layout
 		// contract). Any other value is a typo that would silently do nothing.
 		issues = append(issues, enumIssue("data-visibility", v, "hidden", line, eid))
+	}
+	// data-theme is only meaningful on <section> elements (P10). Any value not in
+	// the bundled theme list is flagged. data-background-color is a reveal.js
+	// pass-through attribute and is always tolerated (no validation). Inline
+	// --r-* CSS custom properties in style= are also silently tolerated so that
+	// P10-3/4 output passes validation without changes here.
+	if v, ok := attrs["data-theme"]; ok && name == "section" && !allowedTheme[v] {
+		issues = append(issues, enumIssue("data-theme", v,
+			"black|white|league|beige|night|moon|solarized|solarized-dark|dracula|sky", line, eid))
 	}
 
 	// (a) numeric attributes. gap/pad/grow are non-negative integers; span is a

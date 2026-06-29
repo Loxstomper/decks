@@ -99,6 +99,8 @@ const deckHTML = `<!doctype html>
   <link rel="stylesheet" href="assets/vendor/reveal/theme/black.css" />
   <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec 03) -->
   <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
+  <!-- Per-slide themes – section[data-theme] re-binds reveal --r-* vars (P10-1) -->
+  <link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />
   <!-- Highlight.js Monokai theme – loaded before plugin to avoid FOUC (P5-9) -->
   <link rel="stylesheet" href="assets/vendor/highlight/monokai.min.css" />
   <link rel="stylesheet" href="custom.css" />
@@ -312,6 +314,14 @@ func Vendor(root, name string) error {
 	}
 	log.Printf("deck: vendored slides-layout → %s", vendorDir)
 
+	// Per-slide theme stylesheet → assets/vendor/slides-slide-themes.css (P10-1).
+	// Derived from the embedded reveal theme CSS so a section[data-theme] can
+	// restyle its own --r-* vars (per-slide theming, single source of truth).
+	if err := writeSlideThemesCSS(vendorDir); err != nil {
+		return fmt.Errorf("vendor: write slide themes to deck: %w", err)
+	}
+	log.Printf("deck: vendored slides-slide-themes.css → %s", vendorDir)
+
 	// Highlight plugin → assets/vendor/highlight/ (P5-9, spec 12 offline-first)
 	if err := copyEmbeddedFS(highlightVendor, "vendor/highlight", filepath.Join(vendorDir, "highlight")); err != nil {
 		return fmt.Errorf("vendor: copy highlight plugin: %w", err)
@@ -439,6 +449,21 @@ func Upgrade(root, name string) error {
 		log.Printf("deck: upgraded reveal config in %s", filepath.Join(root, DecksDir, name, "deck.html"))
 	} else {
 		log.Printf("deck: reveal config already current in %s (no change)", name)
+	}
+	return nil
+}
+
+// writeSlideThemesCSS writes the DERIVED per-slide theme stylesheet (P10-1)
+// into destDir as slides-slide-themes.css. The content is generated from the
+// embedded reveal theme CSS (GenerateSlideThemesCSS), not copied from an
+// embedded file, so it always reflects the bundled themes.
+func writeSlideThemesCSS(destDir string) error {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("writeSlideThemesCSS: mkdir: %w", err)
+	}
+	dest := filepath.Join(destDir, "slides-slide-themes.css")
+	if err := os.WriteFile(dest, GenerateSlideThemesCSS(), 0o644); err != nil {
+		return fmt.Errorf("writeSlideThemesCSS: write %s: %w", dest, err)
 	}
 	return nil
 }

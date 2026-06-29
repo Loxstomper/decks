@@ -119,6 +119,8 @@ func (s *Server) routes(staticFS fs.FS) {
 
 	// Bundled theme list (P6-10): static list of themes shipped in the binary.
 	s.mux.HandleFunc("GET /api/themes", s.handleThemeList)
+	// Per-theme background colours (P10-1): name → --r-background-color.
+	s.mux.HandleFunc("GET /api/themes/backgrounds", s.handleThemeBackgrounds)
 
 	// Shared library (P5-5)
 	s.mux.HandleFunc("GET /api/shared", s.handleSharedList)
@@ -882,6 +884,20 @@ func (s *Server) handleFontLocalize(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleThemeList(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(deck.BundledThemes)
+}
+
+// handleThemeBackgrounds returns each bundled theme's background colour.
+//
+//	GET /api/themes/backgrounds
+//
+// Response: {"black":"#191919","solarized-dark":"#002b36", …}
+//
+// WHY: reveal paints slide backgrounds at deck level, so the editor uses this
+// map (derived from the embedded theme CSS) to paint a per-slide background
+// when a section overrides its theme (P10-1).
+func (s *Server) handleThemeBackgrounds(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(deck.ThemeBackgrounds())
 }
 
 // ── Present route (P7-1) ─────────────────────────────────────────────────────

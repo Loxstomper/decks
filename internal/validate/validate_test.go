@@ -146,6 +146,59 @@ func TestValidate_MalformedHTML(t *testing.T) {
 	}
 }
 
+func TestValidate_DataThemeValid(t *testing.T) {
+	// All bundled theme names must pass validation on a <section>.
+	validThemes := []string{
+		"black", "white", "league", "beige", "night",
+		"moon", "solarized", "solarized-dark", "dracula", "sky",
+	}
+	for _, theme := range validThemes {
+		html := `<section data-eid="s1" data-theme="` + theme + `"><h2 data-eid="t1">ok</h2></section>`
+		res := Bytes([]byte(html), "")
+		if hasCode(res, "invalid-enum") {
+			t.Errorf("data-theme=%q should be valid, got: %+v", theme, res.Errors)
+		}
+	}
+}
+
+func TestValidate_DataThemeInvalid(t *testing.T) {
+	// Unknown theme name on a <section> must produce invalid-enum.
+	html := `<section data-eid="s1" data-theme="bogus"><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), "")
+	if res.OK || !hasCode(res, "invalid-enum") {
+		t.Fatalf("expected invalid-enum for data-theme=bogus, got: %+v", res.Errors)
+	}
+}
+
+func TestValidate_DataThemeOnNonSection(t *testing.T) {
+	// data-theme on a non-section element is currently a no-op (not validated).
+	html := `<div data-theme="bogus">x</div>`
+	res := Bytes([]byte(html), "")
+	if hasCode(res, "invalid-enum") {
+		t.Errorf("data-theme on non-section should not flag invalid-enum, got: %+v", res.Errors)
+	}
+}
+
+func TestValidate_DataBackgroundColorTolerated(t *testing.T) {
+	// data-background-color is a reveal.js pass-through; any value must be
+	// accepted without validation errors.
+	html := `<section data-eid="s1" data-background-color="#ff0000"><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), "")
+	if !res.OK {
+		t.Fatalf("data-background-color must be tolerated, got: %+v", res.Errors)
+	}
+}
+
+func TestValidate_InlineRVarsTolerated(t *testing.T) {
+	// Inline --r-* CSS custom properties in the style attribute must pass
+	// through without any validation error (P10-3/4 output).
+	html := `<section data-eid="s1" style="--r-background-color:#0a0a0a;--r-main-color:#eee;"><h2 data-eid="t1">x</h2></section>`
+	res := Bytes([]byte(html), "")
+	if !res.OK {
+		t.Fatalf("inline --r-* vars must be tolerated, got: %+v", res.Errors)
+	}
+}
+
 func TestValidate_AssetEscapesDeck(t *testing.T) {
 	dir := t.TempDir()
 	html := `<img src="../../etc/passwd" />`

@@ -1,12 +1,30 @@
 <script lang="ts">
   /**
-   * ThemingPanel.svelte — P6-10…P6-13 theming container.
+   * ThemingPanel.svelte — P6-10…P6-13 + P10-5 theming container.
    *
    * Wires together:
-   *   - ThemePicker      → deckStore.applyTheme (changes reveal theme link)
-   *   - CssVarControls   → customCssStore.applyVar (color/font-size pickers)
-   *   - FontChooser      → POST /api/decks/{name}/fonts → updates custom.css
+   *   - ThemePicker      → deckStore.applyTheme (changes reveal theme link) [whole-deck]
+   *   - CssVarControls   → customCssStore.applyVar (color/font-size pickers) [whole-deck]
+   *   - FontChooser      → POST /api/decks/{name}/fonts → updates custom.css [whole-deck]
    *   - CustomCssPane    → direct custom.css editing via CM6
+   *
+   * P10-5 SCOPE TOGGLE:
+   * A "Whole deck / This slide" segment control at the top of the Style tab
+   * lets the user scope theme changes to just the selected slide <section>.
+   *
+   *   Whole deck (default):
+   *     ThemePicker + CssVarControls + FontChooser — existing behaviour.
+   *
+   *   This slide (enabled only when a slide section is selected):
+   *     • Named theme dropdown (THEME_NAMES) → deckStore.applySlideTheme(eid, name)
+   *     • Free-form color swatches (heading/text/link/background) →
+   *         deckStore.applySlideColorVars(eid, delta)
+   *     • "Clear override" button → applySlideTheme(eid, null) + clear all vars
+   *
+   * The "selected slide eid" is resolved from selectionStore by scanning the
+   * slide tree.  If the selection is a slide section eid (top-level or vertical)
+   * it is used directly; block eids inside a slide resolve to null (scope toggle
+   * remains disabled — user must click the slide row in the navigator).
    *
    * INTEGRATION NOTE (for App.svelte wiring):
    * Mount this component alongside the Outline/Properties panel or as a new
@@ -23,26 +41,60 @@
    *
    * TABS:
    * A lightweight tab switcher keeps the panel compact:
-   *   "Style" tab  — ThemePicker + CssVarControls + FontChooser
+   *   "Style" tab  — scope toggle + ThemePicker + CssVarControls + FontChooser
    *   "CSS" tab    — CustomCssPane (full CodeMirror CSS editor)
    */
 
   import { deckStore } from '$lib/store/deck.svelte.ts';
   import { customCssStore } from '$lib/store/customCss.svelte.ts';
+  import { selectionStore } from '$lib/canvas/selection.svelte';
+  import { buildSlideTree } from '$lib/slides';
+  import { findByEid } from '$lib/model';
+  import { THEME_NAMES, getThemeProps } from '$lib/model/theme';
   import ThemePicker from './ThemePicker.svelte';
   import CssVarControls from './CssVarControls.svelte';
   import FontChooser from './FontChooser.svelte';
   import CustomCssPane from './CustomCssPane.svelte';
 
   let activeTab = $state<'style' | 'css'>('style');
+  let scope = $state<'deck' | 'slide'>('deck');
 
   const isOpen = $derived(!!deckStore.name);
 
+  // ── Slide tree + selected slide resolution (P10-5) ──────────────────────────
+
+  const tree = $derived(buildSlideTree(deckStore.model));
+
   /**
-   * Parse the active theme name from the deck source.
-   * Looks for: assets/vendor/reveal/theme/{name}.css
-   * Returns '' when no matching theme link is found.
+   * Resolve the eid of the slide <section> that is currently selected.
+   * Returns the eid when the selected eid is a top-level or vertical slide.
+   * Returns null otherwise (block selected, or nothing selected).
    */
+  const selectedSlideEid = $derived.by<string | null>(() => {
+    const sel = selectionStore.eid;
+    if (!sel) return null;
+    for (const t of tree) {
+      if (t.eid === sel) return t.eid;
+      for (const v of t.verticals) {
+        if (v.eid === sel) return v.eid;
+      }
+    }
+    return null;
+  });
+
+  /** True when "This slide" scope is available (a slide section is selected). */
+  const canScopeSlide = $derived(selectedSlideEid !== null);
+
+  // Auto-fall-back: if we're in slide scope but the selection leaves a slide,
+  // revert to deck scope so the panel doesn't show stale/empty controls.
+  $effect(() => {
+    if (scope === 'slide' && !canScopeSlide) {
+      scope = 'deck';
+    }
+  });
+
+  // ── Whole-deck theme (existing) ──────────────────────────────────────────────
+
   const currentTheme = $derived((() => {
     const m = /assets\/vendor\/reveal\/theme\/([\w-]+)\.css/.exec(deckStore.source);
     return m ? m[1] : '';
@@ -56,23 +108,100 @@
     customCssStore.applyVar(varName, value);
   }
 
-  /**
-   * FontChooser callback: localization succeeded.
-   * 1. Inject @import at the top of custom.css (if not already present).
-   * 2. Update --r-main-font to use the new family.
-   */
   function onFontApplied(result: { cssPath: string; family: string }): void {
     let css = customCssStore.source;
     const importLine = `@import url("${result.cssPath}");`;
-
-    // Only add the @import once (idempotent).
     if (!css.includes(importLine)) {
       css = importLine + '\n' + css;
     }
-
-    // Update --r-main-font with the new family + a sensible fallback.
     customCssStore.source = css;
     customCssStore.applyVar('--r-main-font', `"${result.family}", sans-serif`);
+  }
+
+  // ── Per-slide theming (P10-5) ────────────────────────────────────────────────
+
+  const slideThemeProps = $derived.by(() => {
+    const eid = selectedSlideEid;
+    if (!eid || !deckStore.model) return null;
+    const el = findByEid(deckStore.model, eid);
+    if (!el) return null;
+    return getThemeProps(el);
+  });
+
+  const themeNames = $derived([...THEME_NAMES].sort());
+
+  const slideCurrentTheme = $derived(slideThemeProps?.theme ?? '');
+
+  const slideColors = $derived({
+    heading:    slideThemeProps?.inlineVars?.['--r-heading-color'] ?? '',
+    text:       slideThemeProps?.inlineVars?.['--r-main-color'] ?? '',
+    link:       slideThemeProps?.inlineVars?.['--r-link-color'] ?? '',
+    background: slideThemeProps?.backgroundColor ?? '',
+  });
+
+  const hasSlideOverride = $derived(
+    !!(slideThemeProps?.theme || slideThemeProps?.backgroundColor || slideThemeProps?.inlineVars),
+  );
+
+  /** Color swatches shown in the "This slide" panel. */
+  const COLOR_FIELDS: Array<{ field: keyof typeof slideColors; label: string }> = [
+    { field: 'heading',    label: 'Heading'    },
+    { field: 'text',       label: 'Body text'  },
+    { field: 'link',       label: 'Links'      },
+    { field: 'background', label: 'Background' },
+  ];
+
+  function onApplySlideTheme(e: Event): void {
+    const eid = selectedSlideEid;
+    if (!eid) return;
+    const val = (e.currentTarget as HTMLSelectElement).value;
+    void deckStore.applySlideTheme(eid, val || null);
+  }
+
+  function onApplySlideColor(field: keyof typeof slideColors, e: Event): void {
+    const eid = selectedSlideEid;
+    if (!eid) return;
+    const val = (e.currentTarget as HTMLInputElement).value;
+    if (field === 'background') {
+      void deckStore.applySlideColorVars(eid, { backgroundColor: val });
+    } else {
+      void deckStore.applySlideColorVars(eid, { [field]: val });
+    }
+  }
+
+  function onClearSlideOverride(): void {
+    const eid = selectedSlideEid;
+    if (!eid) return;
+    // Clear named theme + background-color via applySlideTheme(null).
+    void deckStore.applySlideTheme(eid, null);
+    // Clear inline --r-* vars.
+    void deckStore.applySlideColorVars(eid, {
+      heading: null,
+      text: null,
+      link: null,
+      backgroundColor: null,
+    });
+  }
+
+  /**
+   * Convert a CSS color string to a 6-digit hex for <input type="color">.
+   * Falls back to #000000 for unknown/empty values.
+   */
+  function toPickerColor(css: string): string {
+    if (!css) return '#000000';
+    const t = css.trim();
+    if (/^#[0-9a-fA-F]{6}$/.test(t)) return t;
+    if (/^#[0-9a-fA-F]{3}$/.test(t)) {
+      const m = t.match(/^#(.)(.)(.)$/);
+      if (m) return `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}`;
+    }
+    const rgb = t.match(/^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+    if (rgb) {
+      return '#' + [rgb[1], rgb[2], rgb[3]]
+        .map((n) => parseInt(n, 10).toString(16).padStart(2, '0'))
+        .join('');
+    }
+    return '#000000';
   }
 </script>
 
@@ -109,27 +238,114 @@
   <!-- Style tab: pickers + font chooser -->
   {#if activeTab === 'style'}
     <div class="tab-content style-tab" role="tabpanel" aria-label="Style controls">
-      <ThemePicker
-        {currentTheme}
-        disabled={!isOpen}
-        onApply={onApplyTheme}
-      />
+
+      <!-- P10-5: Scope toggle "Whole deck" / "This slide" -->
+      <div class="scope-toggle" role="group" aria-label="Theme scope">
+        <button
+          type="button"
+          class="scope-btn"
+          class:active={scope === 'deck'}
+          onclick={() => (scope = 'deck')}
+          aria-pressed={scope === 'deck'}
+        >Whole deck</button>
+        <button
+          type="button"
+          class="scope-btn"
+          class:active={scope === 'slide'}
+          disabled={!canScopeSlide}
+          onclick={() => { if (canScopeSlide) scope = 'slide'; }}
+          aria-pressed={scope === 'slide'}
+          title={canScopeSlide
+            ? 'Apply theme to this slide only'
+            : 'Select a slide in the navigator first'}
+        >This slide</button>
+      </div>
 
       <div class="separator"></div>
 
-      <CssVarControls
-        cssSource={customCssStore.source}
-        disabled={!isOpen}
-        {onApplyVar}
-      />
+      {#if scope === 'deck'}
+        <!-- ── Whole-deck controls (unchanged) ─────────────────────────── -->
+        <ThemePicker
+          {currentTheme}
+          disabled={!isOpen}
+          onApply={onApplyTheme}
+        />
 
-      <div class="separator"></div>
+        <div class="separator"></div>
 
-      <FontChooser
-        deckName={deckStore.name}
-        disabled={!isOpen}
-        {onFontApplied}
-      />
+        <CssVarControls
+          cssSource={customCssStore.source}
+          disabled={!isOpen}
+          {onApplyVar}
+        />
+
+        <div class="separator"></div>
+
+        <FontChooser
+          deckName={deckStore.name}
+          disabled={!isOpen}
+          {onFontApplied}
+        />
+
+      {:else}
+        <!-- ── Per-slide theming (P10-5) ───────────────────────────────── -->
+        <div class="slide-theme-section">
+          <div class="section-title">Named theme</div>
+          <div class="control-row">
+            <label class="control-label" for="slide-theme-select">Theme</label>
+            <select
+              id="slide-theme-select"
+              class="picker-select"
+              value={slideCurrentTheme}
+              onchange={onApplySlideTheme}
+            >
+              <option value="">— inherit deck —</option>
+              {#each themeNames as name (name)}
+                <option value={name}>
+                  {name.split('-').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                </option>
+              {/each}
+            </select>
+          </div>
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="slide-theme-section">
+          <div class="section-title">Color overrides</div>
+          {#each COLOR_FIELDS as { field, label } (field)}
+            <div class="control-row">
+              <label class="control-label" for="slide-color-{field}">{label}</label>
+              <input
+                id="slide-color-{field}"
+                type="color"
+                class="color-swatch"
+                value={toPickerColor(slideColors[field])}
+                onchange={(e) => onApplySlideColor(field, e)}
+                title="{label} color override"
+                aria-label="{label} color override for this slide"
+              />
+              {#if slideColors[field]}
+                <span class="color-value">{slideColors[field]}</span>
+              {/if}
+            </div>
+          {/each}
+        </div>
+
+        <div class="separator"></div>
+
+        <div class="slide-theme-section">
+          <button
+            type="button"
+            class="clear-btn"
+            disabled={!hasSlideOverride}
+            onclick={onClearSlideOverride}
+            title="Remove all per-slide theme overrides — inherits from deck"
+          >
+            Clear override → inherit deck
+          </button>
+        </div>
+      {/if}
     </div>
 
   <!-- CSS tab: full CodeMirror custom.css editor -->
@@ -216,7 +432,6 @@
   }
 
   .css-tab {
-    /* CustomCssPane fills its own height via CM6 internals. */
     display: flex;
     flex-direction: column;
   }
@@ -232,5 +447,147 @@
     font-size: 0.7rem;
     color: rgba(255, 255, 255, 0.3);
     text-align: center;
+  }
+
+  /* ── P10-5: Scope toggle ── */
+  .scope-toggle {
+    display: flex;
+    gap: 0;
+    padding: 6px 12px;
+    flex-shrink: 0;
+  }
+
+  .scope-btn {
+    flex: 1;
+    padding: 3px 8px;
+    font-size: 0.63rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 255, 255, 0.45);
+    cursor: pointer;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .scope-btn:first-child {
+    border-radius: 4px 0 0 4px;
+  }
+
+  .scope-btn:last-child {
+    border-radius: 0 4px 4px 0;
+    border-left: none;
+  }
+
+  .scope-btn.active {
+    background: rgba(79, 140, 255, 0.2);
+    border-color: rgba(79, 140, 255, 0.4);
+    color: rgba(139, 195, 255, 0.95);
+  }
+
+  .scope-btn:hover:not(.active):not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  .scope-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
+  }
+
+  /* ── P10-5: Per-slide theme controls ── */
+  .slide-theme-section {
+    padding: 6px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .section-title {
+    font-size: 0.6rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.3);
+  }
+
+  .control-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .control-label {
+    flex: 0 0 72px;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    user-select: none;
+  }
+
+  .picker-select {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 6px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.7rem;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.1s;
+  }
+
+  .picker-select:focus {
+    border-color: rgba(59, 130, 246, 0.5);
+  }
+
+  .color-swatch {
+    width: 28px;
+    height: 20px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 3px;
+    background: none;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  .color-value {
+    font-size: 0.6rem;
+    color: rgba(255, 255, 255, 0.35);
+    font-family: monospace;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .clear-btn {
+    width: 100%;
+    padding: 5px 8px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.04);
+    color: rgba(255, 160, 120, 0.85);
+    font-size: 0.65rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    transition: background 0.1s, color 0.1s;
+  }
+
+  .clear-btn:hover:not(:disabled) {
+    background: rgba(220, 80, 60, 0.2);
+    color: rgba(255, 130, 100, 1);
+  }
+
+  .clear-btn:disabled {
+    opacity: 0.3;
+    cursor: default;
   }
 </style>

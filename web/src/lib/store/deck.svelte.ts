@@ -67,6 +67,12 @@ import {
   type ValidationError,
 } from '$lib/model';
 import {
+  getThemeProps,
+  setThemeProps,
+  type ThemeName,
+  type ThemeProps,
+} from '$lib/model/theme';
+import {
   addSlide as addSlideOp,
   duplicateSlide as duplicateSlideOp,
   deleteSlide as deleteSlideOp,
@@ -175,6 +181,14 @@ class DeckStore {
   #savedSource = '';
   /** Pending debounced sync handle. */
   #syncTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /**
+   * P10-3: cached theme-name → background-colour map from
+   * GET /api/themes/backgrounds. The colours are derived from the embedded
+   * reveal theme CSS and never change at runtime, so we fetch once and memoise.
+   * `null` until the first fetch completes.
+   */
+  #themeBackgrounds: Record<string, string> | null = null;
 
   /** URL the iframe loads; empty when no deck is open. */
   get deckUrl(): string {
@@ -510,6 +524,132 @@ class DeckStore {
     // No-op if theme link not found or already on this theme.
     if (next === this.source) return;
     this.updateFromSource(next);
+    await this.commitCommand();
+  }
+
+  // ── Per-slide theming (P10-3 / P10-4, spec 16) ────────────────────────────
+  //
+  // Two complementary commands set theming on a slide <section>:
+  //   • applySlideTheme    — pick a NAMED bundled theme (data-theme + its bg).
+  //   • applySlideColorVars — fine-grained FREE-FORM inline --r-* overrides
+  //                           layered over (or independent of) a named theme.
+  // Both follow the standard command pattern (mutate model → updateFromModel →
+  // commitCommand): one undo entry + one autosave, byte-stable for everything
+  // else (spec 12 #4). Unknown eids are safe no-ops (stale selection guard).
+
+  /**
+   * Fetch + memoise the theme-name → background-colour map (P10-3).
+   *
+   * The map is derived from the embedded reveal theme CSS server-side and is
+   * immutable at runtime, so we cache the first successful response. A failed
+   * fetch caches an empty map (offline-first: a missing colour simply means no
+   * managed background is written — the named theme still applies).
+   */
+  async #fetchThemeBackgrounds(): Promise<Record<string, string>> {
+    if (this.#themeBackgrounds) return this.#themeBackgrounds;
+    try {
+      const res = await fetch('/api/themes/backgrounds', { cache: 'no-store' });
+      this.#themeBackgrounds = res.ok
+        ? ((await res.json()) as Record<string, string>)
+        : {};
+    } catch {
+      this.#themeBackgrounds = {};
+    }
+    return this.#themeBackgrounds;
+  }
+
+  /**
+   * P10-3: Apply (or clear) a NAMED bundled theme on the slide `<section>` with
+   * `eid` as ONE undo entry + ONE autosave.
+   *
+   * Sets BOTH `data-theme` and the section's managed `data-background-color`
+   * (the colour looked up from the cached /api/themes/backgrounds map). Passing
+   * `themeName === null` removes both — restoring the deck-level theme/background.
+   *
+   * PHASE 16 NOTE: spec 16 says the background colour should ultimately flow
+   * through the unified Slide Background command. Phase 16 is not built yet, so
+   * we write `data-background-color` directly here. When Phase 16 lands, the
+   * colour write should be consolidated into that command instead of this one.
+   *
+   * Invalid theme names throw (via setThemeProps) — same fail-fast convention as
+   * setLayoutProps. Unknown eid is a safe no-op.
+   */
+  async applySlideTheme(eid: string, themeName: string | null): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    if (themeName === null) {
+      // Clear both the named theme and its managed background.
+      setThemeProps(el, { theme: null, backgroundColor: null });
+    } else {
+      const backgrounds = await this.#fetchThemeBackgrounds();
+      // PHASE 16: write the managed background colour directly for now.
+      const backgroundColor = backgrounds[themeName] ?? null;
+      setThemeProps(el, { theme: themeName as ThemeName, backgroundColor });
+    }
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P10-4: Apply (or clear) FREE-FORM per-slide colour overrides on the section
+   * with `eid` as ONE undo entry + ONE autosave.
+   *
+   * Each colour maps to an inline reveal.js CSS custom property on the section's
+   * `style` attribute, layered over any named theme bundle:
+   *   • heading → `--r-heading-color`
+   *   • text    → `--r-main-color`
+   *   • link    → `--r-link-color`
+   *   • backgroundColor → `data-background-color` (the managed background attr)
+   *
+   * Per-key semantics (partial delta):
+   *   • `undefined` (key absent) → leave that property untouched.
+   *   • `null`                   → clear just that one property.
+   *   • a string                 → set/override that one property.
+   *
+   * Clearing a single colour removes only that var; sibling `--r-*` vars and all
+   * other style declarations round-trip verbatim. Unknown eid is a safe no-op.
+   */
+  async applySlideColorVars(
+    eid: string,
+    colors: {
+      heading?: string | null;
+      text?: string | null;
+      link?: string | null;
+      backgroundColor?: string | null;
+    },
+  ): Promise<void> {
+    if (!this.model) return;
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+
+    const delta: Partial<ThemeProps> = {};
+
+    // --r-* vars: merge the requested changes over the element's current vars so
+    // we set/clear ONLY the named colours and preserve any others.
+    const touchesVars =
+      'heading' in colors || 'text' in colors || 'link' in colors;
+    if (touchesVars) {
+      const current = getThemeProps(el).inlineVars ?? {};
+      const merged: Record<string, string> = { ...current };
+      const apply = (name: string, value: string | null | undefined): void => {
+        if (value === undefined) return; // untouched
+        if (value === null) delete merged[name]; // clear just this var
+        else merged[name] = value; // set/override
+      };
+      apply('--r-heading-color', colors.heading);
+      apply('--r-main-color', colors.text);
+      apply('--r-link-color', colors.link);
+      // null → setThemeProps removes all --r-* vars (style cleared if empty).
+      delta.inlineVars = Object.keys(merged).length > 0 ? merged : null;
+    }
+
+    if ('backgroundColor' in colors) {
+      delta.backgroundColor = colors.backgroundColor ?? null;
+    }
+
+    setThemeProps(el, delta);
+    this.updateFromModel();
     await this.commitCommand();
   }
 

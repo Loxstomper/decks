@@ -97,11 +97,66 @@
     for (var i = 0; i < els.length; i++) applyToElement(els[i]);
   }
 
+  // ── Vertical-stack theme cascade (P10-7) ──────────────────────────────────
+  //
+  // CSS custom properties (--r-*) inherit automatically, so a vertical-stack
+  // <section data-theme="solarized-dark"> already restyles its child vertical
+  // sections through normal CSS inheritance — no JS needed for the var cascade.
+  //
+  // However, `data-background-color` is a reveal.js attribute: reveal reads it
+  // independently from EACH section and creates a separate `.slide-background`
+  // element per slide.  There is NO CSS-level inheritance for this attribute, so
+  // a themed vertical stack does NOT propagate its background to child sections.
+  //
+  // This function fixes that: it copies `data-background-color` from a vertical-
+  // stack section to any child section that does not carry its own override.
+  // Must run BEFORE Reveal.initialize() so reveal sees the propagated attributes
+  // when it constructs its background layer.  An inner `data-theme` (which sets
+  // its own background colour via the editor/P10-3) is preserved because we only
+  // write the attribute when it is absent on the child.
+  //
+  // Cascade rules:
+  //   1. --r-* CSS vars on a vertical stack → cascade to children via CSS ✓ (no JS needed)
+  //   2. data-background-color on a vertical stack → propagated to children ← this function
+  //   3. Child with its own data-theme or data-background-color → inner wins (not overwritten)
+  function propagateVerticalBackground() {
+    try {
+      var slides = document.querySelector('.reveal .slides');
+      if (!slides) return;
+      // First-level sections are horizontal slide positions.  Those that contain
+      // child <section> elements are vertical stacks.
+      var stacks = slides.children;
+      for (var si = 0; si < stacks.length; si++) {
+        var stack = stacks[si];
+        if (stack.tagName !== 'SECTION') continue;
+        var bg = stack.getAttribute('data-background-color');
+        if (!bg) continue; // stack has no background to propagate
+        // Propagate to child sections that lack their own background colour.
+        var verticals = stack.children;
+        for (var vi = 0; vi < verticals.length; vi++) {
+          var child = verticals[vi];
+          if (child.tagName !== 'SECTION') continue;
+          if (!child.hasAttribute('data-background-color')) {
+            child.setAttribute('data-background-color', bg);
+          }
+        }
+      }
+    } catch (e) {
+      if (typeof console !== 'undefined') {
+        console.warn('[slides-layout] propagateVerticalBackground:', e);
+      }
+    }
+  }
+
   // ── Initial application ────────────────────────────────────────────────────
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', applyAll);
+    document.addEventListener('DOMContentLoaded', function() {
+      propagateVerticalBackground();
+      applyAll();
+    });
   } else {
     // Script loaded after DOM is ready (e.g. deferred or async).
+    propagateVerticalBackground();
     applyAll();
   }
 
