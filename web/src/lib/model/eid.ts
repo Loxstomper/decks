@@ -132,8 +132,11 @@ export function stampEids(model: DeckModel): void {
     if (node.type !== 'element') return;
 
     // Passthrough elements are never stamped — the editor doesn't manage them.
+    // Inline marks (strong/em/a/span/…) are managed rich-text content WITHIN a
+    // leaf (P17) but are addressed via their owning leaf, so they get no eid of
+    // their own — skip them here too.
     const cls = classify(node);
-    if (cls === 'passthrough') return;
+    if (cls === 'passthrough' || cls === 'inline') return;
 
     // Already stamped — skip to preserve idempotency and byte-stability.
     if (getAttribute(node, 'data-eid') !== null) return;

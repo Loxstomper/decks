@@ -49,6 +49,26 @@ func TestValidate_CleanPasses(t *testing.T) {
 	}
 }
 
+// TestValidate_InlineMarksAccepted pins the P17 contract: allowlisted inline
+// marks (strong/em/u/s/a[href,target,rel]/span[style]/br, including legacy b/i)
+// inside a leaf are accepted with NO data-eid of their own — they are managed
+// inline content, not new managed elements. They must not trip the
+// well-formedness, eid, or enum checks. Dual-encoded with classify.ts/inline.ts
+// (TS); this is the Go half of "validate.go + layout.ts accept them".
+func TestValidate_InlineMarksAccepted(t *testing.T) {
+	html := `<section data-eid="s1">
+  <h1 data-eid="h1">A <strong>bold</strong> &amp; <em>italic</em> title</h1>
+  <p data-eid="p1">Text <u>under</u> <s>strike</s> <b>b</b> <i>i</i>
+    <a href="https://example.com" target="_blank" rel="noopener">link</a>
+    <a href="#frag">jump</a>
+    <span style="color: red; font-size: 1.2em">styled</span>.<br />Line two.</p>
+</section>`
+	res := Bytes([]byte(html), "")
+	if !res.OK {
+		t.Fatalf("expected inline marks to validate clean, got: %+v", res.Errors)
+	}
+}
+
 func TestValidate_DuplicateEID(t *testing.T) {
 	html := `<section data-eid="dup"><p data-eid="dup">x</p></section>`
 	res := Bytes([]byte(html), "")

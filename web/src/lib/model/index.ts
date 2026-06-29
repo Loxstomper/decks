@@ -32,6 +32,14 @@ export {
 } from './edit';
 export { decodeEntities, encodeAttr, encodeText } from './entities';
 export { classify, isTextLeaf } from './classify';
+// P17: inline rich-text serializer + sanitizer (allowlist marks within leaves).
+export {
+  serializeInlineHtml,
+  parseInlineNodes,
+  isInlineMarkTag,
+  isSafeHref,
+  INLINE_MARK_TAGS,
+} from './inline';
 export { getInlineColor, setInlineColor } from './style';
 export { stampEids, nextEid } from './eid';
 export { cloneSubtreeStripEids } from './clone';

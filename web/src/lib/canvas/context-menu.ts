@@ -180,7 +180,11 @@ function resolveKind(lookup: KindLookup, eid: string): MenuElementKind | null {
   const el = findByEid(lookup, eid);
   if (!el) return null;
   if (isTextLeaf(el)) return 'text-leaf';
-  return classify(el); // 'container' | 'leaf' | 'free' | 'passthrough'
+  const cls = classify(el);
+  // Inline marks (P17) are never independently selected (selection resolves to
+  // the owning leaf), so they have no menu kind of their own — treat as
+  // passthrough (Delete + Jump only, never a structural edit).
+  return cls === 'inline' ? 'passthrough' : cls; // 'container' | 'leaf' | 'free' | 'passthrough'
 }
 
 // ── Item builders (one per action; kept small + named for readability) ──────────

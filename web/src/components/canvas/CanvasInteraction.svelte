@@ -18,8 +18,9 @@
    *         (overlay-geometry.ts), tracking it at any zoom (transform-reactive)
    *         and on content reflow (ResizeObserver).
    *   P2-5  Double-click a text leaf → contenteditable in place, focus, select.
-   *   P2-6  On commit → applyTextEditToModel via the store (onTextCommit), which
-   *         re-serializes and persists — source pane + canvas stay in sync.
+   *   P2-6/P17-3  On commit → applyRichTextEdit via the store (onRichTextCommit),
+   *         passing the leaf's innerHTML; the model sanitises + canonicalises the
+   *         inline marks, re-serializes, and persists — source + canvas stay in sync.
    *
    * INTEGRATION CONTRACT (see integration_notes):
    *   • Place this as a sibling of <RevealFrame> inside ONE `position: relative`
@@ -35,6 +36,8 @@
   import { deckStore } from '$lib/store/deck.svelte.ts';
   import { selectionStore } from '$lib/canvas/selection.svelte.ts';
   import { resolveSelectable, type ElementLike } from '$lib/canvas/eid.ts';
+  import { serializeInlineHtml } from '$lib/model/inline.ts';
+  import { uploadAsset } from '$lib/blocks/api.ts';
   import {
     domRectToLogical,
     logicalRectToScreen,
@@ -67,12 +70,13 @@
     reloadNonce?: number;
 
     /**
-     * Commit hook for a finished text edit (P2-6). Defaults to the deck store's
-     * `applyTextEdit(eid, literalText)` contract, which mutates the model via
-     * edit.ts (only the edited subtree goes dirty) and re-serializes. Overridable
-     * for tests / alternative wiring.
+     * Commit hook for a finished RICH-text edit (P2-6 / P17-3). Receives the
+     * leaf's `innerHTML`; defaults to the deck store's `applyRichTextEdit(eid,
+     * html)` contract, which sanitises + canonicalises the HTML to the inline
+     * allowlist and replaces only the edited leaf's children (just that subtree
+     * goes dirty) before re-serializing. Overridable for tests / alt wiring.
      */
-    onTextCommit?: (eid: string, literalText: string) => void;
+    onRichTextCommit?: (eid: string, html: string) => void;
 
     /**
      * Right-click (P13-2). Fired after we have resolved + selected the element
@@ -89,7 +93,7 @@
     iframe,
     transform,
     reloadNonce = 0,
-    onTextCommit = (eid, text) => deckStore.applyTextEdit(eid, text),
+    onRichTextCommit = (eid, html) => deckStore.applyRichTextEdit(eid, html),
     onContextMenu,
   }: Props = $props();
 
@@ -246,6 +250,7 @@
     el.setAttribute('contenteditable', 'true');
     el.addEventListener('blur', handleEditBlur);
     el.addEventListener('keydown', handleEditKeydown);
+    el.addEventListener('paste', handleEditPaste);
     selectionStore.setEditing(true);
 
     el.focus();
@@ -285,6 +290,60 @@
     }
   }
 
+  /**
+   * Paste sanitization (P17-2 / spec 12 security). The browser would otherwise
+   * drop raw clipboard HTML — `<script>`, `on*` handlers, `javascript:` hrefs,
+   * external resource URLs, style soup — straight into the contenteditable DOM.
+   * We intercept, run it through the inline allowlist serializer (the same gate
+   * the commit path uses) BEFORE it lands, and localize pasted image files via
+   * the asset pipeline so no external/data URL is ever introduced (offline-first).
+   */
+  function handleEditPaste(e: ClipboardEvent): void {
+    const doc = getDoc();
+    if (!doc) return;
+    const dt = e.clipboardData;
+    if (!dt) return;
+    e.preventDefault();
+
+    // Pasted image FILES → upload to the deck's assets, insert a LOCAL <img>.
+    // Never embed the external/data source (spec 08 / X-1 offline-first).
+    const images = Array.from(dt.files).filter((f) => f.type.startsWith('image/'));
+    if (images.length > 0) {
+      const deck = deckStore.name;
+      if (deck) void localizePastedImages(doc, deck, images);
+      return;
+    }
+
+    // HTML/text → sanitize to the inline allowlist, then insert.
+    const html = dt.getData('text/html');
+    if (html) {
+      doc.execCommand('insertHTML', false, serializeInlineHtml(html));
+    } else {
+      // Plain text only — insert verbatim (insertText escapes for us).
+      doc.execCommand('insertText', false, dt.getData('text/plain'));
+    }
+  }
+
+  /** Upload each pasted image and insert a LOCAL <img> at the caret (best-effort;
+   *  an upload failure is skipped so a paste never injects an external URL).
+   *
+   *  Note: the inline allowlist (P17-1) is text marks only, so a pure text leaf
+   *  (<p>, <h*>) does not retain <img> on commit — but the asset is localized
+   *  regardless (offline-first), and rich/figure leaves keep it. Block-image paste
+   *  handling proper is Lane B/C's concern; here we only guarantee the offline
+   *  invariant: the source is always a local deck-relative path, never external. */
+  async function localizePastedImages(doc: Document, deck: string, files: File[]): Promise<void> {
+    for (const file of files) {
+      try {
+        const src = await uploadAsset(deck, file);
+        const safeSrc = src.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+        doc.execCommand('insertHTML', false, `<img src="${safeSrc}" alt="">`);
+      } catch {
+        /* offline / upload failed → skip this image (no external ref introduced) */
+      }
+    }
+  }
+
   /** Tear down the contenteditable session and, unless cancelled, write back. */
   function commitEdit(): void {
     const el = editingEl;
@@ -293,16 +352,18 @@
 
     el.removeEventListener('blur', handleEditBlur);
     el.removeEventListener('keydown', handleEditKeydown);
+    el.removeEventListener('paste', handleEditPaste);
     el.removeAttribute('contenteditable');
     selectionStore.setEditing(false);
 
     if (!skipCommit) {
       const eid = el.getAttribute('data-eid');
       if (eid) {
-        // contenteditable gives us the flattened literal text (textContent is
-        // already decoded — NOT entity-encoded — which is exactly the "literal"
-        // form applyTextEdit/setText expect; they re-encode for source form).
-        onTextCommit(eid, el.textContent ?? '');
+        // contenteditable gives us the leaf's full innerHTML (inline marks
+        // intact). The model's rich-text path (P17-3) sanitises + canonicalises
+        // it to the inline allowlist, so `<strong>` survives and hostile markup
+        // is stripped before it reaches the source.
+        onRichTextCommit(eid, el.innerHTML);
       }
     }
     skipCommit = false;
@@ -365,6 +426,7 @@
       // Leaving the frame: drop any half-finished edit session and observers.
       editingEl?.removeEventListener('blur', handleEditBlur);
       editingEl?.removeEventListener('keydown', handleEditKeydown);
+      editingEl?.removeEventListener('paste', handleEditPaste);
       editingEl = null;
       elementRO?.disconnect();
     };

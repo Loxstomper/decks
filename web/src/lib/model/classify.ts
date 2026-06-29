@@ -18,8 +18,12 @@
  *                 headings, paragraph, list (ul/ol/li), blockquote, pre/code, img,
  *                 figure/figcaption, table family (table/thead/tbody/tfoot/tr/th/td),
  *                 iframe, svg, video, audio.
- *                 NOTE: inline-only tags (span, em, strong, a, br …) are NOT leaves —
- *                 they live *inside* leaf content and are preserved verbatim there.
+ *
+ *   INLINE      — an allowlisted inline mark (strong/em/u/s/a/span/br + legacy
+ *                 b/i/font) that lives WITHIN a leaf as managed rich-text content
+ *                 (P17). It is NOT a new leaf and NOT passthrough: the editor owns
+ *                 it (the inline serializer canonicalises it), but it never gets a
+ *                 `data-eid` of its own — it is addressed through its owning leaf.
  *                 `<aside>` (reveal.js speaker notes) is passthrough because the
  *                 editor has no speaker-notes editing UI in scope for P2.
  *
@@ -30,9 +34,10 @@
  */
 
 import { hasAttribute, getAttribute } from './edit';
+import { isInlineMarkTag } from './inline';
 import type { ElementNode } from './types';
 
-export type ElementClass = 'container' | 'leaf' | 'free' | 'passthrough';
+export type ElementClass = 'container' | 'leaf' | 'inline' | 'free' | 'passthrough';
 
 /**
  * Known block-content tag names that the editor treats as leaves.
@@ -94,7 +99,12 @@ export function classify(el: ElementNode): ElementClass {
     return 'leaf';
   }
 
-  // Rule 4 — passthrough: everything else.
+  // Rule 4 — inline mark: managed rich-text content inside a leaf (P17). Checked
+  // AFTER leaf/math so `<span class="math-block">` stays a leaf. Inline marks are
+  // never stamped with a data-eid (see eid.ts) — they are addressed via their leaf.
+  if (isInlineMarkTag(tag)) return 'inline';
+
+  // Rule 5 — passthrough: everything else.
   return 'passthrough';
 }
 
