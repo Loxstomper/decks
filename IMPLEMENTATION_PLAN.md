@@ -267,7 +267,7 @@ dependencies are noted inline.
 - [ ] **P10-2 — Recognize `data-theme` in model + validate.** `web/src/lib/model/` and `internal/validate/validate.go` accept `data-theme` on `<section>` (value must name a bundled theme; not a layout primitive, no reflow semantics). Keep the allowed-set in sync with the bundled-theme list. _Done when:_ `validate` passes a deck with a valid `data-theme` and flags an unknown theme name. (Spec 09, 03, 12)
 
 ### Apply commands (one undo + one autosave each, byte-stable)
-- [ ] **P10-3 — Named per-slide theme command.** `deckStore` op to set/clear a section's `data-theme` **and** its managed `data-background-color` (from the P10-1 map). _Done when:_ applying a named theme to the selected slide writes both attributes and the canvas reflects it; clearing removes both. (Spec 09)
+- [ ] **P10-3 — Named per-slide theme command.** `deckStore` op to set/clear a section's `data-theme` **and** its managed `data-background-color` (from the P10-1 map; the color is written through the unified Slide Background command, **Phase 16**). _Done when:_ applying a named theme to the selected slide writes both attributes and the canvas reflects it; clearing removes both. (Spec 09)
 - [ ] **P10-4 — Free-form per-slide color tweaks.** `deckStore` op to set/clear inline `--r-*` custom properties (heading / text / link) + `data-background-color` on a section, layered over any named bundle. _Done when:_ picking colors writes inline vars that override the bundle, byte-stable, undoable. (Spec 09)
 
 ### UI
@@ -380,6 +380,24 @@ dependencies are noted inline.
 - [ ] **P15-3 — Free overlay alignment verified (+ optional measure fallback).** With P15-1/2, the free-transform box/handles (from `data-x/y/w/h`) align with the element at any zoom/aspect. Optionally also draw the display box from the measured rect (like the selection overlay) for content-sized/rotated robustness. _Done when:_ the draggable box tracks the element; drag→drop writes correct logical coords; smart guides snap to canvas center/edges. (Spec 04, 05)
 - [ ] **P15-4 — Migration for existing decks.** A `slides upgrade <deck>` (or fold into `slides vendor`) that rewrites an existing deck's `Reveal.initialize` to set `center:false, margin:0` (byte-stable otherwise). _Done when:_ an old deck gets the corrected config without other diffs. (Spec 05, 13)
 - [ ] **P15-5 — e2e.** Playwright: select a free element, assert the overlay box rect matches the element's measured rect within tolerance; after a drag the element's on-disk `data-x/y` reflect the move. _Done when:_ the spec passes (requires P11-1 so the reload no longer resets the slide). (Spec 05, 12)
+
+## Phase 16 — Slide background (color / image / gradient / video)
+> Goal: a unified per-slide background control via reveal-native `data-background-*` attributes,
+> localized offline. Spec: [09](specs/09-theming-and-styles.md) "Slide background",
+> [08](specs/08-assets-and-media.md). Subsumes Phase 10's per-slide `data-background-color`
+> (color writes through this control). Built via worktree lanes + subagents.
+>
+> Reuse: image/video localization is the existing asset pipeline (`uploadAsset` → `assets/…`,
+> upload/drag/paste/shared/provider); reveal renders backgrounds natively so the canvas is
+> WYSIWYG; attributes are declarative + byte-stable + Claude-authorable; backgrounds cascade to
+> verticals (reveal native).
+
+- [ ] **P16-1 — Background commands.** `deckStore` ops to set/clear a section's background by type — `data-background-color`, `data-background-image` (+ `-size`/`-position`/`-repeat`/`-opacity`), `data-background-gradient`, `data-background-video` (+ loop/muted) — each one undo + one autosave, byte-stable. Consolidates the managed color from P10-3. _Done when:_ each type sets/clears correctly and the canvas reflects it. (Spec 09)
+- [ ] **P16-2 — Image/video localization reuse.** Wire upload/drag/paste/`shared/`/provider sources through `uploadAsset` and set `data-background-image`/`-video` to the returned relative path. _Done when:_ choosing a background image/video copies it into `assets/` and references it relatively (zero external URLs). (Spec 09, 08, 12)
+- [ ] **P16-3 — Slide Background UI control.** A "Slide background" inspector section (keyed to the current slide) + a "Set background…" slide context-menu item (Phase 13): color / image / gradient / video, with image fit/position/opacity and video loop/mute, plus Clear. _Done when:_ all types are settable from one surface and clearable. (Spec 09, 04)
+- [ ] **P16-4 — Thumbnail background rendering.** Extend the thumbnail builder (Phase 12) to paint color/image/gradient as the section's CSS background; video shows poster/first-frame or a placeholder. _Done when:_ a slide with an image background shows it in its navigator thumbnail. (Spec 06, 09)
+- [ ] **P16-5 — Contract + cascade.** `internal/validate/validate.go` + model accept the `data-background-*` attributes; verify a stack's background cascades to its verticals and an inner override wins. _Done when:_ `validate` passes a deck using them and cascade behaves. (Spec 09, 12)
+- [ ] **P16-6 — e2e.** Playwright: set an image background on a slide → it renders in the canvas and the present route, appears in the thumbnail, and the offline-guard still passes (localized, no external URL). _Done when:_ the spec passes. (Spec 09, 12)
 
 ## Cross-cutting (maintain throughout)
 

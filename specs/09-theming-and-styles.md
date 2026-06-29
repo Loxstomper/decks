@@ -50,10 +50,10 @@ Resolution is just CSS specificity: inline (3) > scoped bundle (2) > global link
 
 `--r-*` vars cannot reach a slide's background — reveal renders backgrounds in a separate
 `.backgrounds` layer, not inside the `<section>`. So the background is set with reveal's
-**native `data-background-color`** on the section (works in editor, present, and PDF). Applying
-a named bundle therefore writes **two** attributes — `data-theme` plus a managed
-`data-background-color` (the bundle's background); a free-form background writes just
-`data-background-color`. Clearing an override removes the attributes it added.
+**native `data-background-*`** on the section (works in editor, present, and PDF). Applying
+a named bundle therefore writes the bundle's background as a **managed `data-background-color`**
+alongside `data-theme`. The full background surface (color/image/gradient/video) is the unified
+**Slide background** control below — the per-slide theme's color simply writes through it.
 
 ### Cascade to vertical slides
 
@@ -80,6 +80,34 @@ once: the `--r-*` vars inherit via CSS, and reveal already propagates a stack's
 - **Fidelity caveat.** A named per-slide bundle reproduces a theme's color/font *variables* +
   background — the visible essence — not 100% of its structural CSS. Per-slide theming is for
   accenting individual slides, not byte-identical theme cloning.
+
+## Slide background
+
+A unified per-slide **background** control covering color, image, gradient, and video — all via
+reveal's native `data-background-*` attributes on the `<section>`, so the editor canvas renders
+them WYSIWYG and present/PDF match. Color (above) and the other types are one surface, not two.
+
+- **Types (one control):**
+  - *Color* — `data-background-color` (shared with the per-slide theme override).
+  - *Image* — `data-background-image` (a **localized** asset), with `data-background-size`
+    (cover / contain / explicit), `data-background-position`, `data-background-repeat`, and
+    `data-background-opacity`.
+  - *Gradient* — `data-background-gradient` (a CSS gradient string).
+  - *Video* — `data-background-video` (a **localized** asset), with loop / muted options.
+- **Offline (see [08](08-assets-and-media.md), [12](12-principles-and-invariants.md)):** image
+  and video backgrounds are localized through the **same asset pipeline** as inserted media
+  (`uploadAsset` → `assets/…`; upload / drag / paste / `shared/` library / provider sources) —
+  never an external URL.
+- **Declarative & byte-stable:** plain attributes on the section (one undo + one autosave);
+  Claude-authorable.
+- **Cascade to verticals:** reveal propagates a stack's background to verticals that don't set
+  their own — consistent with the per-slide theme cascade.
+- **Thumbnails:** the static thumbnail builder paints the background (color / image / gradient)
+  as the section's CSS background so navigator thumbnails match ([06](06-slide-management.md));
+  video shows a poster/first-frame or placeholder.
+- **Surface:** a "Slide background" section in the inspector (keyed to the current slide) plus a
+  "Set background…" item in the slide context menu ([04](04-canvas-interaction.md)), with a
+  Clear action.
 
 ## Text appearance (per-element color)
 
