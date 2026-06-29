@@ -314,6 +314,31 @@ dependencies are noted inline.
 > JS-driven reveal plugins and are not run in the script-free thumbnail; they render plain.
 > Documented in spec 06 as the one acknowledged fidelity gap.
 
+## Phase 13 — Right-click context menu
+> Goal: a right-click context menu on elements (canvas + outline) and on empty slide
+> background — a thin UI surface dispatching to existing `deckStore` commands, plus a few
+> net-new element ops. Spec: [04](specs/04-canvas-interaction.md) "Context menu",
+> [06](specs/06-slide-management.md). Built via worktree lanes + subagents.
+>
+> Reuse-first: most items (Delete, Make free/structured, Text color, Insert, Equal columns,
+> quick align, slide ops) call commands that already exist. The registry is a pure
+> `menuItemsFor(selection)`; the menu component is presentational.
+
+### UI surface
+- [ ] **P13-1 — ContextMenu component.** Presentational menu (items `{label, run, disabled, danger, separator, submenu}`) rendered in the parent overlay above the iframe; cursor-positioned with edge-flip; keyboard-navigable; dismiss on Escape / click-outside / selection change / reload. _Done when:_ the menu renders, flips at pane edges, and is fully keyboard-operable. (Spec 04)
+- [ ] **P13-2 — Canvas right-click handler.** In `CanvasInteraction`, add a `contextmenu` listener (re-attached on `reloadNonce`) that `preventDefault`s, resolves the element under the cursor (existing nearest-eid logic), **selects it** unless already in a multi-selection, maps iframe coords→screen via the transform, and opens the menu. _Done when:_ right-clicking a canvas element selects it and opens the menu at the cursor. (Spec 04)
+- [ ] **P13-3 — Action registry.** Pure `menuItemsFor(selection)` → items by element kind (any / text leaf / structured / free / container / passthrough / multi), each wired to an existing `deckStore` command. Passthrough offers only Delete + Jump-to-source (never structural — never-destroy). _Done when:_ each kind shows the correct, enabled/disabled item set; unit-tested. (Spec 04, 12)
+- [ ] **P13-4 — Outline-panel right-click.** Outline rows open the same menu via the same registry (positioned at the cursor). _Done when:_ right-clicking an outline row opens the element menu and its actions apply. (Spec 04)
+
+### Net-new element ops (one undo + one autosave each, byte-stable)
+- [ ] **P13-5 — Duplicate element.** `deckStore` command: clone the selected subtree, regenerate `data-eid`s (per the eid scheme), insert after the original; selects the clone. _Done when:_ duplicating yields a byte-stable independent copy with fresh eids; undo removes it. (Spec 04, 02)
+- [ ] **P13-6 — Z-order for free elements.** `deckStore` commands bring-to-front / send-to-back by reordering the free element to last/first among siblings (reuse the reorder op). Shown only for free elements. _Done when:_ overlapping free elements restack and the order persists. (Spec 04, 03)
+- [ ] **P13-7 — Element clipboard (copy/cut/paste).** Session-scoped in-memory subtree buffer (offline, never on disk). Copy captures; Cut = copy + delete; Paste inserts a clone with freshly regenerated `data-eid`s after the current selection (or as last child of a selected container), working across slides. _Done when:_ copy→paste (incl. across slides) yields a fresh-eid clone; cut removes the original; all byte-stable + undoable. (Spec 04, 02)
+
+### Slide menu, a11y & e2e
+- [ ] **P13-8 — Slide-level menu.** Right-click on empty slide background opens slide actions (Duplicate / Delete / Hide / Insert slide) via the existing navigator ops. _Done when:_ the empty-area menu performs each slide op. (Spec 06, 04)
+- [ ] **P13-9 — Passthrough/never-destroy guard + e2e.** Verify passthrough elements expose no structural edits; add a Playwright spec: right-click → Delete and right-click → Duplicate on a canvas element, and the slide-level menu. _Done when:_ e2e covers open→action for an element and a slide; passthrough is guarded. (Spec 04, 12)
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)

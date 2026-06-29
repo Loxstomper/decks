@@ -38,6 +38,10 @@ structure. All operations are DOM operations on `<section>` elements.
 
 Slides that override the deck theme show a small **theme badge** in the navigator/thumbnail.
 
+These same operations are reachable from a **slide-level context menu** (right-click on empty
+slide background; see [04](04-canvas-interaction.md) "Context menu") — one dispatch path, no
+duplicated logic.
+
 ## Thumbnails
 
 Rendered from the live model and updated on edit. Each thumbnail is a **static, script-free

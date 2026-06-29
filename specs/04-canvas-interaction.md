@@ -52,6 +52,49 @@ This is the first thing to prototype — everything visual depends on it.
 - **Passthrough** elements ([02](02-document-model.md)) can be deleted but never silently
   mangled — they go as a whole or not at all.
 
+## Context menu
+
+Right-click opens a context menu of element actions. It is **a UI surface over existing
+commands**, not a new mutation path — each item dispatches to the same `deckStore` command the
+inspector/toolbar already use (single source of truth).
+
+- **Trigger surfaces:** the canvas (inside the iframe) **and** the outline panel rows share one
+  menu and one action registry. The outline is the easiest way to target nested or passthrough
+  elements.
+- **Right-click selects.** Right-clicking an element selects it first (same nearest-element
+  resolution as left-click), unless it is already part of a multi-selection (then the
+  selection is kept, and actions apply to the whole set). The canvas handler lives alongside
+  the existing click handlers and re-attaches after a reload (`reloadNonce`).
+- **Rendered in the parent overlay**, above the iframe, positioned at the cursor with
+  edge-flip, keyboard-navigable, dismissed on Escape / click-outside / selection change /
+  reload.
+- **Actions are context-dependent** on element kind (a pure `menuItemsFor(selection)`):
+  - *Any:* Delete · **Duplicate** · Cut / Copy / Paste · Jump to source.
+  - *Text leaf:* Edit text · Text color.
+  - *Structured:* Make free · move up/down among siblings.
+  - *Free:* Make structured · **Bring to front / Send to back** · Align/Distribute (multi).
+  - *Container:* Insert block inside · Equal columns · quick align.
+  - *Passthrough:* Delete · Jump to source only — **never** structural edits (never-destroy,
+    [12](12-principles-and-invariants.md)).
+- **Slide-level menu:** right-clicking empty slide background opens slide actions
+  (Duplicate / Delete / Hide / Insert slide), reusing the navigator's slide ops
+  ([06](06-slide-management.md)).
+
+### New element operations the menu introduces
+
+These are the only net-new model commands (each one undo entry + one autosave, byte-stable):
+
+- **Duplicate element** — clone the selected subtree, **regenerate its `data-eid`s** (uniqueness
+  per [02](02-document-model.md), as slide duplication already does), insert after the original.
+- **Z-order (free only)** — free elements paint in sibling order; *bring to front* / *send to
+  back* reorder the element to last/first among its siblings (reuses the reorder op). Not shown
+  for structured elements (they flow, not stack).
+- **Element clipboard** — a **session-scoped, in-memory** model-subtree buffer (like the undo
+  stack; offline, never touches disk). *Copy* captures the subtree; *Cut* = copy + delete;
+  *Paste* inserts a clone with **freshly regenerated `data-eid`s** after the current selection
+  (or as the last child of a selected container), so paste works across slides without eid
+  collisions.
+
 ## Two drag semantics
 
 | Element kind | Drag means |
