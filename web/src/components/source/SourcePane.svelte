@@ -29,6 +29,8 @@
   import { html } from '@codemirror/lang-html';
   import { oneDark } from '@codemirror/theme-one-dark';
   import { EditorSelection } from '@codemirror/state';
+  import { selectionStore } from '$lib/canvas/selection.svelte';
+  import { findEidIndex } from '$lib/layout/eidIndex';
 
   // ── Props ────────────────────────────────────────────────────────────────
   interface Props {
@@ -159,6 +161,48 @@
       // Always reset the flag, even if dispatch throws.
       applyingExternal = false;
     }
+  });
+
+  // ── Source ↔ selection jump (P9-6) ─────────────────────────────────────────
+  /**
+   * Determine whether scrolling now would interrupt an active edit. We skip the
+   * jump when:
+   *   - CodeMirror itself has focus (the user is typing in the source), or
+   *   - an in-place contenteditable session is active (selectionStore.editing,
+   *     set when the canvas leaf is being edited), or
+   *   - any input/textarea/contenteditable in this document holds focus.
+   * Reading `selectionStore.editing` here also makes the effect re-run when an
+   * edit session ends, so the jump lands once the user is done.
+   */
+  function wouldStealActiveEdit(): boolean {
+    if (selectionStore.editing) return true;
+    if (view?.hasFocus) return true;
+    const el = document.activeElement as HTMLElement | null;
+    if (!el) return false;
+    if (el.isContentEditable) return true;
+    return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA';
+  }
+
+  /**
+   * When the primary selection changes and the source pane is visible, scroll
+   * the matching `data-eid="…"` occurrence into view. Coarse, attribute-anchored
+   * (spec 04) — not a full source map. Un-stamped / passthrough elements yield
+   * no index and so do not scroll. Never steals focus from an active edit.
+   */
+  $effect(() => {
+    const eid = selectionStore.eid; // reactive dependency
+    const editing = selectionStore.editing; // re-run when an edit session ends
+    if (!view || !eid) return;
+    // Hidden / zero-height pane (e.g. collapsed) — nothing to reveal.
+    if (view.dom.clientHeight === 0 || view.dom.offsetParent === null) return;
+    if (editing || wouldStealActiveEdit()) return;
+
+    const idx = findEidIndex(view.state.doc.toString(), eid);
+    if (idx === null) return; // un-stamped / passthrough → no-op
+
+    view.dispatch({
+      effects: EditorView.scrollIntoView(idx, { y: 'center' }),
+    });
   });
 </script>
 
