@@ -21,6 +21,9 @@ export {
   nestSlide,
   promoteSlide,
   setSlideHidden,
+  parsePresetSection,
+  addSlideFromLayout,
+  changeSlideLayout,
   type SlideTreeNode,
 } from './slides';
 

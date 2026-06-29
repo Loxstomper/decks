@@ -207,3 +207,95 @@ func TestValidate_AssetEscapesDeck(t *testing.T) {
 		t.Fatalf("expected asset-escapes-deck, got: %+v", res.Errors)
 	}
 }
+
+// TestValidate_DataLayoutMarker verifies that data-layout on a <section> is
+// accepted as any non-empty string (P14 layout-preset marker; not enum-restricted).
+func TestValidate_DataLayoutMarker(t *testing.T) {
+	cases := []string{
+		"title-body",
+		"two-column",
+		"blank",
+		"my-custom-preset",
+	}
+	for _, v := range cases {
+		h := `<section data-eid="s1" data-layout="` + v + `"><div data-lay="stack" data-eid="c1"><h2 data-eid="t1">ok</h2></div></section>`
+		res := Bytes([]byte(h), "")
+		if !res.OK {
+			t.Errorf("data-layout=%q on <section> must be valid, got: %+v", v, res.Errors)
+		}
+	}
+}
+
+// TestValidate_DataLayoutEmptyInvalid verifies that an empty data-layout value
+// is flagged as invalid-attr.
+func TestValidate_DataLayoutEmptyInvalid(t *testing.T) {
+	h := `<section data-eid="s1" data-layout=""><div data-lay="stack" data-eid="c1"><h2 data-eid="t1">x</h2></div></section>`
+	res := Bytes([]byte(h), "")
+	if res.OK || !hasCode(res, "invalid-attr") {
+		t.Fatalf("expected invalid-attr for empty data-layout, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_DataSlotMarker verifies that data-slot on any element is accepted
+// as any non-empty string (P14 named-slot marker; no enum restriction).
+func TestValidate_DataSlotMarker(t *testing.T) {
+	// data-slot on a section child container and on a section itself.
+	h := `<section data-eid="s1" data-layout="two-column">` +
+		`<div data-lay="row" data-eid="row1">` +
+		`<div data-lay="stack" data-eid="col1" data-slot="content"><h2 data-eid="t1">Main</h2></div>` +
+		`<div data-lay="stack" data-eid="col2" data-slot="sidebar"><p data-eid="p1">Side</p></div>` +
+		`</div></section>`
+	res := Bytes([]byte(h), "")
+	if !res.OK {
+		t.Fatalf("data-slot on containers must be valid, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_DataSlotEmptyInvalid verifies that an empty data-slot value is
+// flagged as invalid-attr.
+func TestValidate_DataSlotEmptyInvalid(t *testing.T) {
+	h := `<section data-eid="s1"><div data-lay="stack" data-eid="c1" data-slot=""><h2 data-eid="t1">x</h2></div></section>`
+	res := Bytes([]byte(h), "")
+	if res.OK || !hasCode(res, "invalid-attr") {
+		t.Fatalf("expected invalid-attr for empty data-slot, got: %+v", res.Errors)
+	}
+}
+
+// TestValidate_DataLayoutAndSlotTogether verifies a realistic deck using both
+// data-layout on a <section> and data-slot on child containers passes cleanly.
+func TestValidate_DataLayoutAndSlotTogether(t *testing.T) {
+	h := validDeckHTMLWithPreset
+	res := Bytes([]byte(h), "")
+	if !res.OK {
+		t.Fatalf("deck with data-layout + data-slot must pass, got: %+v", res.Errors)
+	}
+}
+
+// validDeckHTMLWithPreset is a minimal well-formed deck that uses the P14
+// data-layout marker on a section and data-slot on child containers.
+const validDeckHTMLWithPreset = `<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>preset-test</title>
+  <link rel="stylesheet" href="custom.css" />
+</head>
+<body>
+  <div class="reveal">
+    <div class="slides">
+      <section data-eid="s1" data-layout="two-column">
+        <div data-lay="row" data-gap="64" data-eid="row1">
+          <div data-lay="stack" data-gap="16" data-grow="1" data-eid="col1" data-slot="content">
+            <h2 data-eid="t1">Main Content</h2>
+            <p data-eid="p1">Body text goes here.</p>
+          </div>
+          <div data-lay="stack" data-gap="16" data-grow="1" data-eid="col2" data-slot="sidebar">
+            <p data-eid="p2">Sidebar text.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</body>
+</html>
+`

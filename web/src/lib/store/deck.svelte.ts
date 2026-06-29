@@ -83,6 +83,8 @@ import {
   nestSlide as nestSlideOp,
   promoteSlide as promoteSlideOp,
   setSlideHidden as setSlideHiddenOp,
+  addSlideFromLayout as addSlideFromLayoutOp,
+  changeSlideLayout as changeSlideLayoutOp,
 } from '$lib/slides';
 import { undoStore } from './undo.svelte';
 import { highlightStore } from './highlight.svelte';
@@ -786,6 +788,35 @@ class DeckStore {
   async addSlide(afterEid?: string): Promise<string | null> {
     if (!this.model) return null;
     const section = addSlideOp(this.model, afterEid);
+    if (!section) return null;
+    return await this.#commitNewSection(section);
+  }
+
+  /**
+   * P14-3: Add a new slide built from a layout PRESET (a `<section data-layout>`
+   * snippet from GET /api/templates) after the slide with `afterEid` (or appended
+   * when omitted). The preset's structure + starter prompt content is inserted and
+   * fresh unique data-eids are stamped onto every managed element. Returns the new
+   * slide's data-eid, or null when no deck is open or the snippet has no section.
+   */
+  async addSlideFromLayout(presetHtml: string, afterEid?: string): Promise<string | null> {
+    if (!this.model) return null;
+    const section = addSlideFromLayoutOp(this.model, presetHtml, afterEid);
+    if (!section) return null;
+    return await this.#commitNewSection(section);
+  }
+
+  /**
+   * P14-4: Re-flow the slide carrying `sectionEid` into a new layout PRESET,
+   * preserving its position + identity and moving ALL of its content into the new
+   * layout's content slot (nothing is dropped — the preset's starter prompts are
+   * replaced by the user's content). One undo entry + one autosave; undo restores
+   * the prior structure byte-for-byte (the snapshot stack). Returns the re-flowed
+   * slide's data-eid, or null when the eid is unknown / the snippet has no section.
+   */
+  async changeSlideLayout(sectionEid: string, presetHtml: string): Promise<string | null> {
+    if (!this.model) return null;
+    const section = changeSlideLayoutOp(this.model, sectionEid, presetHtml);
     if (!section) return null;
     return await this.#commitNewSection(section);
   }
