@@ -44,3 +44,4 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
 
 ## Endpoints
 `GET /health` · `GET /api/decks` · `GET|PUT /api/decks/{name}` · `GET /decks/{name}/...` (static deck files: `deck.html` + `assets/`, traversal-guarded; the iframe loads `/decks/{name}/deck.html`) · `GET /events` (SSE) · `GET /` (SPA).
+Deck-config rewrites (byte-stable edits to `Reveal.initialize` in deck.html): `POST /api/decks/{name}/slide-number` (`{enabled,format}`) · `POST /api/decks/{name}/autoslide` (`{ms,loop}`). The present route (`GET /present/{name}`) injects the chalkboard + laser plugins **in-memory only** (deck.html on disk stays byte-identical).
