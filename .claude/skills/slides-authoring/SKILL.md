@@ -120,7 +120,7 @@ Rules for `data-eid`:
    `row1`, `s4`). Use the same prefix style you see in the existing deck.
 4. **On containers and leaves.** Every `data-lay` container and every known leaf
    element (`h1`-`h6`, `p`, `ul`, `ol`, `img`, `pre`, `code`, `table`, `figure`,
-   `iframe`, `svg`, `video`, `audio`) should have a `data-eid`.
+   `iframe`, `svg`, `video`, `audio`, `canvas` [chart]) should have a `data-eid`.
 5. **Do NOT add** `data-eid` to passthrough elements (script, style, meta, link,
    div without data-lay, span, em, strong, a, br, etc.). The editor preserves
    those verbatim.
@@ -225,6 +225,25 @@ A child spanning two columns:
 `data-free` presence (boolean) is what matters; the value is ignored.
 Coordinates are in the 1920×1080 logical space.
 
+### 4f. Chart block (Chart.js leaf)
+
+A chart is a `<canvas>` carrying two editor-owned markers — `data-chart` (the
+type) and `data-chart-data` (a JSON Chart.js config). The bundled chart plugin
+`JSON.parse`s the config and renders it offline.
+
+```html
+<canvas data-eid="chart1"
+        data-chart="bar"
+        data-chart-data='{"type":"bar","data":{"labels":["Q1","Q2","Q3"],"datasets":[{"label":"Revenue","data":[12,19,24]}]}}'>
+</canvas>
+```
+
+- `data-chart` must be a non-empty type string (`bar`, `line`, `pie`, …).
+- `data-chart-data` must be **parseable JSON** (a `{type, data, options?}`
+  config). `slides validate` rejects malformed JSON.
+- A bare `<canvas>` without `data-chart` is left as passthrough — the editor
+  only manages charts it emitted.
+
 ---
 
 ## 5. Slide-level attributes
@@ -253,6 +272,52 @@ These go on `<section>` elements:
 
 Allowed `data-transition` values: `slide` | `fade` | `convex` | `concave` | `zoom` | `none`
 Allowed `data-transition-speed` values: `default` | `fast` | `slow`
+
+### Per-slide theme override (P10)
+
+```html
+<section data-eid="s15" data-theme="dracula">
+```
+
+Overrides the deck theme for one slide. Allowed values: `black` | `white` |
+`league` | `beige` | `night` | `moon` | `solarized` | `solarized-dark` |
+`dracula` | `sky` (any other value fails validation).
+
+### Per-slide background (P16)
+
+reveal.js renders these natively — set whichever you need on the `<section>`:
+
+| Attribute | Value |
+|-----------|-------|
+| `data-background-color` | any CSS color |
+| `data-background-gradient` | a CSS gradient string |
+| `data-background-image` | `assets/…` relative path (offline-first) |
+| `data-background-size` / `-position` / `-repeat` / `-opacity` | CSS `background-*` values |
+| `data-background-video` | `assets/…` relative path |
+| `data-background-video-loop` / `-muted` | `"true"` / `"false"` |
+
+`data-background-image` and `data-background-video` must point at **local
+assets** — external `http(s)://` URLs fail the offline guard.
+
+### Layout-preset markers (P14)
+
+When a slide is built from a layout preset, the editor stamps informational
+markers that have **no reflow semantics** (flex/grid still comes from `data-lay`):
+
+- `data-layout="<preset>"` on the `<section>` (e.g. `title-body`, `two-column`)
+- `data-slot="<role>"` on its child containers (e.g. `content`, `sidebar`)
+
+Both are non-empty strings. Preserve them verbatim — the editor relies on them
+for content-preserving "Change layout". Don't invent new values by hand.
+
+### Footer opt-out (P17)
+
+```html
+<section data-eid="s16" data-footer-hidden>
+```
+
+Boolean marker: hides the deck-level footer overlay on this one slide. Presence
+is all that matters (any value counts).
 
 ---
 
@@ -401,6 +466,40 @@ Per-deck theme overrides go in `custom.css` as CSS custom properties:
 }
 ```
 
+### Inline marks & links (rich text within a leaf)
+
+Inside a text leaf (`p`, `h1`–`h6`, `li`, …) you may use an allowlisted set of
+inline marks. These are rich text *within* content — addressed by the leaf's
+`data-eid` plus a selection range — so they do **not** take their own `data-eid`:
+
+| Mark | Use |
+|------|-----|
+| `<strong>` / `<em>` | bold / italic |
+| `<u>` / `<s>` | underline / strikethrough |
+| `<a href="…">` | link (see below) |
+| `<span style="color:…;font-size:…">` | inline color / size |
+
+```html
+<p data-eid="p12">
+  Ship <strong>fast</strong>, stay <em>offline</em>, and
+  <a href="assets/spec.pdf">read the spec</a>.
+</p>
+```
+
+The editor normalises marks to this allowlist on save:
+
+- Legacy tags map to canonical ones (`<b>`→`<strong>`, `<i>`→`<em>`, `<font>`→`<span>`).
+- `<span style>` keeps only `color` and `font-size`; other declarations, classes,
+  ids, and `on*` handlers are stripped (an emptied span is unwrapped).
+- `<a>` keeps `href` / `target` / `rel`; `javascript:`, `vbscript:`, and `data:`
+  hrefs are neutralised (the anchor is unwrapped).
+- Unknown/disallowed inline tags are unwrapped (text kept, tag dropped).
+
+For links: prefer relative `assets/…` paths for in-deck resources. Unlike `src`,
+an `<a href>` is navigation rather than a loaded resource, so external
+`http(s)://` link *targets* are allowed and not flagged by validation — but they
+won't resolve offline.
+
 ---
 
 ## 13. Turn-taking with the editor
@@ -473,8 +572,12 @@ Before finishing any deck edit, verify:
 - [ ] Every `data-gap` and `data-pad` is a non-negative integer
 - [ ] Every `data-span` is a positive integer >= 1
 - [ ] Every `data-grow` is a non-negative integer
+- [ ] Every `data-theme` (if present) is one of the 10 bundled theme names
+- [ ] Every `data-layout` / `data-slot` value is a non-empty string
+- [ ] Every `data-chart` has a parseable `data-chart-data` JSON config
+- [ ] Inline marks are limited to `strong` / `em` / `u` / `s` / `a` / `span[style]`
 - [ ] All `data-eid` values are unique within the file
-- [ ] No external URLs in `src=`, `href=`, or `url()` (except inside `<aside class="notes">` speaker text)
+- [ ] No external URLs in image/media `src=`, `data-background-image/-video=`, or `url()` (external `<a href>` link targets are allowed; speaker-note URLs are fine)
 - [ ] `assets/vendor/` was not modified
 - [ ] `deck.html` is complete (not a fragment) before saving
 

@@ -137,8 +137,35 @@ These go on `<section>` elements:
 | `data-transition`      | `slide` \| `fade` \| `convex` \| `concave` \| `zoom` \| `none` | Per-slide transition override            |
 | `data-transition-speed`| `default` \| `fast` \| `slow`                                | Per-slide transition speed                  |
 | `data-auto-animate`    | boolean (presence)                                            | Enables auto-animate tween to/from adjacent |
+| `data-theme` (P10)     | `black` \| `white` \| `league` \| `beige` \| `night` \| `moon` \| `solarized` \| `solarized-dark` \| `dracula` \| `sky` | Per-slide theme override |
+| `data-layout` (P14)    | non-empty preset name (e.g. `title-body`, `two-column`)       | Layout-preset marker (drives "Change layout"); no reflow semantics |
+| `data-footer-hidden` (P17) | boolean (presence)                                       | Opts this slide out of the deck-level footer overlay |
+| `data-background-color` | any CSS color                                                | reveal.js per-slide background color        |
+| `data-background-gradient` | CSS gradient string                                       | reveal.js per-slide background gradient     |
+| `data-background-image` (P16) | `assets/…` relative path (offline-first)               | reveal.js per-slide background image        |
+| `data-background-video` (P16) | `assets/…` relative path (offline-first)               | reveal.js per-slide background video        |
+| `data-background-size` / `-position` / `-repeat` / `-opacity` / `-video-loop` / `-video-muted` | CSS / reveal pass-through strings | Background tuning (tolerated verbatim) |
 
 Nested `<section>` elements create reveal's 2D slide grid (vertical stacks).
+
+### Child-container and leaf markers (P14 / P17)
+
+- `data-slot="<role>"` — on a child container of a preset layout (e.g. `content`,
+  `sidebar`). Non-empty string; informational only (no reflow semantics).
+- `data-chart` + `data-chart-data` — on a `<canvas>` leaf: the chart type string
+  plus a parseable Chart.js JSON config `{type, data, options?}`. A bare
+  `<canvas>` without `data-chart` stays passthrough.
+
+### Inline marks (rich text within a leaf, P17)
+
+Inside a text leaf the editor recognises an allowlist of inline marks —
+`strong` · `em` · `u` · `s` · `a[href,target,rel]` · `span[style: color, font-size]`
+(plus `br`). Legacy tags are normalised (`b`→`strong`, `i`→`em`, `font`→`span`);
+disallowed tags/attributes are unwrapped or stripped on save; `javascript:` /
+`vbscript:` / `data:` anchor hrefs are neutralised. Inline marks carry **no**
+`data-eid` — they are addressed by the leaf's `data-eid` plus a selection range.
+Unlike resource `src`s, external `<a href>` link targets are not flagged by the
+offline guard (they are navigation, not loaded assets).
 
 ---
 
@@ -254,8 +281,11 @@ HTTP (`POST /api/decks/{name}/validate`) and gates its own save path on them.
 
 The canonical attribute names and allowed-value sets are defined in:
 
-- `web/src/lib/model/layout.ts` — `LayValue`, `AlignValue`, `JustifyValue`, `LayoutProps`
+- `web/src/lib/model/layout.ts` — `LayValue`, `AlignValue`, `JustifyValue`, `LayoutProps`; chart + preset/slot accessors
+- `web/src/lib/model/theme.ts` — `THEME_NAMES` and the `data-background-*` set
+- `web/src/lib/model/inline.ts` — `INLINE_MARK_TAGS` and the inline-mark allowlist/normalisation
 - `web/src/lib/model/classify.ts` — element classification rules (container / leaf / free / passthrough)
+- `internal/validate/validate.go` — the Go re-implementation of the same allowed-sets (keep in sync)
 - `internal/deck/deck.go` — deck template, vendored asset structure, CLI commands
 - `specs/03-layout-vocabulary.md` — design intent and contract
 - `specs/12-principles-and-invariants.md` — offline-first, round-trip, never-destroy
