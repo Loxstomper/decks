@@ -689,6 +689,20 @@ func (s *Server) handleDeckStatic(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// The MUTABLE deck documents (deck.html, custom.css) are rewritten in place by
+	// the editor/Claude Code and the iframe must reflect the new bytes immediately
+	// after a save. ServeFileFS uses Last-Modified for conditional requests, but
+	// HTTP Last-Modified has only 1-SECOND granularity: an edit + the follow-up
+	// canvas reload land within the same second, so the browser's If-Modified-Since
+	// matches the freshly-written file's mtime and the server answers 304 — the
+	// iframe then renders the STALE cached copy (e.g. an inline font-size run shows
+	// on disk and in the present route but never in the canvas). Forbid caching of
+	// these two files so every reload fetches the current bytes. The immutable
+	// vendor/asset files keep normal caching.
+	if rel == "deck.html" || rel == "custom.css" {
+		w.Header().Set("Cache-Control", "no-store")
+	}
+
 	// os.DirFS confines all access to deckDir; ServeFileFS sets Content-Type
 	// from the file extension and handles conditional/range requests.
 	http.ServeFileFS(w, r, os.DirFS(deckDir), rel)

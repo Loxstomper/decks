@@ -36,12 +36,14 @@
 
   /** Font-size presets offered in the picker (em units, resolution-independent). */
   const FONT_SIZES: ReadonlyArray<{ label: string; value: string }> = [
-    { label: 'Size', value: '' },
     { label: 'Small', value: '0.75em' },
     { label: 'Normal', value: '1em' },
     { label: 'Large', value: '1.5em' },
     { label: 'XL', value: '2em' },
   ];
+
+  /** Whether the (custom) font-size menu is open. */
+  let sizeOpen = $state(false);
 
   // Horizontal centre + vertical anchor of the selection (overlay-local px).
   const centerX = $derived(rect.left + rect.width / 2);
@@ -58,10 +60,14 @@
     onColor((e.target as HTMLInputElement).value);
   }
 
-  function onSizeChange(e: Event): void {
-    const v = (e.target as HTMLSelectElement).value;
-    (e.target as HTMLSelectElement).selectedIndex = 0; // reset to "Size"
-    if (v) onFontSize(v);
+  function toggleSize(): void {
+    sizeOpen = !sizeOpen;
+  }
+
+  /** Apply a preset and close the menu. '' clears any explicit size run. */
+  function pickSize(value: string): void {
+    sizeOpen = false;
+    onFontSize(value);
   }
 </script>
 
@@ -90,11 +96,42 @@
 
   <span class="st-sep"></span>
 
-  <select class="st-select" title="Font size" aria-label="Font size" onmousedown={hold} onchange={onSizeChange}>
-    {#each FONT_SIZES as size (size.label)}
-      <option value={size.value}>{size.label}</option>
-    {/each}
-  </select>
+  <!--
+    Font size uses a CUSTOM button menu, not a native <select>. A native select
+    can't work here: every toolbar control does onmousedown+preventDefault to keep
+    the iframe contenteditable focused (a blur commits + tears down the edit
+    session), but preventDefault on a <select>'s mousedown also stops Chromium from
+    opening the dropdown — so onchange never fired. Buttons take the same
+    focus-holding path the B/I/U controls use, then apply on click.
+  -->
+  <div class="st-size">
+    <button
+      class="st-btn st-size-trigger"
+      title="Font size"
+      aria-label="Font size"
+      aria-haspopup="listbox"
+      aria-expanded={sizeOpen}
+      onmousedown={hold}
+      onclick={toggleSize}
+    >
+      Size
+      <svg class="st-caret" viewBox="0 0 10 6" aria-hidden="true">
+        <path d="M1 1l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.4" />
+      </svg>
+    </button>
+    {#if sizeOpen}
+      <div class="st-menu" role="listbox" aria-label="Font size">
+        {#each FONT_SIZES as size (size.value)}
+          <button class="st-menu-item" role="option" aria-selected="false" onmousedown={hold} onclick={() => pickSize(size.value)}>
+            {size.label}
+          </button>
+        {/each}
+        <button class="st-menu-item st-menu-default" onmousedown={hold} onclick={() => pickSize('')}>
+          Default
+        </button>
+      </div>
+    {/if}
+  </div>
 
   <label class="st-color" title="Text color">
     <span class="st-color-glyph">A</span>
@@ -173,20 +210,63 @@
     background: rgba(255, 255, 255, 0.12);
   }
 
-  .st-select {
+  .st-size {
+    position: relative;
+    display: flex;
+  }
+
+  .st-size-trigger {
+    gap: 3px;
+    font-size: 12px;
+  }
+
+  .st-caret {
+    width: 8px;
+    height: 5px;
+    opacity: 0.7;
+  }
+
+  .st-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    min-width: 96px;
+    padding: 3px;
+    background: rgba(22, 22, 26, 0.99);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 8px;
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.3),
+      0 8px 24px rgba(0, 0, 0, 0.5);
+    z-index: 1;
+  }
+
+  .st-menu-item {
+    display: flex;
+    align-items: center;
     height: 26px;
+    padding: 0 8px;
     border: none;
     border-radius: 5px;
     background: transparent;
     color: rgba(255, 255, 255, 0.85);
     font-size: 12px;
+    text-align: left;
     cursor: pointer;
-    outline: none;
+    transition: background 0.07s ease;
   }
 
-  .st-select option {
-    background: #16161a;
+  .st-menu-item:hover {
+    background: rgba(255, 255, 255, 0.12);
     color: #fff;
+  }
+
+  .st-menu-default {
+    margin-top: 3px;
+    padding-top: 3px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
   }
 
   .st-color {

@@ -354,6 +354,44 @@ func TestDeckStatic_ServesEntryAndAssets(t *testing.T) {
 	}
 }
 
+// TestDeckStatic_NoStoreForMutableDocs verifies the mutable deck documents
+// (deck.html, custom.css) are served with Cache-Control: no-store so the canvas
+// iframe never renders a stale copy after a save. HTTP Last-Modified has only
+// 1-second granularity, so without this an edit + the follow-up reload within the
+// same second would get a 304 and the canvas would keep showing the old bytes
+// (the inline font-size run shows on disk + present route but never in the canvas).
+// Immutable vendor assets must keep normal caching (no no-store).
+func TestDeckStatic_NoStoreForMutableDocs(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "cachetest"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	cases := []struct {
+		path        string
+		wantNoStore bool
+	}{
+		{"/decks/cachetest/deck.html", true},
+		{"/decks/cachetest/", true}, // root → deck.html
+		{"/decks/cachetest/custom.css", true},
+		{"/decks/cachetest/assets/vendor/reveal/reveal.css", false},
+	}
+	for _, tc := range cases {
+		req := httptest.NewRequest("GET", tc.path, nil)
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		if rr.Code != http.StatusOK {
+			t.Errorf("%s: want 200, got %d", tc.path, rr.Code)
+			continue
+		}
+		gotNoStore := strings.Contains(rr.Header().Get("Cache-Control"), "no-store")
+		if gotNoStore != tc.wantNoStore {
+			t.Errorf("%s: Cache-Control=%q, want no-store=%v",
+				tc.path, rr.Header().Get("Cache-Control"), tc.wantNoStore)
+		}
+	}
+}
+
 // TestDeckStatic_PathTraversalBlocked ensures a crafted URL cannot escape the deck folder.
 func TestDeckStatic_PathTraversalBlocked(t *testing.T) {
 	srv, root := newTestServer(t)
