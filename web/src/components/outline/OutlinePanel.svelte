@@ -220,7 +220,7 @@
         eid so Svelte can efficiently diff individual slides without re-rendering
         siblings when only one changes.
       -->
-      {#each tree as node (node.eid ?? node.tag)}
+      {#each tree as node, i (node.eid ?? node.tag + '_' + i)}
         <OutlineTreeNode
           {node}
           depth={0}

@@ -280,7 +280,16 @@
   <!-- ── Children ──────────────────────────────────────────────────────────── -->
   {#if hasChildren && isExpanded}
     <div role="group">
-      {#each node.children as child (child.eid ?? child.tag + '_' + child.label)}
+      <!--
+        Key MUST be unique among siblings or Svelte throws each_key_duplicate,
+        which aborts the whole reactive update (this froze the panel on the
+        previously-open deck). Passthrough nodes have no eid AND their label is
+        just the bare tag (computeLabel returns the tag), so `tag + '_' + label`
+        collides for repeated same-tag passthrough siblings — e.g. the 5 kanban
+        `<div class="col">`, their cards, the two choice-grid divs, the `<br>`s
+        inside mermaid. Fall back to the sibling index, which is always unique.
+      -->
+      {#each node.children as child, i (child.eid ?? child.tag + '_' + i)}
         <OutlineTreeNode
           node={child}
           depth={depth + 1}

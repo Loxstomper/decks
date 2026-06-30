@@ -151,6 +151,13 @@
 
   async function openDeck(name: string): Promise<void> {
     if (name === deckStore.name) return;
+    // Switching decks: drop any selection carried over from the previous deck.
+    // eids are only unique WITHIN a deck (every deck reuses s1, h1, p1, …), so a
+    // stale selection would silently point at a same-eid element in the new deck
+    // (phantom multi-select, broken navigation). The outline/properties panels
+    // are also remounted per deck name (see the {#key} in the outline snippet),
+    // which clears their per-eid expand state for the same reason.
+    selectionStore.clear();
     await deckStore.load(name);
   }
 
@@ -731,6 +738,15 @@
       Both read/drive the SAME selectionStore singleton the canvas uses, so
       selection stays in sync three ways: canvas ↔ outline ↔ properties.
     -->
+    <!--
+      {#key deckStore.name}: fully remount the outline + properties panels when
+      the open deck changes. Their internal state is keyed by data-eid (outline
+      expand map, tree node identity), and eids are only unique within a single
+      deck — so without a remount the previous deck's tree/expand state is reused
+      for colliding eids in the new deck (stale rows, wrong content). Remounting
+      rebuilds both panels from the new deck's model.
+    -->
+    {#key deckStore.name}
     <div class="outline-zone flex flex-col h-full min-h-0">
       <div class="flex-1 min-h-0 overflow-hidden">
         <OutlinePanel
@@ -820,6 +836,7 @@
         </div>
       </div>
     </div>
+    {/key}
   {/snippet}
 
   {#snippet source()}
