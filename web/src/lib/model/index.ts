@@ -74,6 +74,8 @@ export {
   setChartProps,
   getAutoslide,
   setAutoslide,
+  getFooterHidden,
+  setFooterHidden,
 } from './layout';
 export type { ElementClass } from './classify';
 export type {

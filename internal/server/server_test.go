@@ -705,6 +705,50 @@ func TestCustomCSSWrite_OK(t *testing.T) {
 	}
 }
 
+// TestSlideNumberEndpoint exercises POST /api/decks/{name}/slide-number (P17-17):
+// enabling writes a quoted format into Reveal.initialize, an unknown format is
+// rejected, and disabling is byte-stable on a fresh scaffold.
+func TestSlideNumberEndpoint(t *testing.T) {
+	srv, root := newTestServer(t)
+	if err := deck.New(root, "num-deck"); err != nil {
+		t.Fatalf("deck.New: %v", err)
+	}
+
+	post := func(body string) int {
+		req := httptest.NewRequest("POST", "/api/decks/num-deck/slide-number", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		rr := httptest.NewRecorder()
+		srv.ServeHTTP(rr, req)
+		return rr.Code
+	}
+
+	// Enable with current/total format.
+	if code := post(`{"enabled":true,"format":"c/t"}`); code != http.StatusNoContent {
+		t.Fatalf("enable: want 204, got %d", code)
+	}
+	html, err := deck.Read(root, "num-deck")
+	if err != nil {
+		t.Fatalf("Read: %v", err)
+	}
+	if !strings.Contains(string(html), "slideNumber: 'c/t',") {
+		t.Errorf("enabled deck.html missing slideNumber: 'c/t':\n%s", html)
+	}
+
+	// Unknown format → 400, deck unchanged.
+	if code := post(`{"enabled":true,"format":"bogus"}`); code != http.StatusBadRequest {
+		t.Errorf("bad format: want 400, got %d", code)
+	}
+
+	// Disable → back to false.
+	if code := post(`{"enabled":false}`); code != http.StatusNoContent {
+		t.Fatalf("disable: want 204, got %d", code)
+	}
+	html, _ = deck.Read(root, "num-deck")
+	if !strings.Contains(string(html), "slideNumber: false,") {
+		t.Errorf("disabled deck.html missing slideNumber: false:\n%s", html)
+	}
+}
+
 func TestCustomCSSRead_OK(t *testing.T) {
 	srv, root := newTestServer(t)
 	if err := deck.New(root, "css-read"); err != nil {

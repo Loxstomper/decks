@@ -62,6 +62,7 @@
     getChartProps,
     hasAttribute,
     getAutoslide,
+    getFooterHidden,
     type ChartProps,
   } from '$lib/model';
   import type { ElementNode } from '$lib/model/types';
@@ -159,6 +160,18 @@
   }
   /** True when something is selected but no editable container could be found. */
   const isPassthrough: boolean = $derived(!!selectedEid && !container);
+
+  // ── P17-18: per-slide footer opt-out (data-footer-hidden) ───────────────────
+  /** Whether the resolved Slide section opts out of the deck footer. */
+  const slideFooterHidden: boolean = $derived(
+    containerKind === 'Slide' && container ? getFooterHidden(container) : false,
+  );
+
+  function onFooterHiddenToggle(e: Event): void {
+    if (!containerEid) return;
+    const hidden = (e.currentTarget as HTMLInputElement).checked;
+    void deckStore.setSlideFooterHidden(containerEid, hidden);
+  }
 
   // ── P9-8: per-element text colour (spec 09 "Text appearance") ──────────────
   //
@@ -457,6 +470,21 @@
             />
             <span class="unit">ms</span>
           </div>
+        </div>
+      </div>
+
+      <!-- ── P17-18: per-slide footer opt-out (data-footer-hidden) ── -->
+      <div class="separator"></div>
+      <div class="prop-section">
+        <div class="section-sublabel">Footer</div>
+        <div class="prop-row">
+          <label class="prop-label" for="slide-footer-hidden">Hide on this slide</label>
+          <input
+            id="slide-footer-hidden"
+            type="checkbox"
+            checked={slideFooterHidden}
+            onchange={onFooterHiddenToggle}
+          />
         </div>
       </div>
     {/if}

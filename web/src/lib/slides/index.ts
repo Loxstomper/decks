@@ -22,6 +22,7 @@ export {
   promoteSlide,
   setSlideHidden,
   setSlideAutoslide,
+  setSlideFooterHidden,
   parsePresetSection,
   addSlideFromLayout,
   changeSlideLayout,

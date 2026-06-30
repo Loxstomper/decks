@@ -45,6 +45,7 @@ import {
   getLayoutMarker,
   setLayoutMarker,
   setAutoslide,
+  setFooterHidden,
   type DeckModel,
   type ElementNode,
   type SlideNode,
@@ -449,6 +450,20 @@ export function setSlideAutoslide(model: DeckModel, eid: string, ms: number | nu
   const found = findSectionAndParent(model, eid);
   if (!found) return false;
   setAutoslide(found.section, ms);
+  return true;
+}
+
+/**
+ * P17-18: Opt the slide carrying `eid` in/out of the deck-level footer overlay.
+ * Hiding adds the boolean `data-footer-hidden` marker to the `<section>` (the
+ * managed footer custom.css rule is keyed off `section:not([data-footer-hidden])`
+ * so the footer disappears on that slide); showing removes it. Byte-stable.
+ * Returns true on success, false when the eid is unknown.
+ */
+export function setSlideFooterHidden(model: DeckModel, eid: string, hidden: boolean): boolean {
+  const found = findSectionAndParent(model, eid);
+  if (!found) return false;
+  setFooterHidden(found.section, hidden);
   return true;
 }
 

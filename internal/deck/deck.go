@@ -477,7 +477,8 @@ func initLineRE(key string) *regexp.Regexp {
 
 // setInitKey upserts (value != "") or removes (value == "") exactly one key in
 // the first Reveal.initialize({…}) object. `value` is the raw JS literal placed
-// after the colon (e.g. "3000" or "true"). Pure, idempotent and byte-stable: if
+// after the colon (e.g. "3000", "true", "false", or "'c/t'"). Pure, idempotent
+// and byte-stable: if
 // the desired state already holds the input is returned unchanged (changed=false),
 // so re-running produces no diff. New keys are inserted at the top of the object
 // (right after the `{` line) with the surrounding indentation; the always-present
@@ -573,6 +574,48 @@ func SetAutoSlide(root, name string, ms int, loop bool) error {
 		return err
 	}
 	out, changed := setRevealAutoSlide(string(html), ms, loop)
+	if !changed {
+		return nil
+	}
+	return Write(root, name, []byte(out))
+}
+
+// setSlideNumber sets the deck-level slide-number config in Reveal.initialize:
+// `slideNumber: false` (off) or `slideNumber: '<format>'` (e.g. 'c/t' for
+// current/total, 'c' for current). The key is always KEPT present (set to `false`
+// when disabled) rather than removed, matching the scaffold which ships
+// `slideNumber: false`, so a freshly scaffolded deck toggled off is byte-stable.
+// Pure, idempotent and byte-stable: a deck already in the requested state is
+// returned unchanged. `format` is the raw token placed inside single quotes —
+// callers must restrict it to a safe whitelist (the endpoint does) so no quote
+// escaping is required.
+func setSlideNumber(html string, enabled bool, format string) (string, bool) {
+	val := "false"
+	if enabled {
+		f := format
+		if f == "" {
+			f = "c/t"
+		}
+		val = "'" + f + "'"
+	}
+	return setInitKey(html, "slideNumber", val)
+}
+
+// SetSlideNumber rewrites decks/<name>/deck.html under root so Reveal.initialize
+// carries the requested deck-level slide-number config (P17-17). When `enabled`
+// is false the key is set to `false`; otherwise to the quoted `format` token. The
+// rewrite is byte-stable: when the deck already holds the requested config the
+// file is left untouched (no atomic write at all). Uses the same temp-file +
+// os.Rename atomic pattern as Write.
+func SetSlideNumber(root, name string, enabled bool, format string) error {
+	if err := validateName(name); err != nil {
+		return err
+	}
+	html, err := Read(root, name)
+	if err != nil {
+		return err
+	}
+	out, changed := setSlideNumber(string(html), enabled, format)
 	if !changed {
 		return nil
 	}

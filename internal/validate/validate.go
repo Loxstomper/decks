@@ -382,6 +382,14 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 			EID:     eid,
 		})
 	}
+	// data-footer-hidden (P17-18): boolean MARKER on a <section> opting that slide
+	// out of the deck-level footer overlay (a managed custom.css rule keyed off
+	// section:not([data-footer-hidden])). It is presence-only — any value (incl.
+	// the empty boolean-attribute form) is tolerated, so there is nothing to
+	// reject here; the clause documents the recognised attribute and keeps the
+	// contract dual-encoded with getFooterHidden/setFooterHidden in
+	// web/src/lib/model/layout.ts (keep in sync on the attribute name).
+	_ = attrs["data-footer-hidden"]
 
 	// (a) numeric attributes. gap/pad/grow are non-negative integers; span is a
 	// positive integer (>=1). These are the documented integer attributes of the
@@ -410,8 +418,8 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 
 	// Free-element coordinates: numeric (floats allowed); w/h must be >= 0.
 	for _, n := range []struct {
-		attr    string
-		nonNeg  bool
+		attr   string
+		nonNeg bool
 	}{
 		{"data-x", false}, {"data-y", false}, {"data-rot", false},
 		{"data-w", true}, {"data-h", true},

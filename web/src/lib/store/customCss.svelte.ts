@@ -104,6 +104,39 @@ class CustomCssStore {
     void this.save();
   }
 
+  /**
+   * P17-18: Set (or update) the deck footer. Inserts/replaces ONLY the managed
+   * footer block (delimited by the slides-builder:footer marker comments) — a
+   * fixed overlay rendered via `section:not([data-footer-hidden])::after` (text)
+   * and `::before` (optional local logo). User free-form CSS and the `:root`
+   * block are untouched.
+   * Idempotent: re-setting the same footer yields no diff. Immediately saves so
+   * the canvas re-renders. Pass an empty `text` with no logo to effectively clear
+   * (use clearFooter for an explicit removal).
+   */
+  setFooter(text: string, logoSrc?: string | null): void {
+    const next =
+      text.trim() === '' && !logoSrc
+        ? clearFooterBlock(this.source)
+        : setFooterBlock(this.source, text, logoSrc ?? null);
+    if (next === this.source) return;
+    this.source = next;
+    this.status = 'unsaved';
+    void this.save();
+  }
+
+  /**
+   * P17-18: Remove the managed footer block entirely (no-op if absent). User CSS
+   * and the `:root` block are preserved. Immediately saves.
+   */
+  clearFooter(): void {
+    const next = clearFooterBlock(this.source);
+    if (next === this.source) return;
+    this.source = next;
+    this.status = 'unsaved';
+    void this.save();
+  }
+
   #scheduleDebounce(): void {
     if (this.#saveTimer) clearTimeout(this.#saveTimer);
     this.#saveTimer = setTimeout(() => {
@@ -204,6 +237,155 @@ export function setCssVar(css: string, varName: string, value: string): string {
 /** Escape a string for use as a literal in a RegExp. */
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// ── P17-18: Managed deck-footer block ───────────────────────────────────────
+//
+// The footer is a single, clearly-delimited managed region in custom.css:
+//
+//   /* slides-builder:footer */
+//   .reveal .slides section:not([data-footer-hidden])::after { … text … }
+//   .reveal .slides section:not([data-footer-hidden])::before { … logo … }
+//   /* /slides-builder:footer */
+//
+// WHY THIS SELECTOR: reveal renders every slide as a <section> but hides the
+// non-current ones (display:none), so a fixed `::after` on
+// `section:not([data-footer-hidden])` shows the footer on the visible slide in
+// the editor, the present route AND PDF export, while slides carrying the
+// boolean `data-footer-hidden` marker get no pseudo-element (footer suppressed).
+//
+// setFooterBlock / clearFooterBlock touch ONLY this region — the user's
+// free-form CSS and the :root block (managed by setCssVar) are never modified.
+
+/** Opening + closing marker comments delimiting the managed footer region. */
+const FOOTER_OPEN = '/* slides-builder:footer */';
+const FOOTER_CLOSE = '/* /slides-builder:footer */';
+
+/**
+ * Matches the whole managed footer region INCLUDING the blank line(s) preceding
+ * it and a single trailing newline, so removal/replacement leaves no orphaned
+ * whitespace. Non-greedy body so it stops at the first close marker.
+ */
+const footerBlockRe =
+  /\n*\/\* slides-builder:footer \*\/[\s\S]*?\/\* \/slides-builder:footer \*\/\n?/;
+
+/**
+ * CSS-escape a string for use inside a double-quoted `content:` value: backslash
+ * and double-quote are escaped, and a newline becomes the CSS `\A` line break.
+ */
+function cssEscapeContent(s: string): string {
+  return s
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\r?\n/g, '\\A ');
+}
+
+/** Escape a string for use inside a double-quoted `url("…")` token. */
+function cssEscapeUrl(s: string): string {
+  return s.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\r?\n/g, '');
+}
+
+/**
+ * True when `src` is a LOCAL (offline-safe) asset reference — not an absolute
+ * http(s)/protocol-relative URL or a data: URI. Offline-first (spec 12): a logo
+ * must live in the deck (e.g. `assets/logo.png`), never a remote URL.
+ */
+function isLocalAsset(src: string): boolean {
+  const t = src.trim();
+  if (t === '') return false;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(t)) return false; // has a scheme (http:, data:, …)
+  if (t.startsWith('//')) return false; // protocol-relative
+  return true;
+}
+
+/**
+ * Build the canonical managed footer CSS block (between the marker comments) for
+ * the given footer `text` and optional local `logoSrc`. Pure + deterministic so
+ * setFooterBlock can compare for idempotency. A non-local logoSrc is ignored
+ * (offline-first) — only the text rule is emitted.
+ */
+export function buildFooterBlock(text: string, logoSrc?: string | null): string {
+  const lines: string[] = [
+    FOOTER_OPEN,
+    '.reveal .slides section:not([data-footer-hidden])::after {',
+    `  content: "${cssEscapeContent(text)}";`,
+    '  position: fixed;',
+    '  left: 0;',
+    '  right: 0;',
+    '  bottom: 0.6em;',
+    '  text-align: center;',
+    '  font-size: 0.4em;',
+    '  line-height: 1.2;',
+    '  color: var(--r-main-color, #888888);',
+    '  opacity: 0.7;',
+    '  pointer-events: none;',
+    '  z-index: 30;',
+    '}',
+  ];
+  if (logoSrc && isLocalAsset(logoSrc)) {
+    lines.push(
+      '.reveal .slides section:not([data-footer-hidden])::before {',
+      '  content: "";',
+      '  position: fixed;',
+      '  left: 0.8em;',
+      '  bottom: 0.4em;',
+      '  width: 1.6em;',
+      '  height: 1.6em;',
+      `  background-image: url("${cssEscapeUrl(logoSrc.trim())}");`,
+      '  background-size: contain;',
+      '  background-repeat: no-repeat;',
+      '  background-position: left center;',
+      '  pointer-events: none;',
+      '  z-index: 30;',
+      '}',
+    );
+  }
+  lines.push(FOOTER_CLOSE);
+  return lines.join('\n');
+}
+
+/**
+ * Idempotently insert or replace the managed footer block in `css`. If a footer
+ * block already exists it is replaced in place; otherwise the block is appended
+ * after the user's CSS, separated by one blank line. User CSS + the :root block
+ * are never touched. Re-running with the same args yields byte-identical output.
+ */
+export function setFooterBlock(css: string, text: string, logoSrc?: string | null): string {
+  const block = buildFooterBlock(text, logoSrc);
+  // Remove any existing block first so insert + replace share one code path
+  // (keeps whitespace canonical and the operation idempotent).
+  const base = clearFooterBlock(css).replace(/\s*$/, '');
+  return base === '' ? block + '\n' : base + '\n\n' + block + '\n';
+}
+
+/**
+ * Remove the managed footer block (and its surrounding blank line) from `css`.
+ * No-op when no footer block is present. User CSS + the :root block are kept.
+ */
+export function clearFooterBlock(css: string): string {
+  if (!footerBlockRe.test(css)) return css;
+  return css.replace(footerBlockRe, '');
+}
+
+/**
+ * Parse the managed footer block out of `css` for the UI to populate its inputs.
+ * Returns `{ text, logoSrc }` (logoSrc null when no logo rule) or null when no
+ * footer block exists. Decodes the CSS `\A` line break and unescapes `\"`/`\\`.
+ */
+export function parseFooterBlock(css: string): { text: string; logoSrc: string | null } | null {
+  const m = footerBlockRe.exec(css);
+  if (!m) return null;
+  const block = m[0];
+  const contentM = /content:\s*"((?:[^"\\]|\\.)*)"/.exec(block);
+  const text = contentM ? cssUnescapeContent(contentM[1]) : '';
+  const logoM = /background-image:\s*url\("((?:[^"\\]|\\.)*)"\)/.exec(block);
+  const logoSrc = logoM ? logoM[1].replace(/\\(.)/g, '$1') : null;
+  return { text, logoSrc };
+}
+
+/** Inverse of cssEscapeContent for round-tripping into the UI text field. */
+function cssUnescapeContent(s: string): string {
+  return s.replace(/\\A\s?/g, '\n').replace(/\\(.)/g, '$1');
 }
 
 /**
