@@ -316,25 +316,28 @@
           <span class="cm-chevron" aria-hidden="true">›</span>
         {/if}
       </button>
-
-      <!--
-        Inline submenu: rendered as a sibling right after its trigger button so
-        it inherits the same stacking context. Positioned via `getSubmenuPos`
-        which offsets by the menu width + the item's vertical offset.
-      -->
-      {#if openSubmenu === idx && item.submenu?.length}
-        {@const subPos = getSubmenuPos(idx)}
-        <ContextMenu
-          items={item.submenu}
-          x={subPos.x}
-          y={subPos.y}
-          {onClose}
-          _isSubmenu={true}
-        />
-      {/if}
     {/if}
   {/each}
 </div>
+
+<!--
+  Submenu: rendered as a true sibling of the menu box (NOT nested inside it) so
+  its offset parent is the canvas pane, matching the pane-local coordinates that
+  `getSubmenuPos` produces. Nesting it inside `.cm-menu` (a `position: absolute`
+  ancestor) would double-count the parent menu's pane offset and push the
+  submenu away from its trigger. Only one submenu is open at a time, so it is
+  driven by `openSubmenu` outside the item loop.
+-->
+{#if openSubmenu !== null && items[openSubmenu]?.submenu?.length}
+  {@const subPos = getSubmenuPos(openSubmenu)}
+  <ContextMenu
+    items={items[openSubmenu].submenu ?? []}
+    x={subPos.x}
+    y={subPos.y}
+    {onClose}
+    _isSubmenu={true}
+  />
+{/if}
 
 <style>
   /* ── Backdrop ──────────────────────────────────────────────────────────── */
