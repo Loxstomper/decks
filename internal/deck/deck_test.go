@@ -179,6 +179,42 @@ func TestNew_VendorFilesPresent(t *testing.T) {
 	}
 }
 
+// TestNew_QrPluginVendored (P19) asserts the QR generator + plugin are vendored
+// into a fresh deck and linked relatively, and that the scaffold registers the
+// RevealQR plugin — so <div data-qr> blocks render offline.
+func TestNew_QrPluginVendored(t *testing.T) {
+	root := makeWorkspace(t)
+	if err := deck.New(root, "qr-test"); err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	qrDir := filepath.Join(root, "decks", "qr-test", "assets", "vendor", "qr")
+	for _, rel := range []string{"qrcode.js", "plugin.js"} {
+		info, err := os.Stat(filepath.Join(qrDir, rel))
+		if err != nil {
+			t.Errorf("vendored QR file missing: %s: %v", rel, err)
+			continue
+		}
+		if info.Size() == 0 {
+			t.Errorf("vendored QR file is empty: %s", rel)
+		}
+	}
+
+	html, err := os.ReadFile(filepath.Join(root, "decks", "qr-test", "deck.html"))
+	if err != nil {
+		t.Fatalf("read deck.html: %v", err)
+	}
+	for _, want := range []string{
+		"assets/vendor/qr/qrcode.js",
+		"assets/vendor/qr/plugin.js",
+		"RevealQR",
+	} {
+		if !bytes.Contains(html, []byte(want)) {
+			t.Errorf("deck.html missing expected QR reference %q", want)
+		}
+	}
+}
+
 // TestNew_DeckHTMLUsesRelativeRevealPaths asserts that the scaffolded deck.html
 // references reveal.js assets via relative paths (assets/vendor/reveal/…) rather
 // than absolute CDN URLs — required for offline-first rendering (spec 12).

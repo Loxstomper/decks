@@ -60,10 +60,12 @@
     getInlineColor,
     getInlineStyleProp,
     getChartProps,
+    getQrProps,
     hasAttribute,
     getAutoslide,
     getFooterHidden,
     type ChartProps,
+    type QrProps,
   } from '$lib/model';
   import type { ElementNode } from '$lib/model/types';
   import AlignmentToolbar from './AlignmentToolbar.svelte';
@@ -71,6 +73,7 @@
   import BlockTextControl from './BlockTextControl.svelte';
   import AltTextControl from './AltTextControl.svelte';
   import ChartDataControl from './ChartDataControl.svelte';
+  import QrControl from './QrControl.svelte';
   import SlideBackgroundControl from './SlideBackgroundControl.svelte';
 
   // ── Component props ────────────────────────────────────────────────────────
@@ -225,6 +228,24 @@
   const chartLeaf: ElementNode | null = $derived(deriveChartLeaf(selectedEid));
   const chartProps: ChartProps | null = $derived(chartLeaf ? getChartProps(chartLeaf) : null);
 
+  // ── P19: QR code editor (spec 03 "QR code" leaf) ───────────────────────────
+  //
+  // Shown only when the SELECTED element itself is a <div data-qr> QR leaf. Its
+  // payload + encoding options are edited in QrControl, which commits via
+  // deckStore.applyQrData.
+
+  /** The selected element when it is a QR div, else null. */
+  function deriveQrLeaf(eid: string | null): ElementNode | null {
+    if (!eid || !deckStore.model) return null;
+    const el = findByEid(deckStore.model, eid);
+    return el && el.tagName.toLowerCase() === 'div' && hasAttribute(el, 'data-qr')
+      ? el
+      : null;
+  }
+
+  const qrLeaf: ElementNode | null = $derived(deriveQrLeaf(selectedEid));
+  const qrProps: QrProps | null = $derived(qrLeaf ? getQrProps(qrLeaf) : null);
+
   function onTextColorChange(value: string | null): void {
     if (!selectedEid) return;
     // Panel already depends on deckStore (model reads); call the command directly
@@ -324,6 +345,12 @@
   <!-- ── P17-15: chart data — shown whenever a chart canvas is selected ─────── -->
   {#if chartLeaf && chartProps && selectedEid}
     <ChartDataControl eid={selectedEid} type={chartProps.type} data={chartProps.data} />
+    <div class="separator"></div>
+  {/if}
+
+  <!-- ── P19: QR code — shown whenever a QR div is selected ─────────────────── -->
+  {#if qrLeaf && qrProps && selectedEid}
+    <QrControl eid={selectedEid} props={qrProps} />
     <div class="separator"></div>
   {/if}
 

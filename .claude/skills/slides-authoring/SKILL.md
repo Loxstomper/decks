@@ -120,10 +120,11 @@ Rules for `data-eid`:
    `row1`, `s4`). Use the same prefix style you see in the existing deck.
 4. **On containers and leaves.** Every `data-lay` container and every known leaf
    element (`h1`-`h6`, `p`, `ul`, `ol`, `img`, `pre`, `code`, `table`, `figure`,
-   `iframe`, `svg`, `video`, `audio`, `canvas` [chart]) should have a `data-eid`.
+   `iframe`, `svg`, `video`, `audio`, `canvas` [chart], `div` [qr]) should have a
+   `data-eid`.
 5. **Do NOT add** `data-eid` to passthrough elements (script, style, meta, link,
-   div without data-lay, span, em, strong, a, br, etc.). The editor preserves
-   those verbatim.
+   div without data-lay (and without `data-qr`), span, em, strong, a, br, etc.).
+   The editor preserves those verbatim.
 
 ---
 
@@ -243,6 +244,37 @@ type) and `data-chart-data` (a JSON Chart.js config). The bundled chart plugin
   config). `slides validate` rejects malformed JSON.
 - A bare `<canvas>` without `data-chart` is left as passthrough — the editor
   only manages charts it emitted.
+
+### 4g. QR code block (QR leaf)
+
+A QR code is a `<div>` carrying the editor-owned marker `data-qr` (the encoded
+payload — a URL or text). The div is **empty on disk**; the bundled QR plugin
+generates an inline SVG into it at runtime, offline.
+
+```html
+<div data-eid="qr1"
+     data-qr="https://example.com"
+     data-qr-ec="M"
+     data-qr-fg="#000000"
+     data-qr-bg="#ffffff"
+     data-qr-quiet="4"
+     aria-label="QR code: https://example.com"
+     style="width: 280px; height: 280px"></div>
+```
+
+- `data-qr` must be a **non-empty** string (the payload). `slides validate`
+  rejects an empty one.
+- `data-qr-ec` (optional) is the error-correction level — one of `L`, `M`, `Q`,
+  `H` (default `M`). Any other value is rejected.
+- `data-qr-fg` / `data-qr-bg` (optional) are the module / background colours
+  (default `#000000` / `#ffffff`). They are **functional generation inputs**
+  stored as attributes, not CSS — keep strong contrast or the code won't scan.
+- `data-qr-quiet` (optional) is the quiet-zone width in modules — a non-negative
+  integer (default `4`).
+- Add an `aria-label` (e.g. `QR code: <payload>`) so the code is described to
+  assistive tech.
+- A bare `<div>` without `data-qr` is left as passthrough — the editor only
+  manages QR blocks it emitted.
 
 ---
 
@@ -575,6 +607,7 @@ Before finishing any deck edit, verify:
 - [ ] Every `data-theme` (if present) is one of the 10 bundled theme names
 - [ ] Every `data-layout` / `data-slot` value is a non-empty string
 - [ ] Every `data-chart` has a parseable `data-chart-data` JSON config
+- [ ] Every `data-qr` is a non-empty payload; `data-qr-ec` (if present) is `L`|`M`|`Q`|`H`; `data-qr-quiet` (if present) is a non-negative integer
 - [ ] Inline marks are limited to `strong` / `em` / `u` / `s` / `a` / `span[style]`
 - [ ] All `data-eid` values are unique within the file
 - [ ] No external URLs in image/media `src=`, `data-background-image/-video=`, or `url()` (external `<a href>` link targets are allowed; speaker-note URLs are fine)

@@ -110,6 +110,18 @@ export function classify(el: ElementNode): ElementClass {
     return 'leaf';
   }
 
+  // Rule 3d — QR block (P19): a QR code is a <div> carrying the editor's own
+  // marker attribute `data-qr` (the encoded payload; see blocks/builders.ts).
+  // spec 03 lists QR code as a leaf block type — recognise the marker so the QR
+  // gets a data-eid and is individually selectable (its payload/options are
+  // edited in the inspector). A bare <div> WITHOUT data-qr stays passthrough —
+  // the editor only owns QR blocks it emitted. Dual-encoded with the
+  // data-qr recognition in internal/validate/validate.go and getQrProps in
+  // layout.ts.
+  if (tag === 'div' && hasAttribute(el, 'data-qr')) {
+    return 'leaf';
+  }
+
   // Rule 4 — inline mark: managed rich-text content inside a leaf (P17). Checked
   // AFTER leaf/math/chart so `<span class="math-block">` stays a leaf. Inline
   // marks are never stamped with a data-eid (see eid.ts) — addressed via the leaf.

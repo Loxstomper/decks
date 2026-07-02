@@ -542,6 +542,94 @@ dependencies are noted inline.
 > - **P18-3:** already satisfied — `Vendor` → `writeSlideThemesCSS` → `GenerateSlideThemesCSS` regenerates the file every vendor, so re-vendoring picks up the P18-1 fix. Asserted via new determinism test.
 > - **P18-4:** Go tests (`theme_test.go`): `TestGenerateSlideThemesCSS_AssertsColorAtSectionScope` (every theme has the 3 color assertions), `TestGenerateSlideThemesCSS_Deterministic`, `TestInjectSlideThemesLink_PreP10Deck` / `_ScaffoldUnchanged`. e2e (`per-slide-theme.spec.ts`): new test asserts the themed paragraph's computed `color` differs from the plain slide's (run pending browser env).
 
+## Phase 19 — QR code block
+> Goal: an insertable **QR code** leaf that encodes a URL/text into a scannable code, generated
+> **locally** (offline-first) and rendered to SVG at runtime — mirroring the Phase 17 Chart leaf's
+> data-bound model. Specs: [03](specs/03-layout-vocabulary.md) "QR code",
+> [08](specs/08-assets-and-media.md), [12](specs/12-principles-and-invariants.md). Built via a
+> worktree lane + subagents.
+>
+> **Decisions (locked):**
+> - **Data-bound leaf, not a generated asset.** Source is `<div data-qr="…" data-qr-ec="…">` — the
+>   payload stays human/Claude-readable + editable in source, the round-trip is byte-stable (one
+>   attribute), and there is no asset-vs-attribute staleness. A vendored QR plugin renders an
+>   **SVG** into the div at runtime (SVG, not `<canvas>` — crisp under logical-canvas scaling).
+>   Mirrors the Chart leaf (P17-14..16).
+> - **Encoding inputs are `data-qr-*` attributes, not CSS.** `data-qr-fg` / `data-qr-bg` (colours)
+>   + `data-qr-quiet` (quiet-zone modules) are functional inputs to generation (the renderer reads
+>   them to draw scannable modules) — a justified exception to the editor-owns-layout /
+>   you-own-styling split ([03]). The inspector exposes payload + EC + fg/bg (contrast guard) +
+>   quiet zone.
+> - **Thumbnail = placeholder.** Like Chart / code / KaTeX, the QR is JS-rendered; the script-free
+>   navigator thumbnail paints a placeholder — the documented thumbnail-only fidelity gap.
+> - **Accessibility:** the payload is mirrored into an `aria-label`.
+>
+> **Cross-cutting:** keep `internal/validate/validate.go` ⟷ `web/src/lib/model/layout.ts`
+> allowed-sets in sync for the new attributes; the QR plugin is `go:embed`'d + copied per deck +
+> linked relatively (zero external URLs). The vendored QR library must be tiny, dependency-free,
+> SVG-capable, and permissively licensed — pick + pin it at build time (verify, don't assume).
+
+- [x] **P19-1 — Vendor a QR library + plugin (offline).** `go:embed` a small, dependency-free,
+  SVG-emitting, permissively-licensed QR generator + a thin reveal plugin (reads `data-qr` + the
+  `data-qr-*` options, renders an inline SVG) into the binary; copy it into
+  `decks/<name>/assets/vendor/` on `slides new` / `slides vendor`; enable it in the scaffold
+  template; link it relatively. _Done when:_ a fresh deck links the QR plugin locally and a
+  hand-written `<div data-qr="https://…">` renders a scannable code with zero external URLs. (Spec 03, 12, 01)
+- [x] **P19-2 — QR block + inspector.** Insert-palette QR block (registry entry + glyph + panel)
+  writing `<div data-qr data-qr-ec data-qr-fg data-qr-bg data-qr-quiet aria-label>`; inspector
+  controls for payload, EC level, fg/bg swatches (with a contrast guard), and quiet zone. One undo
+  + one autosave, byte-stable. _Done when:_ inserting a QR renders it in the canvas; editing the
+  payload/options updates it; persists byte-stable; undo removes it. (Spec 03, 04)
+- [x] **P19-3 — QR contract + thumbnail placeholder.** `validate.go` + model
+  (`classify` / `layout.ts`) recognize `data-qr` (non-empty) / `data-qr-ec` (∈ `L|M|Q|H`) /
+  `data-qr-fg` / `data-qr-bg` / `data-qr-quiet` (non-negative int) as a managed leaf; keep the
+  allowed-sets synced. The thumbnail builder paints a script-free QR placeholder. _Done when:_
+  `validate` passes a QR deck and flags a bad EC level; the thumbnail shows a placeholder; no
+  external URLs. (Spec 03, 06, 12)
+- [x] **P19-4 — Accessibility + authoring docs.** Mirror the payload into `aria-label` on
+  insert/edit; document the QR block (attributes, EC levels, offline guarantee) in
+  `docs/AUTHORING.md` + the `slides-authoring` skill so Claude Code can author one by hand. _Done
+  when:_ a hand-authored QR block validates and carries an `aria-label`. (Spec 03, 11)
+- [x] **P19-5 — Tests + e2e.** Unit: builder + contract (round-trip byte-stable, EC/quiet
+  validation). Playwright: insert-QR renders via the plugin (+ thumbnail placeholder), and the
+  offline-guard stays green. _Done when:_ suites pass. (Spec 12)
+
+> **Phase 19 STATUS (done):** QR code block. Built directly on `main` (single self-contained
+> feature, ~Chart-leaf shaped). Verified: `go build/vet/test ./...` green, **vitest 1375** green
+> (+18 QR tests across builders/qr-util/model), **svelte-check 0/0** (529 files), e2e `tsc -p
+> e2e/tsconfig.json` clean, FE+binary build clean, binary smoke-tested (fresh deck vendors
+> `assets/vendor/qr/{qrcode.js,plugin.js}`, links them + `RevealQR`, zero external URLs). The
+> plugin was additionally run end-to-end in Node against the vendored generator → emits a valid
+> SVG (correct module count incl. quiet zone, fg/bg honoured, UTF-8 payload, idempotent re-render).
+> - **Vendor (`internal/deck/vendor/qr/`):** `qrcode.js` = qrcode-generator 2.0.4 (Kazuhiko Arase,
+>   MIT; exposes the global `qrcode`); `plugin.js` = self-authored reveal plugin (`RevealQR`) that
+>   reads `data-qr` + `data-qr-*`, builds the SVG itself from `getModuleCount()`/`isDark()` (full
+>   fg/bg/quiet-zone control, row-run-merged rects) and installs a UTF-8 byte encoder (the lib's
+>   default is Latin1). `go:embed vendor/qr` + `Vendor()` copy + scaffold template (`RevealQR` in
+>   `plugins:[…]`, two `<script>`s). SVG (not canvas) → crisp under logical-canvas scaling.
+> - **Data-bound leaf (mirrors Chart, P17-14..16):** `<div data-qr="…" data-qr-ec data-qr-fg
+>   data-qr-bg data-qr-quiet aria-label>` is EMPTY on disk (byte-stable); the plugin renders the
+>   SVG at runtime (editor / present / PDF). `data-qr-fg/bg/quiet` are functional generation inputs
+>   stored as attributes (not CSS) — the documented exception to the ownership split (spec 03).
+> - **FE:** `builders.buildQrBlock` + `qrAriaLabel` + `blocks/qr.ts` (registry, panel) +
+>   `QrBlockPanel.svelte` (payload/EC/fg/bg/quiet + contrast guard) + `QrControl.svelte` inspector
+>   (self-wires via `deckStore.applyQrData`, one undo + one autosave) + `blocks/qr-util.ts` (WCAG
+>   contrast helper, shared by panel + inspector). `classify` recognises `div[data-qr]` as a leaf;
+>   `getQrProps`/`setQrProps` in `layout.ts`; thumbnail paints a script-free QR placeholder
+>   (`substituteQrPlaceholders`, joining the Chart/code/KaTeX gap).
+> - **Contract (dual-encoded):** `validate.go` flags an empty `data-qr`, an out-of-set `data-qr-ec`,
+>   and a negative/non-integer `data-qr-quiet`; allowed-sets kept in sync with `layout.ts`.
+> - **Migration (`slides upgrade`):** unlike charts, the scaffold-only gap is closed — `injectQrPlugin`
+>   (in `Upgrade`, alongside `injectSlideThemesLink`) adds the two QR `<script>`s (before the inline
+>   `Reveal.initialize`) + `RevealQR` to the `plugins:` array on a pre-P19 deck, byte-matching the
+>   scaffold, idempotent + byte-stable; `Vendor()` supplies the `assets/vendor/qr/` files. So an
+>   inserted `<div data-qr>` renders in existing decks after `./slides upgrade <name>` (needed because
+>   the editor lets you insert QR into any deck; without it the block silently rendered nowhere).
+> - **⚠️ Needs browser confirmation:** `web/e2e/qr.spec.ts` (QR renders to SVG on the present route,
+>   the on-disk div stays empty, offline-guard) written + type-checks — run pending a Playwright
+>   browser env (`npm run test:e2e:docker`). QR insert panel / inspector / contrast-warning UX need
+>   visual confirmation.
+
 ## Cross-cutting (maintain throughout)
 
 - [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec 12)

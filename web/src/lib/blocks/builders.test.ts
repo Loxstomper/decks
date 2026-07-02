@@ -15,6 +15,9 @@ import {
   buildChartBlock,
   CHART_WIDTH,
   CHART_HEIGHT,
+  buildQrBlock,
+  qrAriaLabel,
+  QR_DEFAULTS,
 } from './builders';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -351,5 +354,69 @@ describe('buildChartBlock', () => {
     const { classify } = await import('$lib/model');
     const el = buildChartBlock('bar', sampleJson);
     expect(classify(el)).toBe('leaf');
+  });
+});
+
+// ── buildQrBlock (P19) ────────────────────────────────────────────────────────
+
+describe('buildQrBlock', () => {
+  it('produces a <div data-qr> with the payload + default options', () => {
+    const el = buildQrBlock('https://example.com');
+    expect(el.tagName).toBe('div');
+    expect(getAttribute(el, 'data-qr')).toBe('https://example.com');
+    expect(getAttribute(el, 'data-qr-ec')).toBe(QR_DEFAULTS.ec);
+    expect(getAttribute(el, 'data-qr-fg')).toBe(QR_DEFAULTS.fg);
+    expect(getAttribute(el, 'data-qr-bg')).toBe(QR_DEFAULTS.bg);
+    expect(getAttribute(el, 'data-qr-quiet')).toBe(String(QR_DEFAULTS.quiet));
+  });
+
+  it('honours explicit encoding options', () => {
+    const el = buildQrBlock('hi', { ec: 'H', fg: '#112233', bg: '#fafafa', quiet: 2 });
+    expect(getAttribute(el, 'data-qr-ec')).toBe('H');
+    expect(getAttribute(el, 'data-qr-fg')).toBe('#112233');
+    expect(getAttribute(el, 'data-qr-bg')).toBe('#fafafa');
+    expect(getAttribute(el, 'data-qr-quiet')).toBe('2');
+  });
+
+  it('mirrors the payload into an aria-label for assistive tech', () => {
+    const el = buildQrBlock('https://example.com');
+    expect(getAttribute(el, 'aria-label')).toBe('QR code: https://example.com');
+    expect(qrAriaLabel('x')).toBe('QR code: x');
+  });
+
+  it('is empty on disk (the plugin renders the SVG at runtime)', () => {
+    const el = buildQrBlock('https://example.com');
+    expect(el.children).toHaveLength(0);
+  });
+
+  it('round-trips byte-stable: the payload + options survive serialize→parse', () => {
+    const el = buildQrBlock('https://café.example/☕', { ec: 'Q' });
+    const out = serialize(el);
+    const reparsed = parseDeck(
+      `<!DOCTYPE html><html><head></head><body>${out}</body></html>`,
+    );
+    let div: ReturnType<typeof buildQrBlock> | null = null;
+    const find = (n: { type: string; tagName?: string; children?: unknown[] }) => {
+      if (n.type === 'element' && (n as { tagName: string }).tagName === 'div') {
+        div = n as unknown as ReturnType<typeof buildQrBlock>;
+      }
+      for (const c of (n as { children?: unknown[] }).children ?? []) {
+        find(c as { type: string; tagName?: string; children?: unknown[] });
+      }
+    };
+    for (const n of reparsed.nodes) find(n as never);
+    expect(div).not.toBeNull();
+    expect(getAttribute(div!, 'data-qr')).toBe('https://café.example/☕');
+    expect(getAttribute(div!, 'data-qr-ec')).toBe('Q');
+  });
+
+  it('classifies as a leaf (selectable, eid-stampable)', async () => {
+    const { classify } = await import('$lib/model');
+    expect(classify(buildQrBlock('https://example.com'))).toBe('leaf');
+  });
+
+  it('a bare <div> without data-qr stays passthrough', async () => {
+    const { classify, createElement } = await import('$lib/model');
+    expect(classify(createElement('div'))).toBe('passthrough');
   });
 });

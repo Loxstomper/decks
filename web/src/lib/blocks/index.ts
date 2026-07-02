@@ -15,6 +15,8 @@ import './defaults';
 import './media';
 // Side-effect: register the chart block (P17-15, panel-driven).
 import './chart';
+// Side-effect: register the QR code block (P19, panel-driven).
+import './qr';
 
 // ── Registry API ──────────────────────────────────────────────────────────────
 export {

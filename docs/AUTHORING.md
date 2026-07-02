@@ -155,6 +155,23 @@ Nested `<section>` elements create reveal's 2D slide grid (vertical stacks).
 - `data-chart` + `data-chart-data` — on a `<canvas>` leaf: the chart type string
   plus a parseable Chart.js JSON config `{type, data, options?}`. A bare
   `<canvas>` without `data-chart` stays passthrough.
+- `data-qr` (+ `data-qr-*`) — on a `<div>` leaf: a QR code. `data-qr` is the
+  encoded payload (a URL or text; non-empty). The div is **empty on disk** — the
+  vendored QR plugin renders an inline SVG into it at runtime (offline; renders in
+  editor / present / PDF, a static placeholder in the navigator thumbnail). A bare
+  `<div>` without `data-qr` stays passthrough. Encoding options (all optional):
+  - `data-qr-ec="L|M|Q|H"` — error-correction level (default `M`).
+  - `data-qr-fg` / `data-qr-bg` — module / background colours (default
+    `#000000` / `#ffffff`). These are **functional inputs to generation**, stored
+    as attributes (not CSS) so the renderer can draw scannable modules — keep
+    strong contrast or the code won't scan.
+  - `data-qr-quiet` — quiet-zone width in modules, non-negative int (default `4`).
+  - also carry an `aria-label` (e.g. `QR code: <payload>`) so the code is
+    described to assistive tech.
+
+  Example: `<div data-qr="https://example.com" data-qr-ec="M" data-qr-fg="#000000"
+  data-qr-bg="#ffffff" data-qr-quiet="4" aria-label="QR code: https://example.com"
+  style="width: 280px; height: 280px"></div>`
 
 ### Inline marks (rich text within a leaf, P17)
 
@@ -281,7 +298,7 @@ HTTP (`POST /api/decks/{name}/validate`) and gates its own save path on them.
 
 The canonical attribute names and allowed-value sets are defined in:
 
-- `web/src/lib/model/layout.ts` — `LayValue`, `AlignValue`, `JustifyValue`, `LayoutProps`; chart + preset/slot accessors
+- `web/src/lib/model/layout.ts` — `LayValue`, `AlignValue`, `JustifyValue`, `LayoutProps`; chart, QR, and preset/slot accessors
 - `web/src/lib/model/theme.ts` — `THEME_NAMES` and the `data-background-*` set
 - `web/src/lib/model/inline.ts` — `INLINE_MARK_TAGS` and the inline-mark allowlist/normalisation
 - `web/src/lib/model/classify.ts` — element classification rules (container / leaf / free / passthrough)

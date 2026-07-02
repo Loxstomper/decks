@@ -86,6 +86,18 @@ var notesVendor embed.FS
 //go:embed vendor/chart
 var chartVendor embed.FS
 
+// qrVendor holds the QR generator + the slides-builder QR plugin (P19):
+//   - vendor/qr/qrcode.js — qrcode-generator (Kazuhiko Arase, MIT; exposes the
+//                           global `qrcode`), the matrix/error-correction core.
+//   - vendor/qr/plugin.js  — thin reveal plugin reading data-qr + data-qr-*,
+//                           building the SVG from the module matrix.
+//
+// Loaded in the scaffold so <div data-qr> blocks render in the editor, the
+// present route, and PDF export — all offline (spec 12, zero CDN URLs).
+//
+//go:embed vendor/qr
+var qrVendor embed.FS
+
 // chalkboardVendor holds the reveal.js chalkboard/annotation plugin (P17-19):
 //   - vendor/chalkboard/plugin.js — drawing/annotation (window.RevealChalkboard)
 //   - vendor/chalkboard/style.css — toolbar/cursor styles
@@ -165,6 +177,9 @@ const deckHTML = `<!doctype html>
   <!-- Chart.js + chart plugin – <canvas data-chart> blocks (P17-15, offline) -->
   <script src="assets/vendor/chart/chart.umd.js"></script>
   <script src="assets/vendor/chart/plugin.js"></script>
+  <!-- QR generator + plugin – <div data-qr> blocks (P19, offline) -->
+  <script src="assets/vendor/qr/qrcode.js"></script>
+  <script src="assets/vendor/qr/plugin.js"></script>
   <script>
     Reveal.initialize({
       // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
@@ -187,7 +202,7 @@ const deckHTML = `<!doctype html>
       // The math plugin constructs URLs as: local + '/dist/katex.min.{css,js}'
       // and local + '/dist/contrib/auto-render.min.js'.
       katex: { local: 'assets/vendor/katex' },
-      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes, RevealChart ]
+      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes, RevealChart, RevealQR ]
     });
   </script>
 </body>
@@ -384,6 +399,12 @@ func Vendor(root, name string) error {
 		return fmt.Errorf("vendor: copy chart plugin: %w", err)
 	}
 	log.Printf("deck: vendored chart plugin → %s/chart", vendorDir)
+
+	// QR generator + plugin → assets/vendor/qr/ (P19, in scaffold template)
+	if err := copyEmbeddedFS(qrVendor, "vendor/qr", filepath.Join(vendorDir, "qr")); err != nil {
+		return fmt.Errorf("vendor: copy qr plugin: %w", err)
+	}
+	log.Printf("deck: vendored qr plugin → %s/qr", vendorDir)
 
 	// Chalkboard plugin → assets/vendor/chalkboard/ (P17-19, present-route only)
 	if err := copyEmbeddedFS(chalkboardVendor, "vendor/chalkboard", filepath.Join(vendorDir, "chalkboard")); err != nil {
@@ -662,6 +683,97 @@ func injectSlideThemesLink(html string) (string, bool) {
 	return html[:insertAt] + indent + slideThemesLinkTag + "\n" + html[insertAt:], true
 }
 
+// qrScriptRE detects an existing QR generator <script> so injection is idempotent.
+var qrScriptRE = regexp.MustCompile(`assets/vendor/qr/qrcode\.js`)
+
+// qrScriptTags is the exact pair of <script> tags (with the scaffold comment) the
+// template emits for the QR block, reused so an upgraded deck matches a freshly
+// scaffolded one byte-for-byte. Trailing newline included so it slots in cleanly.
+const qrScriptTags = `  <!-- QR generator + plugin – <div data-qr> blocks (P19, offline) -->
+  <script src="assets/vendor/qr/qrcode.js"></script>
+  <script src="assets/vendor/qr/plugin.js"></script>
+`
+
+// qrScriptInsertIndex returns the byte offset at which the QR <script> tags are
+// spliced in: the start of the line holding the bare inline `<script>` tag that
+// opens the `Reveal.initialize` block. The QR scripts must load before that block
+// executes (it names RevealQR in its plugins array). Returns -1 when the deck has
+// no Reveal.initialize call, or no inline `<script>` precedes it.
+//
+// WHY not a single "<script> then Reveal.initialize" regex: the inline block often
+// carries setup code between its `<script>` open tag and Reveal.initialize (custom
+// demo wiring, mermaid config, dock sync). Requiring adjacency misses those decks —
+// the scripts get skipped while RevealQR is still registered, so init throws on the
+// undefined global and the whole deck renders blank. Anchoring on the block that
+// *contains* Reveal.initialize is robust to whatever sits in between.
+func qrScriptInsertIndex(html string) int {
+	ri := strings.Index(html, "Reveal.initialize")
+	if ri < 0 {
+		return -1
+	}
+	// The bare inline `<script>` (no src attr) that opens the init block is the
+	// last such tag before Reveal.initialize; the `>` in the literal guarantees
+	// we skip `<script src=…>` external tags.
+	open := strings.LastIndex(html[:ri], "<script>")
+	if open < 0 {
+		return -1
+	}
+	// Back up to the start of that line so the inserted tags keep indentation.
+	return strings.LastIndex(html[:open], "\n") + 1
+}
+
+// qrPluginsArrayRE captures the `plugins: [ … ]` array so RevealQR can be appended
+// when absent. Identifiers only (no nested brackets), so `[^\]]*` is safe.
+var qrPluginsArrayRE = regexp.MustCompile(`plugins:\s*\[[^\]]*\]`)
+
+// qrPluginsCloseRE matches the closing bracket (with any leading space) of that
+// array so we can splice `, RevealQR ` in before it, byte-matching the scaffold's
+// `…RevealChart, RevealQR ]` spacing.
+var qrPluginsCloseRE = regexp.MustCompile(`\s*\]$`)
+
+// injectQrPlugin ensures deck.html loads the QR generator + plugin and registers
+// RevealQR (P19). Decks scaffolded before Phase 19 never had the <script> tags or
+// the plugin registration written into their markup; vendor/upgrade copies the
+// files but left the markup alone, so an inserted `<div data-qr>` never rendered.
+// This adds both, exactly once each, positioned/spaced to match the scaffold.
+// Pure + idempotent: returns changed=false when both are already present.
+//
+// The two mutations are COUPLED: if the scripts are missing but there's no init
+// block to anchor them against, the deck is left completely untouched rather than
+// registering RevealQR without loading it (a half-wired deck throws at init and
+// renders blank — the exact failure this migration exists to prevent).
+func injectQrPlugin(html string) (string, bool) {
+	haveScripts := qrScriptRE.MatchString(html)
+
+	// Locate the script insertion point up front so we can bail atomically when
+	// the scripts are missing and unplaceable — before touching the plugins array.
+	insertAt := -1
+	if !haveScripts {
+		if insertAt = qrScriptInsertIndex(html); insertAt < 0 {
+			return html, false
+		}
+	}
+
+	out := html
+	changed := false
+
+	// (1) <script> tags — inject before the inline Reveal.initialize block.
+	if !haveScripts {
+		out = out[:insertAt] + qrScriptTags + out[insertAt:]
+		changed = true
+	}
+
+	// (2) plugins array — append RevealQR when absent. Re-scan `out` (step 1 may
+	// have shifted offsets) rather than the original html.
+	if m := qrPluginsArrayRE.FindString(out); m != "" && !strings.Contains(m, "RevealQR") {
+		replaced := qrPluginsCloseRE.ReplaceAllString(m, ", RevealQR ]")
+		out = strings.Replace(out, m, replaced, 1)
+		changed = true
+	}
+
+	return out, changed
+}
+
 // Upgrade migrates an existing deck to the current vendored assets and the
 // Phase 15 coordinate-identity reveal config. It:
 //
@@ -689,12 +801,13 @@ func Upgrade(root, name string) error {
 	}
 	updated, changedInit := upgradeInitialize(string(html))
 	updated, changedLink := injectSlideThemesLink(updated)
-	if changedInit || changedLink {
+	updated, changedQr := injectQrPlugin(updated)
+	if changedInit || changedLink || changedQr {
 		if err := Write(root, name, []byte(updated)); err != nil {
 			return fmt.Errorf("upgrade: write deck.html: %w", err)
 		}
-		log.Printf("deck: upgraded deck.html in %s (reveal config: %v, slide-themes link: %v)",
-			filepath.Join(root, DecksDir, name, "deck.html"), changedInit, changedLink)
+		log.Printf("deck: upgraded deck.html in %s (reveal config: %v, slide-themes link: %v, qr plugin: %v)",
+			filepath.Join(root, DecksDir, name, "deck.html"), changedInit, changedLink, changedQr)
 	} else {
 		log.Printf("deck: deck.html already current in %s (no change)", name)
 	}

@@ -116,6 +116,9 @@ func TestValidate_InvalidNumeric(t *testing.T) {
 		// P17-20: data-autoslide must be a non-negative integer (ms).
 		`<section data-autoslide="-1">x</section>`,
 		`<section data-autoslide="fast">x</section>`,
+		// P19: data-qr-quiet must be a non-negative integer.
+		`<div data-qr="x" data-qr-quiet="-1">y</div>`,
+		`<div data-qr="x" data-qr-quiet="lots">y</div>`,
 	}
 	for _, c := range cases {
 		res := Bytes([]byte(c), "")
@@ -135,6 +138,36 @@ func TestValidate_AutoslideValid(t *testing.T) {
 		res := Bytes([]byte(c), "")
 		if hasCode(res, "invalid-numeric") {
 			t.Fatalf("unexpected invalid-numeric for %q: %+v", c, res.Errors)
+		}
+	}
+}
+
+// TestValidate_QrValid (P19): a well-formed QR <div> with a non-empty payload,
+// a valid EC level, and a non-negative quiet zone is accepted.
+func TestValidate_QrValid(t *testing.T) {
+	for _, c := range []string{
+		`<div data-eid="q1" data-qr="https://example.com">x</div>`,
+		`<div data-eid="q1" data-qr="hi" data-qr-ec="H" data-qr-fg="#000" data-qr-bg="#fff" data-qr-quiet="4">x</div>`,
+		`<div data-eid="q1" data-qr="hi" data-qr-ec="L">x</div>`,
+	} {
+		res := Bytes([]byte(c), "")
+		if !res.OK {
+			t.Fatalf("expected QR %q to pass, got: %+v", c, res.Errors)
+		}
+	}
+}
+
+// TestValidate_QrInvalid (P19): an empty payload or an out-of-set EC level is
+// flagged invalid-attr.
+func TestValidate_QrInvalid(t *testing.T) {
+	for _, c := range []string{
+		`<div data-qr="">x</div>`,          // empty payload
+		`<div data-qr="   ">x</div>`,       // whitespace-only payload
+		`<div data-qr="x" data-qr-ec="Z">x</div>`, // bad EC level
+	} {
+		res := Bytes([]byte(c), "")
+		if res.OK || !hasCode(res, "invalid-attr") {
+			t.Fatalf("expected invalid-attr for %q, got: %+v", c, res.Errors)
 		}
 	}
 }

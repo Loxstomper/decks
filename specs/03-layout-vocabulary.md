@@ -89,8 +89,8 @@ Styling classes the editor doesn't recognize pass through verbatim ([02](02-docu
 ## Leaf block types
 
 Text (heading / paragraph / list, `contenteditable`) · Image · Code (highlighted) · Math
-(KaTeX) · Table · **Chart** · Shape / line / arrow · Embed / iframe · SVG / icon. Each is
-insertable, selectable, individually styleable, and knows how to serialize itself.
+(KaTeX) · Table · **Chart** · Shape / line / arrow · Embed / iframe · SVG / icon · **QR code**.
+Each is insertable, selectable, individually styleable, and knows how to serialize itself.
 
 ### Chart (data-bound)
 
@@ -101,6 +101,28 @@ config the inspector edits. Because Chart.js draws to `<canvas>` at runtime, the
 correctly in the editor, the present route, and PDF (all run JS) — but **not** in the
 script-free navigator thumbnail, where it shows a placeholder, joining code-highlight and KaTeX
 as a documented thumbnail-only fidelity gap ([06](06-slide-management.md)).
+
+### QR code (data-bound)
+
+A QR leaf encodes a URL or text into a scannable code, generated **locally** (offline-first, no
+network) by a vendored QR plugin (vendored offline, [01](01-architecture.md) /
+[13](13-project-structure.md)): `<div data-qr="https://…" data-qr-ec="L|M|Q|H">`, empty on disk
+and rendered to an inline **SVG** at runtime (SVG, not `<canvas>` — it stays crisp under the
+logical-canvas scaling). The encoded payload stays human- and Claude-readable in the source and
+edits like any attribute, so the round-trip is byte-stable — the data-bound model the Chart leaf
+established.
+
+Because generation is a pure function of the attributes, `data-qr-fg` / `data-qr-bg` (colours)
+and `data-qr-quiet` (quiet-zone modules) are stored as **`data-qr-*` attributes, not CSS** — a
+deliberate exception to the [ownership split](#ownership-split) above: they are functional inputs
+to QR generation (the renderer must read them to draw scannable modules), not styling the editor
+can leave to Tailwind/CSS. The inspector surfaces payload, error-correction level, fg/bg (with a
+contrast guard for scannability), and quiet zone; the payload is also mirrored into an `aria-label`
+so the code isn't an opaque blob to assistive tech.
+
+Like Chart / code-highlight / KaTeX, the QR renders in the editor, the present route, and PDF (all
+run JS) — but **not** in the script-free navigator thumbnail, where it shows a placeholder, joining
+the documented thumbnail-only fidelity gap ([06](06-slide-management.md)).
 
 ### Inline marks (rich text)
 

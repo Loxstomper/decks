@@ -72,6 +72,8 @@ export {
   setSlot,
   getChartProps,
   setChartProps,
+  getQrProps,
+  setQrProps,
   getAutoslide,
   setAutoslide,
   getFooterHidden,
@@ -85,6 +87,8 @@ export type {
   JustifyValue,
   LayoutProps,
   ChartProps,
+  QrProps,
+  QrEcLevel,
 } from './layout';
 export type {
   DeckModel,

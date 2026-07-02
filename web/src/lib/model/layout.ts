@@ -453,6 +453,103 @@ export function setChartProps(el: ElementNode, type: string, dataJson: string): 
   setAttribute(el, 'data-chart-data', dataJson);
 }
 
+// ─── P19: QR block accessors (data-qr / data-qr-*) ──────────────────────────
+//
+// A QR code is a <div> carrying the editor's own marker attributes:
+//   • `data-qr`       — the encoded PAYLOAD (a URL or text); non-empty.
+//   • `data-qr-ec`    — error-correction level: 'L' | 'M' | 'Q' | 'H' (default M).
+//   • `data-qr-fg`    — module (foreground) colour (default #000000).
+//   • `data-qr-bg`    — background colour (default #ffffff).
+//   • `data-qr-quiet` — quiet-zone width in modules, non-negative int (default 4).
+// These have NO layout/reflow semantics; they are functional INPUTS to QR
+// generation (the vendored plugin reads them to draw scannable modules) — stored
+// as data-qr-* attributes rather than CSS, a deliberate exception to the
+// editor-owns-layout / you-own-styling split (spec 03 "QR code").
+//
+// Dual-encoded: the Go validator (internal/validate/validate.go) and classify.ts
+// recognise the same markers. Keep the allowed-sets in sync on attribute names
+// and the EC enum.
+
+/** Error-correction levels accepted by the QR generator (spec 03 "QR code"). */
+export type QrEcLevel = 'L' | 'M' | 'Q' | 'H';
+
+/** Guard: is the string a valid QR error-correction level? */
+function isQrEcLevel(v: string): v is QrEcLevel {
+  return v === 'L' || v === 'M' || v === 'Q' || v === 'H';
+}
+
+/** Typed snapshot of a QR div's marker attributes. `null` = attribute absent. */
+export interface QrProps {
+  /** `data-qr` payload (URL/text), or null if absent/empty. */
+  payload: string | null;
+  /** `data-qr-ec` error-correction level, or null if absent/invalid. */
+  ec: QrEcLevel | null;
+  /** `data-qr-fg` foreground colour, or null if absent. */
+  fg: string | null;
+  /** `data-qr-bg` background colour, or null if absent. */
+  bg: string | null;
+  /** `data-qr-quiet` quiet-zone modules, or null if absent/invalid. */
+  quiet: number | null;
+}
+
+/**
+ * Read a QR div's `data-qr` + `data-qr-*` markers as a typed snapshot. Empty or
+ * absent attributes read as `null`. Pure; never mutates.
+ */
+export function getQrProps(el: ElementNode): QrProps {
+  const payload = getAttribute(el, 'data-qr');
+  const ecRaw = getAttribute(el, 'data-qr-ec');
+  return {
+    payload: payload !== null && payload !== '' ? payload : null,
+    ec: ecRaw !== null && isQrEcLevel(ecRaw) ? ecRaw : null,
+    fg: getAttribute(el, 'data-qr-fg'),
+    bg: getAttribute(el, 'data-qr-bg'),
+    quiet: parsePx(getAttribute(el, 'data-qr-quiet')),
+  };
+}
+
+/**
+ * Write a partial `QrProps` delta back to `el` (a <div>) as `data-qr-*`
+ * attributes, marking it dirty.
+ *
+ * Rules (mirror setLayoutProps):
+ *   • `null` value → remove the attribute.
+ *   • defined non-null value → set the attribute.
+ *   • keys absent from `delta` → untouched.
+ *
+ * VALIDATION: `payload` must be a non-empty string (use `null` to clear); `ec`
+ * must be one of L/M/Q/H; `quiet` a non-negative integer. Invalid values throw
+ * TypeError so callers catch mistakes early.
+ */
+export function setQrProps(el: ElementNode, delta: Partial<QrProps>): void {
+  function applyAttr(name: string, value: string | number | null | undefined): void {
+    if (value === undefined) return;
+    if (value === null) removeAttribute(el, name);
+    else setAttribute(el, name, String(value));
+  }
+
+  if ('payload' in delta) {
+    if (delta.payload !== null && delta.payload !== undefined && delta.payload.trim() === '') {
+      throw new TypeError('setQrProps: payload must be a non-empty string or null');
+    }
+    applyAttr('data-qr', delta.payload);
+  }
+  if ('ec' in delta) {
+    if (delta.ec !== null && delta.ec !== undefined && !isQrEcLevel(delta.ec)) {
+      throw new TypeError(`setQrProps: invalid data-qr-ec value "${delta.ec}"`);
+    }
+    applyAttr('data-qr-ec', delta.ec);
+  }
+  if ('fg' in delta) applyAttr('data-qr-fg', delta.fg);
+  if ('bg' in delta) applyAttr('data-qr-bg', delta.bg);
+  if ('quiet' in delta) {
+    if (delta.quiet !== null && delta.quiet !== undefined) {
+      validateNonNegativeInt('data-qr-quiet', delta.quiet);
+    }
+    applyAttr('data-qr-quiet', delta.quiet);
+  }
+}
+
 // ─── P17-18: Per-slide footer opt-out (data-footer-hidden) ──────────────────
 //
 // `data-footer-hidden` is a BOOLEAN marker on a `<section>` opting that slide out

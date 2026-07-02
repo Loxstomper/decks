@@ -63,6 +63,8 @@ import {
   unlinkLeaf,
   indentList as indentListOp,
   setChartProps,
+  setQrProps,
+  type QrProps,
   diffModels,
   validateSource,
   normalizeRemote,
@@ -1358,6 +1360,41 @@ class DeckStore {
     const el = findByEid(this.model, eid);
     if (!el) return;
     setChartProps(el, type, dataJson);
+    this.updateFromModel();
+    await this.commitCommand();
+  }
+
+  /**
+   * P19: Update a QR code block's `data-qr` payload + `data-qr-*` encoding
+   * options as ONE undo entry + ONE autosave, byte-stable (mirrors
+   * {@link applyChartData}). Also keeps the block's `aria-label` in sync with the
+   * payload so the code stays described to assistive tech (spec 03 "QR code").
+   *
+   * GUARDS (never throw into the UI):
+   *   • unknown eid → safe no-op (stale selection after an external reload);
+   *   • a `payload` that is present but blank → no-op (nothing to encode; the
+   *     inspector keeps the last good payload).
+   *
+   * `delta` is a partial {@link QrProps}: only the keys present are written, so
+   * editing just the colour leaves the payload/EC untouched. When `payload` is in
+   * the delta, the aria-label is rewritten from it.
+   *
+   * Whole-element scope: only this div's marker attributes change, so it goes
+   * dirty and serializes canonically while every other element round-trips
+   * byte-for-byte (spec 12 #4).
+   */
+  async applyQrData(eid: string, delta: Partial<QrProps>): Promise<void> {
+    if (!this.model) return;
+    if ('payload' in delta && (delta.payload === null || delta.payload?.trim() === '')) {
+      return; // never blank an existing QR — leave the deck untouched.
+    }
+    const el = findByEid(this.model, eid);
+    if (!el) return;
+    setQrProps(el, delta);
+    if (typeof delta.payload === 'string') {
+      // Mirror builders.qrAriaLabel — keep the description in step with the payload.
+      setAttribute(el, 'aria-label', `QR code: ${delta.payload.trim()}`);
+    }
     this.updateFromModel();
     await this.commitCommand();
   }

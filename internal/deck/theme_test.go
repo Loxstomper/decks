@@ -140,6 +140,146 @@ func TestInjectSlideThemesLink_ScaffoldUnchanged(t *testing.T) {
 	}
 }
 
+// TestInjectQrPlugin_PreP19Deck (P19 migration): a deck scaffolded before the QR
+// feature gains the QR <script> tags AND RevealQR in the plugins array, exactly
+// once each, matching the scaffold's ordering/spacing; idempotent thereafter.
+func TestInjectQrPlugin_PreP19Deck(t *testing.T) {
+	const html = `<body>
+  <script src="assets/vendor/chart/chart.umd.js"></script>
+  <script src="assets/vendor/chart/plugin.js"></script>
+  <script>
+    Reveal.initialize({
+      width: 1920,
+      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes, RevealChart ]
+    });
+  </script>
+</body>`
+	out, changed := injectQrPlugin(html)
+	if !changed {
+		t.Fatalf("expected QR wiring to be injected")
+	}
+	if n := strings.Count(out, "assets/vendor/qr/qrcode.js"); n != 1 {
+		t.Fatalf("expected exactly one qrcode.js script, got %d:\n%s", n, out)
+	}
+	if n := strings.Count(out, "assets/vendor/qr/plugin.js"); n != 1 {
+		t.Fatalf("expected exactly one qr plugin.js script, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "RevealChart, RevealQR ]") {
+		t.Errorf("RevealQR not appended with scaffold spacing:\n%s", out)
+	}
+	// QR scripts must sit AFTER the chart scripts and BEFORE the inline init.
+	qi := strings.Index(out, "assets/vendor/qr/qrcode.js")
+	ci := strings.Index(out, "assets/vendor/chart/plugin.js")
+	ii := strings.Index(out, "Reveal.initialize")
+	if !(ci < qi && qi < ii) {
+		t.Errorf("QR scripts mis-ordered (chart=%d qr=%d init=%d):\n%s", ci, qi, ii, out)
+	}
+	// Idempotent: a second pass changes nothing.
+	out2, changed2 := injectQrPlugin(out)
+	if changed2 || out2 != out {
+		t.Errorf("injectQrPlugin not idempotent")
+	}
+}
+
+// TestInjectQrPlugin_HandAuthoredInitBlock (P19 migration regression): a deck
+// whose inline <script> carries setup code BEFORE Reveal.initialize (custom demo
+// wiring, mermaid config) must still get the QR scripts placed before that block.
+// The earlier adjacency-only anchor skipped the scripts here while still appending
+// RevealQR — leaving init to throw on the undefined global and blanking the deck.
+func TestInjectQrPlugin_HandAuthoredInitBlock(t *testing.T) {
+	const html = `<body>
+  <script src="assets/vendor/reveal/reveal.js"></script>
+  <script src="assets/mermaid.min.js"></script>
+  <script>
+    // --- Demo wiring ---
+    const HARNESS = "http://127.0.0.1:8080";
+    Reveal.initialize({
+      width: 1920,
+      plugins: [ RevealHighlight, RevealNotes ]
+    });
+  </script>
+</body>`
+	out, changed := injectQrPlugin(html)
+	if !changed {
+		t.Fatalf("expected QR wiring to be injected into a hand-authored init block")
+	}
+	if n := strings.Count(out, "assets/vendor/qr/qrcode.js"); n != 1 {
+		t.Fatalf("expected exactly one qrcode.js script, got %d:\n%s", n, out)
+	}
+	if !strings.Contains(out, "RevealNotes, RevealQR ]") {
+		t.Errorf("RevealQR not appended:\n%s", out)
+	}
+	// Scripts must land BEFORE the inline block that names RevealQR.
+	qi := strings.Index(out, "assets/vendor/qr/plugin.js")
+	ii := strings.Index(out, "Reveal.initialize")
+	if !(qi >= 0 && qi < ii) {
+		t.Errorf("QR scripts not placed before Reveal.initialize (qr=%d init=%d):\n%s", qi, ii, out)
+	}
+	if out2, changed2 := injectQrPlugin(out); changed2 || out2 != out {
+		t.Errorf("injectQrPlugin not idempotent on a hand-authored block")
+	}
+}
+
+// TestInjectQrPlugin_RepairsHalfWiredDeck (P19 migration regression): a deck left
+// in the broken half-state — RevealQR already in the plugins array but the QR
+// <script> tags never written — is repaired by adding just the scripts, so a
+// buggy earlier upgrade self-heals on the next run.
+func TestInjectQrPlugin_RepairsHalfWiredDeck(t *testing.T) {
+	const html = `<body>
+  <script src="assets/vendor/reveal/reveal.js"></script>
+  <script>
+    const HARNESS = "x";
+    Reveal.initialize({
+      plugins: [ RevealHighlight, RevealNotes, RevealQR ]
+    });
+  </script>
+</body>`
+	out, changed := injectQrPlugin(html)
+	if !changed {
+		t.Fatalf("expected the missing QR scripts to be injected")
+	}
+	if n := strings.Count(out, "assets/vendor/qr/qrcode.js"); n != 1 {
+		t.Fatalf("expected exactly one qrcode.js script, got %d:\n%s", n, out)
+	}
+	// RevealQR was already present — must not be duplicated.
+	if n := strings.Count(out, "RevealQR"); n != 1 {
+		t.Fatalf("expected RevealQR to stay single, got %d:\n%s", n, out)
+	}
+	if out2, changed2 := injectQrPlugin(out); changed2 || out2 != out {
+		t.Errorf("injectQrPlugin not idempotent after repair")
+	}
+}
+
+// TestInjectQrPlugin_NoInitBlock verifies a deck with no Reveal.initialize (nothing
+// to anchor against) is left untouched — never half-wired with a dangling RevealQR.
+func TestInjectQrPlugin_NoInitBlock(t *testing.T) {
+	const html = `<body>
+  <div class="reveal"><div class="slides"></div></div>
+</body>`
+	out, changed := injectQrPlugin(html)
+	if changed || out != html {
+		t.Errorf("expected no change when there is no init block to anchor against:\n%s", out)
+	}
+}
+
+// TestInjectQrPlugin_ScaffoldUnchanged verifies a current scaffold (already wired
+// for QR) is left byte-stable.
+func TestInjectQrPlugin_ScaffoldUnchanged(t *testing.T) {
+	const html = `<body>
+  <script src="assets/vendor/qr/qrcode.js"></script>
+  <script src="assets/vendor/qr/plugin.js"></script>
+  <script>
+    Reveal.initialize({
+      plugins: [ RevealHighlight, RevealMath.KaTeX, RevealNotes, RevealChart, RevealQR ]
+    });
+  </script>
+</body>`
+	out, changed := injectQrPlugin(html)
+	if changed || out != html {
+		t.Errorf("expected no change for an already-wired deck")
+	}
+}
+
 // TestGenerateSlideThemesCSS_NoExternalURLs guards the offline-first contract:
 // the generated stylesheet must contain zero http(s) URLs (spec 12).
 func TestGenerateSlideThemesCSS_NoExternalURLs(t *testing.T) {

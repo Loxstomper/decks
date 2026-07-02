@@ -160,3 +160,55 @@ export function buildChartBlock(type: string, dataJson: string): ElementNode {
     'data-chart-data': dataJson,
   });
 }
+
+// ── QR code block (P19) ──────────────────────────────────────────────────────
+
+/** Default rendered size of a QR block (logical px, square). The SVG fills the
+ *  div; the div needs an intrinsic size since it has no other content. */
+export const QR_DEFAULT_SIZE = 280;
+
+/** QR generation/encoding defaults (mirrored by the vendored plugin's fallbacks). */
+export const QR_DEFAULTS = { ec: 'M', fg: '#000000', bg: '#ffffff', quiet: 4 } as const;
+
+/**
+ * Build the `aria-label` for a QR block from its payload. The encoded value is
+ * otherwise opaque to assistive tech, so we surface it (spec 03 "QR code").
+ * Shared with the store's edit command so insert + edit stay consistent.
+ */
+export function qrAriaLabel(payload: string): string {
+  return `QR code: ${payload}`;
+}
+
+/**
+ * Build a QR code leaf:
+ *   <div data-qr="{payload}" data-qr-ec="M" data-qr-fg="#000000"
+ *        data-qr-bg="#ffffff" data-qr-quiet="4"
+ *        aria-label="QR code: {payload}"
+ *        style="width:280px;height:280px"></div>
+ *
+ * The div is EMPTY on disk (byte-stable round-trip); the vendored QR plugin
+ * (internal/deck/vendor/qr/plugin.js) renders an inline SVG into it at runtime
+ * from the data-qr* attributes. This mirrors the Chart leaf's data-bound model.
+ *
+ * `fg`/`bg`/`quiet` are functional inputs to QR generation stored as data-qr-*
+ * attributes (not CSS) — the renderer must read them to draw scannable modules
+ * (spec 03 "QR code").
+ *
+ * OFFLINE-FIRST (spec 12): emits zero external URLs — the QR generator + plugin
+ * are vendored into the deck by the scaffold (P19-1). The block is inert (empty
+ * div) without them but never breaks the deck.
+ */
+export function buildQrBlock(
+  payload: string,
+  opts: { ec?: string; fg?: string; bg?: string; quiet?: number } = {},
+): ElementNode {
+  return createElement('div', {
+    'data-qr': payload,
+    'data-qr-ec': opts.ec ?? QR_DEFAULTS.ec,
+    'data-qr-fg': opts.fg ?? QR_DEFAULTS.fg,
+    'data-qr-bg': opts.bg ?? QR_DEFAULTS.bg,
+    'data-qr-quiet': String(opts.quiet ?? QR_DEFAULTS.quiet),
+    'aria-label': qrAriaLabel(payload),
+    style: `width: ${QR_DEFAULT_SIZE}px; height: ${QR_DEFAULT_SIZE}px`,
+  });
+}

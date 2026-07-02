@@ -45,6 +45,7 @@
   import CodeBlockPanel from './CodeBlockPanel.svelte';
   import MathBlockPanel from './MathBlockPanel.svelte';
   import ChartBlockPanel from './ChartBlockPanel.svelte';
+  import QrBlockPanel from './QrBlockPanel.svelte';
 
   /**
    * Props every panel-driven block component accepts. The palette owns placement;
@@ -68,6 +69,7 @@
     CodeBlockPanel,
     MathBlockPanel,
     ChartBlockPanel,
+    QrBlockPanel,
   };
 
   // ── Local UI state ───────────────────────────────────────────────────────────

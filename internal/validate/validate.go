@@ -382,6 +382,39 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 			EID:     eid,
 		})
 	}
+	// data-qr / data-qr-* (P19): QR code block on a <div>.
+	//   • data-qr       — the encoded PAYLOAD (URL/text). Any non-empty string is
+	//                      valid; empty → error (nothing to encode).
+	//   • data-qr-ec    — error-correction level, one of L | M | Q | H. Other
+	//                      values are rejected (the generator only accepts these).
+	//   • data-qr-quiet — quiet-zone width in modules, a non-negative integer
+	//                      (validated with the numeric attributes below).
+	//   • data-qr-fg / data-qr-bg — free-form colour strings (no constraint here).
+	// Dual-encoded: also see getQrProps/setQrProps in web/src/lib/model/layout.ts
+	// and the div-data-qr leaf rule in web/src/lib/model/classify.ts (keep in sync
+	// on the attribute names and the EC enum).
+	if v, ok := attrs["data-qr"]; ok && strings.TrimSpace(v) == "" {
+		issues = append(issues, Issue{
+			Code:    "invalid-attr",
+			Message: "data-qr must be a non-empty string (the encoded payload)",
+			Line:    line,
+			EID:     eid,
+		})
+	}
+	if v, ok := attrs["data-qr-ec"]; ok {
+		switch strings.TrimSpace(v) {
+		case "L", "M", "Q", "H":
+			// valid
+		default:
+			issues = append(issues, Issue{
+				Code:    "invalid-attr",
+				Message: fmt.Sprintf("data-qr-ec=%q must be one of L, M, Q, H", v),
+				Line:    line,
+				EID:     eid,
+			})
+		}
+	}
+
 	// data-footer-hidden (P17-18): boolean MARKER on a <section> opting that slide
 	// out of the deck-level footer overlay (a managed custom.css rule keyed off
 	// section:not([data-footer-hidden])). It is presence-only — any value (incl.
@@ -403,6 +436,8 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 		// Non-negative integer (0 = pause on this slide). Only emitted on
 		// <section> by the editor, but validated wherever present.
 		{"data-autoslide", 0},
+		// data-qr-quiet (P19): QR quiet-zone width in modules. Non-negative int.
+		{"data-qr-quiet", 0},
 	} {
 		if v, ok := attrs[n.attr]; ok {
 			if iv, err := strconv.Atoi(strings.TrimSpace(v)); err != nil || iv < n.min {

@@ -124,6 +124,65 @@ export function substituteChartPlaceholders(node: ElementNode): void {
   }
 }
 
+// ── QR placeholder (P19) ────────────────────────────────────────────────────
+//
+// Same thumbnail-only fidelity gap as charts: a QR `<div data-qr>` is painted at
+// runtime by the vendored QR plugin (getModuleCount/isDark → SVG), which never
+// runs in the script-free thumbnail. So we SUBSTITUTE each QR div with a static
+// SVG QR glyph the same size. The live editor + present route + PDF render the
+// real, scannable code.
+
+/** True when `el` is a QR div the editor owns (mirrors classify.ts). */
+function isQrDiv(el: ElementNode): boolean {
+  return el.tagName.toLowerCase() === 'div' && getAttribute(el, 'data-qr') !== null;
+}
+
+/** Build a static SVG QR glyph placeholder the size of the QR div. */
+function buildQrPlaceholder(qr: ElementNode): ElementNode {
+  // Preserve the div's own sizing (inline style width/height) so the placeholder
+  // occupies the same box as the live QR.
+  const style = getAttribute(qr, 'style');
+  const div = createElement('div', {
+    class: 'sb-qr-placeholder',
+    ...(style ? { style } : {}),
+  });
+
+  // A simplified QR glyph: two finder squares + scattered modules.
+  const svg = createElement('svg', {
+    class: 'sb-qr-glyph',
+    viewBox: '0 0 24 24',
+    fill: 'currentColor',
+    'aria-hidden': 'true',
+  });
+  // Finder squares (top-left, top-right, bottom-left) as ring rects + a few modules.
+  for (const d of [
+    'M3 3h6v6H3V3M5 5h2v2H5V5', // top-left finder
+    'M15 3h6v6h-6V3M17 5h2v2h-2V5', // top-right finder
+    'M3 15h6v6H3v-6M5 17h2v2H5v-2', // bottom-left finder
+    'M13 13h3v3h-3zM17 17h2v2h-2zM19 13h2v2h-2zM13 19h2v2h-2z', // data modules
+  ]) {
+    appendChild(svg, createElement('path', { d }));
+  }
+  appendChild(div, svg);
+  return div;
+}
+
+/**
+ * Replace every `<div data-qr>` in the (already-cloned) subtree with a static QR
+ * placeholder, in place. Operates ONLY on a clone (see substituteChartPlaceholders).
+ */
+export function substituteQrPlaceholders(node: ElementNode): void {
+  for (let i = 0; i < node.children.length; i++) {
+    const child = node.children[i];
+    if (child.type !== 'element') continue;
+    if (isQrDiv(child)) {
+      node.children[i] = buildQrPlaceholder(child);
+    } else {
+      substituteQrPlaceholders(child);
+    }
+  }
+}
+
 /** Options for buildThumbnailSrcdoc. */
 export interface ThumbnailOptions {
   /** Reveal theme name (e.g. "black", "white", "moon"). Defaults to "black". */
@@ -152,6 +211,8 @@ export function buildThumbnailSrcdoc(
   // P17-16: charts are JS-driven; swap each <canvas data-chart> for a static SVG
   // placeholder so the script-free thumbnail shows something meaningful.
   substituteChartPlaceholders(laidOut);
+  // P19: QR codes are JS-driven too; swap each <div data-qr> for a static QR glyph.
+  substituteQrPlaceholders(laidOut);
   const sectionHtml = serializeSection(laidOut);
 
   // Per-slide background color from data-background-color attribute.
@@ -275,7 +336,15 @@ export function buildThumbnailSrcdoc(
     .sb-chart-glyph { width: 96px; height: 72px; }
     .sb-chart-label {
       font-size: 28px; letter-spacing: 0.04em; text-transform: lowercase;
-    }${bgImageOpacityExtraRule}${bgVideoPlaceholderExtraRule}
+    }
+    /* P19: static QR placeholder (QR codes are JS-driven; see header). */
+    .sb-qr-placeholder {
+      display: inline-flex; align-items: center; justify-content: center;
+      max-width: 100%; box-sizing: border-box;
+      border: 2px dashed rgba(128,128,128,0.45); border-radius: 8px;
+      background: rgba(128,128,128,0.08); color: rgba(128,128,128,0.75);
+    }
+    .sb-qr-glyph { width: 70%; height: 70%; }${bgImageOpacityExtraRule}${bgVideoPlaceholderExtraRule}
   `;
 
   // NOTE: the override <link>/<style> order matters — overrides come AFTER the
