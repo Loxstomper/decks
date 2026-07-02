@@ -24,12 +24,21 @@
  * backgrounds) and the slides-layout flex/grid vocabulary, so it visually
  * approximates the slide.
  *
- * OFFLINE (spec 12): every URL is root-relative to `/decks/<name>/…`, which the
- * Go backend serves from the deck's own `assets/` (vendored, zero external
- * URLs). The `<base href>` makes relative asset references inside slide content
- * (e.g. `assets/img.png`) resolve against the deck directory too. A srcdoc
- * document is same-origin with the editor, so these subresource loads succeed
- * even though the iframe itself is sandboxed to an opaque origin.
+ * OFFLINE (spec 12): every stylesheet / background-image URL this builder emits is
+ * written ABSOLUTE (`/decks/<name>/assets/…`), which the Go backend serves from the
+ * deck's own `assets/` (vendored, zero external URLs).
+ *
+ * WHY ABSOLUTE, NOT `<base href>` + relative: the thumbnail iframe is `sandbox=""`
+ * (opaque origin) so its document URL is `about:srcdoc`. A path-absolute `<base
+ * href="/decks/<name>/">` has no origin to resolve against there, so the browser
+ * DISCARDS it and resolves any *relative* subresource URL against the PARENT
+ * document instead — i.e. `assets/vendor/reveal.css` becomes `/assets/vendor/…` at
+ * the editor root. Those root paths miss on disk and (via the SPA handler) 301 to
+ * themselves → `ERR_TOO_MANY_REDIRECTS`, retried per stylesheet × every slide =
+ * hundreds of failing requests. Emitting the fully-qualified `/decks/<name>/…` path
+ * sidesteps base-href resolution entirely: a path-absolute URL resolves against the
+ * origin regardless. The `<base href>` is kept only as a best-effort for RELATIVE
+ * asset refs authored inside slide content (e.g. `<img src="assets/img.png">`).
  *
  * Pure string builder → unit-testable; the Svelte component just renders it.
  */
@@ -239,14 +248,14 @@ export function buildThumbnailSrcdoc(
       bgImageOpacityExtraRule = `
     .reveal .slides > section::before {
       content: ''; position: absolute; inset: 0;
-      background-image: url('${bgImageSafe}');
+      background-image: url('${base}${bgImageSafe}');
       background-size: ${bgSize}; background-position: ${bgPos};
       background-repeat: ${bgRepeat}; opacity: ${bgOpacity};
       pointer-events: none; z-index: 0;
     }`;
     } else {
       bgImageInlineRule = `
-      background-image: url('${bgImageSafe}') !important;
+      background-image: url('${base}${bgImageSafe}') !important;
       background-size: ${bgSize} !important;
       background-position: ${bgPos} !important;
       background-repeat: ${bgRepeat} !important;`;
@@ -354,13 +363,13 @@ export function buildThumbnailSrcdoc(
 <head>
 <meta charset="utf-8">
 <base href="${base}">
-<link rel="stylesheet" href="assets/vendor/reveal/reset.css">
-<link rel="stylesheet" href="assets/vendor/reveal/reveal.css">
-<link rel="stylesheet" href="assets/vendor/reveal/theme/${theme}.css">
-<link rel="stylesheet" href="assets/vendor/slides-layout.css">
-<link rel="stylesheet" href="assets/vendor/slides-slide-themes.css">
-<link rel="stylesheet" href="assets/vendor/highlight/monokai.min.css">
-<link rel="stylesheet" href="custom.css">
+<link rel="stylesheet" href="${base}assets/vendor/reveal/reset.css">
+<link rel="stylesheet" href="${base}assets/vendor/reveal/reveal.css">
+<link rel="stylesheet" href="${base}assets/vendor/reveal/theme/${theme}.css">
+<link rel="stylesheet" href="${base}assets/vendor/slides-layout.css">
+<link rel="stylesheet" href="${base}assets/vendor/slides-slide-themes.css">
+<link rel="stylesheet" href="${base}assets/vendor/highlight/monokai.min.css">
+<link rel="stylesheet" href="${base}custom.css">
 <style>${overrideCss}</style>
 </head>
 <body>

@@ -497,6 +497,22 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).not.toMatch(/https?:\/\//);
   });
 
+  it('emits ABSOLUTE deck-qualified stylesheet URLs, never base-relative ones', () => {
+    // REGRESSION (thumbnail request storm): the iframe is sandbox="" (opaque
+    // origin), so its <base href="/decks/name/"> is discarded and any RELATIVE
+    // href (assets/…) resolves against the editor root → /assets/vendor/… which
+    // 301-loops → ERR_TOO_MANY_REDIRECTS × every slide. Every stylesheet URL must
+    // be fully qualified so it resolves against the origin without the base.
+    const doc = buildThumbnailSrcdoc('My Deck', topLevelSlides(parseDeck(DECK))[0]);
+    // No relative vendor/custom links (href value starting straight at "assets"
+    // or "custom.css").
+    expect(doc).not.toMatch(/href="assets\/vendor\//);
+    expect(doc).not.toMatch(/href="custom\.css"/);
+    // Every emitted stylesheet points at the deck folder explicitly.
+    expect(doc).toContain('href="/decks/My%20Deck/assets/vendor/reveal/reveal.css"');
+    expect(doc).toContain('href="/decks/My%20Deck/custom.css"');
+  });
+
   it('uses the theme passed via opts (non-black theme link present)', () => {
     const model = parseDeck(DECK);
     const s1 = topLevelSlides(model)[0];
@@ -580,7 +596,7 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
       const model = parseDeck(DECK_BG_IMG);
       const s1 = topLevelSlides(model)[0];
       const doc = buildThumbnailSrcdoc('My Deck', s1);
-      expect(doc).toContain("background-image: url('assets/bg.jpg')");
+      expect(doc).toContain("background-image: url('/decks/My%20Deck/assets/bg.jpg')");
       expect(doc).toContain('background-size: cover');
       expect(doc).toContain('background-position: center');
       expect(doc).toContain('background-repeat: no-repeat');
@@ -596,7 +612,7 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
       const model = parseDeck(DECK_BG_IMG);
       const s1 = topLevelSlides(model)[0];
       const doc = buildThumbnailSrcdoc('My Deck', s1);
-      expect(doc).toContain("background-image: url('assets/tile.png')");
+      expect(doc).toContain("background-image: url('/decks/My%20Deck/assets/tile.png')");
       expect(doc).toContain('background-size: contain');
       expect(doc).toContain('background-position: top left');
       expect(doc).toContain('background-repeat: repeat');
@@ -613,10 +629,10 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
       const doc = buildThumbnailSrcdoc('My Deck', s1);
       // Image is placed in ::before (not inline on the section).
       expect(doc).toContain('::before');
-      expect(doc).toContain("url('assets/bg.jpg')");
+      expect(doc).toContain("url('/decks/My%20Deck/assets/bg.jpg')");
       expect(doc).toContain('opacity: 0.4');
       // No inline background-image on the section itself.
-      expect(doc).not.toContain("background-image: url('assets/bg.jpg') !important");
+      expect(doc).not.toContain("background-image: url('/decks/My%20Deck/assets/bg.jpg') !important");
       expect(doc).not.toMatch(/https?:\/\//);
     });
 
