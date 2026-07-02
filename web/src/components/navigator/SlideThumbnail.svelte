@@ -12,6 +12,16 @@
    * The thumbnail updates automatically on edit: `srcdoc` is derived from the
    * live `section` node, which is a fresh object after each re-parse, so Svelte
    * recomputes it and the iframe reloads.
+   *
+   * LAZY RENDERING (perf): each thumbnail is its own sandboxed iframe that links
+   * all ~7 of the deck's stylesheets. Every opaque-origin srcdoc iframe fetches
+   * its OWN copy, so eagerly mounting a big deck's filmstrip fires 7 × N requests
+   * up front (≈350 for a 50-slide deck) — a cache stampede before any entry warms.
+   * We instead gate the srcdoc behind an IntersectionObserver: the iframe stays
+   * empty until it scrolls near the viewport, then loads once. Only the visible
+   * slice loads initially; the rest stagger in on scroll, by which point the
+   * shared vendor CSS is cached. `rootMargin` preloads a screenful ahead so
+   * thumbnails are ready before they're scrolled into view.
    */
 
   import { buildThumbnailSrcdoc } from '$lib/slides';
@@ -41,11 +51,45 @@
   // logical aspect ratio so it never distorts.
   const scale = $derived(width / LOGICAL_WIDTH);
   const height = $derived((width * LOGICAL_HEIGHT) / LOGICAL_WIDTH);
-  const srcdoc = $derived(buildThumbnailSrcdoc(deckName, section, { theme }));
+
+  // Lazy gate: stays false until the thumbnail nears the viewport, then latches
+  // true (load-once — we don't tear the iframe down again on scroll-away, which
+  // would re-fetch on return). `container` is the observed element.
+  let container = $state<HTMLDivElement | null>(null);
+  let loaded = $state(false);
+
+  $effect(() => {
+    if (loaded || !container) return;
+    // Fallback for environments without IntersectionObserver (e.g. jsdom): load
+    // eagerly so the thumbnail still renders.
+    if (typeof IntersectionObserver === 'undefined') {
+      loaded = true;
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((e) => e.isIntersecting)) {
+          loaded = true;
+          io.disconnect();
+        }
+      },
+      { rootMargin: '400px 0px' }, // preload a screenful ahead of scroll
+    );
+    io.observe(container);
+    return () => io.disconnect();
+  });
+
+  // Only build the (potentially large) srcdoc once the thumbnail is due to load;
+  // it stays reactive to edits thereafter (fresh `section` on re-parse).
+  const srcdoc = $derived(loaded ? buildThumbnailSrcdoc(deckName, section, { theme }) : undefined);
 </script>
 
-<div class="thumb" style="width: {width}px; height: {height}px;">
+<div class="thumb" style="width: {width}px; height: {height}px;" bind:this={container}>
   <!--
+    Gated on `loaded` (IntersectionObserver, see <script>) so offscreen thumbnails
+    issue no requests until they near the viewport. Until then the .thumb's dark
+    background is the placeholder.
+
     sandbox="" (no flags) → opaque origin, NO scripts. The srcdoc's <base href>
     is NOT honoured here (an opaque-origin about:srcdoc has no base to resolve a
     path-absolute href against), so buildThumbnailSrcdoc emits every asset URL —
@@ -55,18 +99,20 @@
     which would 301-loop → ERR_TOO_MANY_REDIRECTS × every slide.
     aria-hidden: the thumbnail is decorative; the surrounding button is labelled.
   -->
-  <iframe
-    class="thumb-frame"
-    title="Slide preview"
-    aria-hidden="true"
-    tabindex="-1"
-    sandbox=""
-    scrolling="no"
-    {srcdoc}
-    style:width="{LOGICAL_WIDTH}px"
-    style:height="{LOGICAL_HEIGHT}px"
-    style:transform="scale({scale})"
-  ></iframe>
+  {#if srcdoc !== undefined}
+    <iframe
+      class="thumb-frame"
+      title="Slide preview"
+      aria-hidden="true"
+      tabindex="-1"
+      sandbox=""
+      scrolling="no"
+      {srcdoc}
+      style:width="{LOGICAL_WIDTH}px"
+      style:height="{LOGICAL_HEIGHT}px"
+      style:transform="scale({scale})"
+    ></iframe>
+  {/if}
 </div>
 
 <style>
