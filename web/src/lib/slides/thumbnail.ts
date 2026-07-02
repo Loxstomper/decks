@@ -47,6 +47,7 @@ import { LOGICAL_WIDTH, LOGICAL_HEIGHT } from '$lib/coords';
 import {
   serializeDeck,
   getAttribute,
+  setAttribute,
   createElement,
   createText,
   appendChild,
@@ -192,6 +193,74 @@ export function substituteQrPlaceholders(node: ElementNode): void {
   }
 }
 
+// ── Relative asset URL rewriting ─────────────────────────────────────────────
+//
+// The thumbnail iframe is opaque-origin (sandbox="", no scripts), where a
+// path-absolute <base href="/decks/<name>/"> is NOT honoured — the browser
+// resolves any RELATIVE subresource ref against the editor root instead
+// (`assets/x.png` → `/assets/x.png`), which 301-loops to itself → a storm of
+// ERR_TOO_MANY_REDIRECTS × every slide. Author content routinely carries relative
+// refs (`<img src="assets/photo.jpg">`), so we resolve them to absolute
+// `/decks/<name>/…` paths up front; an absolute path resolves against the origin
+// regardless of the (ignored) base. Runs on the CLONE only — the model is untouched.
+
+/** A ref that already resolves without the base: scheme, protocol-relative,
+ *  root-absolute, or a fragment. Only genuinely deck-relative refs get prefixed. */
+const ABSOLUTE_REF_RE = /^(?:[a-z][a-z0-9+.-]*:|\/\/|\/|#)/i;
+
+/** Resolve one URL against `base` (which ends in `/`), leaving absolute refs alone. */
+function resolveRef(value: string, base: string): string {
+  const v = value.trim();
+  if (v === '' || ABSOLUTE_REF_RE.test(v)) return value;
+  return base + v;
+}
+
+/**
+ * Rewrite deck-relative asset URLs in the (already-cloned) subtree to absolute
+ * `/decks/<name>/…` paths. Covers the URL-bearing constructs slide content can
+ * carry: `src` + `poster` (img/video/audio/source/track), the `srcset` candidate
+ * list, and `url(…)` inside inline `style`. Operates in place on a clone (see
+ * substituteChartPlaceholders) — never the live model.
+ */
+export function rewriteRelativeAssetUrls(node: ElementNode, base: string): void {
+  for (const attr of ['src', 'poster']) {
+    const v = getAttribute(node, attr);
+    if (v) {
+      const r = resolveRef(v, base);
+      if (r !== v) setAttribute(node, attr, r);
+    }
+  }
+
+  const srcset = getAttribute(node, 'srcset');
+  if (srcset) {
+    const rewritten = srcset
+      .split(',')
+      .map((part) => {
+        const seg = part.trim();
+        if (seg === '') return part;
+        const sp = seg.search(/\s/);
+        const url = sp === -1 ? seg : seg.slice(0, sp);
+        const descriptor = sp === -1 ? '' : seg.slice(sp);
+        return resolveRef(url, base) + descriptor;
+      })
+      .join(', ');
+    if (rewritten !== srcset) setAttribute(node, 'srcset', rewritten);
+  }
+
+  const style = getAttribute(node, 'style');
+  if (style && style.includes('url(')) {
+    const rewritten = style.replace(
+      /url\(\s*(['"]?)([^'")]+)\1\s*\)/gi,
+      (_m, quote, url) => `url(${quote}${resolveRef(url, base)}${quote})`,
+    );
+    if (rewritten !== style) setAttribute(node, 'style', rewritten);
+  }
+
+  for (const child of node.children) {
+    if (child.type === 'element') rewriteRelativeAssetUrls(child, base);
+  }
+}
+
 /** Options for buildThumbnailSrcdoc. */
 export interface ThumbnailOptions {
   /** Reveal theme name (e.g. "black", "white", "moon"). Defaults to "black". */
@@ -222,6 +291,10 @@ export function buildThumbnailSrcdoc(
   substituteChartPlaceholders(laidOut);
   // P19: QR codes are JS-driven too; swap each <div data-qr> for a static QR glyph.
   substituteQrPlaceholders(laidOut);
+  // Resolve relative asset refs (<img src="assets/…">, etc.) to absolute
+  // /decks/<name>/… paths — the opaque-origin thumbnail ignores <base href>, so a
+  // relative ref would 301-loop at the editor root (see rewriteRelativeAssetUrls).
+  rewriteRelativeAssetUrls(laidOut, base);
   const sectionHtml = serializeSection(laidOut);
 
   // Per-slide background color from data-background-color attribute.

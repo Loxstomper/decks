@@ -513,6 +513,26 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).toContain('href="/decks/My%20Deck/custom.css"');
   });
 
+  it('rewrites relative slide-content asset refs (<img src>) to absolute deck URLs', () => {
+    // REGRESSION (thumbnail request storm, image variant): a relative `<img
+    // src="assets/photo.jpg">` in an opaque-origin thumbnail ignores <base href>
+    // and resolves at the editor root → /assets/photo.jpg → 301-loop. Content
+    // refs must be rewritten to /decks/<name>/… like the stylesheet links.
+    const DECK_IMG = `<!doctype html>
+<html><body><div class="reveal"><div class="slides">
+<section data-eid="s1"><img data-eid="i1" src="assets/photo.jpg" srcset="assets/small.jpg 1x, /already/abs.jpg 2x"><img data-eid="i2" src="https://ext.example/x.png"></section>
+</div></div></body></html>`;
+    const s1 = topLevelSlides(parseDeck(DECK_IMG))[0];
+    const doc = buildThumbnailSrcdoc('My Deck', s1);
+    expect(doc).toContain('src="/decks/My%20Deck/assets/photo.jpg"');
+    // srcset: relative candidate rewritten, already-absolute one left alone.
+    expect(doc).toContain('/decks/My%20Deck/assets/small.jpg 1x');
+    expect(doc).toContain('/already/abs.jpg 2x');
+    // External (http) refs are never rewritten and never leak to root.
+    expect(doc).toContain('src="https://ext.example/x.png"');
+    expect(doc).not.toMatch(/src="assets\//);
+  });
+
   it('uses the theme passed via opts (non-black theme link present)', () => {
     const model = parseDeck(DECK);
     const s1 = topLevelSlides(model)[0];

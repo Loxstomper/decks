@@ -46,8 +46,13 @@
 
 <div class="thumb" style="width: {width}px; height: {height}px;">
   <!--
-    sandbox="" (no flags) → opaque-origin, NO scripts. Subresource loads
-    (the deck's CSS) still succeed because srcdoc inherits the editor origin.
+    sandbox="" (no flags) → opaque origin, NO scripts. The srcdoc's <base href>
+    is NOT honoured here (an opaque-origin about:srcdoc has no base to resolve a
+    path-absolute href against), so buildThumbnailSrcdoc emits every asset URL —
+    its own stylesheets AND the slide's relative `<img src>`/`poster` refs —
+    fully qualified as `/decks/<name>/…`. Absolute paths resolve against the
+    origin regardless, so no relative ref leaks to the editor root (`/assets/…`),
+    which would 301-loop → ERR_TOO_MANY_REDIRECTS × every slide.
     aria-hidden: the thumbnail is decorative; the surrounding button is labelled.
   -->
   <iframe
