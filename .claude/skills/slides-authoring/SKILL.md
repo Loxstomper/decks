@@ -251,6 +251,12 @@ A QR code is a `<div>` carrying the editor-owned marker `data-qr` (the encoded
 payload — a URL or text). The div is **empty on disk**; the bundled QR plugin
 generates an inline SVG into it at runtime, offline.
 
+A QR is a fixed-size graphic you place on the slide, so it's a **free**
+(absolutely-positioned) block — `data-free` + `data-x/y/w/h` in logical px, sized
+by the free-layout CSS. Don't drop a bare `<div data-qr>` straight under a
+`data-layout` section (it overflows off the slide edge); make it free (below) or
+put it inside a layout slot.
+
 ```html
 <div data-eid="qr1"
      data-qr="https://example.com"
@@ -259,7 +265,7 @@ generates an inline SVG into it at runtime, offline.
      data-qr-bg="#ffffff"
      data-qr-quiet="4"
      aria-label="QR code: https://example.com"
-     style="width: 280px; height: 280px"></div>
+     data-free data-x="820" data-y="400" data-w="280" data-h="280"></div>
 ```
 
 - `data-qr` must be a **non-empty** string (the payload). `slides validate`

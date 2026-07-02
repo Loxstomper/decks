@@ -163,8 +163,8 @@ export function buildChartBlock(type: string, dataJson: string): ElementNode {
 
 // ── QR code block (P19) ──────────────────────────────────────────────────────
 
-/** Default rendered size of a QR block (logical px, square). The SVG fills the
- *  div; the div needs an intrinsic size since it has no other content. */
+/** Default rendered size of a QR block (logical px, square). The free-layout CSS
+ *  sizes the div from data-w/h (→ inline width/height); the SVG fills it. */
 export const QR_DEFAULT_SIZE = 280;
 
 /** QR generation/encoding defaults (mirrored by the vendored plugin's fallbacks). */
@@ -180,15 +180,24 @@ export function qrAriaLabel(payload: string): string {
 }
 
 /**
- * Build a QR code leaf:
+ * Build a QR code leaf as a FREE (absolutely-positioned) block, centred on the
+ * logical canvas:
  *   <div data-qr="{payload}" data-qr-ec="M" data-qr-fg="#000000"
  *        data-qr-bg="#ffffff" data-qr-quiet="4"
  *        aria-label="QR code: {payload}"
- *        style="width:280px;height:280px"></div>
+ *        data-free data-x="820" data-y="400" data-w="280" data-h="280"></div>
+ *
+ * WHY FREE (not a flow leaf like chart): a QR is a small fixed-size graphic the
+ * user positions on the slide — like a shape/image/embed. As a flow child it lands
+ * wherever the layout puts it (e.g. appended after a title layout's content slot,
+ * it overflows off the bottom edge) and can't be dragged. Free placement gives it
+ * known on-canvas coords + drag/resize from the first insert. The block registry
+ * pairs this with `placement: 'free'` so the insert seam drops it into the slide
+ * section, not a content slot (see blocks/qr.ts).
  *
  * The div is EMPTY on disk (byte-stable round-trip); the vendored QR plugin
  * (internal/deck/vendor/qr/plugin.js) renders an inline SVG into it at runtime
- * from the data-qr* attributes. This mirrors the Chart leaf's data-bound model.
+ * from the data-qr* attributes. The free-layout CSS sizes the div from data-w/h.
  *
  * `fg`/`bg`/`quiet` are functional inputs to QR generation stored as data-qr-*
  * attributes (not CSS) — the renderer must read them to draw scannable modules
@@ -202,6 +211,8 @@ export function buildQrBlock(
   payload: string,
   opts: { ec?: string; fg?: string; bg?: string; quiet?: number } = {},
 ): ElementNode {
+  const x = (1920 - QR_DEFAULT_SIZE) / 2;
+  const y = (1080 - QR_DEFAULT_SIZE) / 2;
   return createElement('div', {
     'data-qr': payload,
     'data-qr-ec': opts.ec ?? QR_DEFAULTS.ec,
@@ -209,6 +220,12 @@ export function buildQrBlock(
     'data-qr-bg': opts.bg ?? QR_DEFAULTS.bg,
     'data-qr-quiet': String(opts.quiet ?? QR_DEFAULTS.quiet),
     'aria-label': qrAriaLabel(payload),
-    style: `width: ${QR_DEFAULT_SIZE}px; height: ${QR_DEFAULT_SIZE}px`,
+    // Free positioning (draggable/resizable): centred on the logical canvas. The
+    // free-layout CSS turns data-w/h into the div's inline width/height.
+    'data-free': null,
+    'data-x': String(x),
+    'data-y': String(y),
+    'data-w': String(QR_DEFAULT_SIZE),
+    'data-h': String(QR_DEFAULT_SIZE),
   });
 }

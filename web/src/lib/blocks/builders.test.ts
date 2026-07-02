@@ -389,6 +389,18 @@ describe('buildQrBlock', () => {
     expect(el.children).toHaveLength(0);
   });
 
+  it('is a free (draggable) block: data-free + centred data-x/y/w/h, no style', () => {
+    const el = buildQrBlock('https://example.com');
+    expect(hasAttribute(el, 'data-free')).toBe(true);
+    // 280×280 centred on the 1920×1080 logical canvas.
+    expect(getAttribute(el, 'data-w')).toBe('280');
+    expect(getAttribute(el, 'data-h')).toBe('280');
+    expect(getAttribute(el, 'data-x')).toBe('820');
+    expect(getAttribute(el, 'data-y')).toBe('400');
+    // Size comes from data-w/h via the free-layout CSS, not an inline style.
+    expect(getAttribute(el, 'style')).toBeNull();
+  });
+
   it('round-trips byte-stable: the payload + options survive serialize→parse', () => {
     const el = buildQrBlock('https://café.example/☕', { ec: 'Q' });
     const out = serialize(el);
@@ -410,9 +422,11 @@ describe('buildQrBlock', () => {
     expect(getAttribute(div!, 'data-qr-ec')).toBe('Q');
   });
 
-  it('classifies as a leaf (selectable, eid-stampable)', async () => {
+  it('classifies as free (draggable, selectable, eid-stampable)', async () => {
+    // data-free wins over the div-data-qr leaf rule (classify Rule 1), so the QR
+    // is an absolutely-positioned free element — draggable on the canvas.
     const { classify } = await import('$lib/model');
-    expect(classify(buildQrBlock('https://example.com'))).toBe('leaf');
+    expect(classify(buildQrBlock('https://example.com'))).toBe('free');
   });
 
   it('a bare <div> without data-qr stays passthrough', async () => {

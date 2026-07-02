@@ -169,9 +169,15 @@ Nested `<section>` elements create reveal's 2D slide grid (vertical stacks).
   - also carry an `aria-label` (e.g. `QR code: <payload>`) so the code is
     described to assistive tech.
 
+  A QR is a fixed-size graphic you position on the slide, so the editor inserts it
+  as a **free** block (`data-free` + `data-x/y/w/h`, sized by the free-layout CSS)
+  — draggable/resizable on the canvas. Hand-authoring, either make it free or place
+  it inside a layout slot; a bare `<div data-qr>` dropped straight under a
+  `data-layout` section overflows off the slide edge.
+
   Example: `<div data-qr="https://example.com" data-qr-ec="M" data-qr-fg="#000000"
   data-qr-bg="#ffffff" data-qr-quiet="4" aria-label="QR code: https://example.com"
-  style="width: 280px; height: 280px"></div>`
+  data-free data-x="820" data-y="400" data-w="280" data-h="280"></div>`
 
 ### Inline marks (rich text within a leaf, P17)
 
