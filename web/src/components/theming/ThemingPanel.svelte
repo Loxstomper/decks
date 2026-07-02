@@ -118,41 +118,33 @@
     customCssStore.applyVar('--r-main-font', `"${result.family}", sans-serif`);
   }
 
-  // ── Deck-level auto-advance (P17-20) ─────────────────────────────────────────
+  // ── Deck-level playback: loop only (P17-20) ─────────────────────────────────
   //
-  // The autoSlide/loop config lives inside the opaque Reveal.initialize <script>,
-  // so we READ the current values by regex over deckStore.source and WRITE via
-  // deckStore.applyDeckAutoslide (POST /api/decks/{name}/autoslide → byte-stable
-  // deck.html rewrite → reload). Reading from source keeps the controls in sync
-  // after the reload with no local mirror to drift.
+  // Auto-advance is intentionally PER-SLIDE only: it lives on each `<section>` as
+  // `data-autoslide` (edited in the Properties panel), so a delay applies to just
+  // the selected slide. We deliberately do NOT expose the deck-level `autoSlide`
+  // default here — setting it would auto-advance EVERY slide. So this panel only
+  // owns `loop`, and every write pins the global `autoSlide` to 0 to guarantee no
+  // deck-wide auto-advance leaks in (reveal reads a slide's own data-autoslide
+  // first, falling back to this now-always-0 default).
+  //
+  // The loop flag lives inside the opaque Reveal.initialize <script>, so we READ it
+  // by regex over deckStore.source and WRITE via deckStore.applyDeckAutoslide (POST
+  // /api/decks/{name}/autoslide → byte-stable deck.html rewrite → reload).
 
-  const deckAutoslideMs = $derived.by<number>(() => {
-    const m = /autoSlide:\s*(\d+)/.exec(deckStore.source);
-    return m ? parseInt(m[1], 10) : 0;
-  });
   const deckLoop = $derived(/\bloop:\s*true\b/.test(deckStore.source));
 
   let autoslideBusy = $state(false);
 
-  async function applyDeckAutoslide(ms: number, loop: boolean): Promise<void> {
+  async function onDeckLoopToggle(e: Event): Promise<void> {
     if (autoslideBusy) return;
     autoslideBusy = true;
     try {
-      await deckStore.applyDeckAutoslide(ms, loop);
+      // ms=0 → no deck-wide auto-advance; loop is independent (wraps navigation).
+      await deckStore.applyDeckAutoslide(0, (e.currentTarget as HTMLInputElement).checked);
     } finally {
       autoslideBusy = false;
     }
-  }
-
-  function onDeckAutoslideInput(e: Event): void {
-    const raw = (e.currentTarget as HTMLInputElement).value.trim();
-    const ms = raw === '' ? 0 : parseInt(raw, 10);
-    if (!Number.isFinite(ms) || ms < 0) return;
-    void applyDeckAutoslide(ms, deckLoop);
-  }
-
-  function onDeckLoopToggle(e: Event): void {
-    void applyDeckAutoslide(deckAutoslideMs, (e.currentTarget as HTMLInputElement).checked);
   }
 
   // ── Deck-level slide numbers (P17-17) ────────────────────────────────────────
@@ -395,23 +387,9 @@
 
         <div class="separator"></div>
 
-        <!-- ── Deck-level auto-advance (P17-20) ─────────────────────────── -->
+        <!-- ── Deck-level playback: loop only (P17-20) ──────────────────── -->
         <div class="slide-theme-section">
-          <div class="section-title">Auto-advance</div>
-          <div class="control-row">
-            <label class="control-label" for="deck-autoslide">Default (ms)</label>
-            <input
-              id="deck-autoslide"
-              class="picker-select"
-              type="number"
-              min="0"
-              step="500"
-              placeholder="off"
-              disabled={!isOpen || autoslideBusy}
-              value={deckAutoslideMs || ''}
-              onchange={onDeckAutoslideInput}
-            />
-          </div>
+          <div class="section-title">Playback</div>
           <div class="control-row">
             <label class="control-label" for="deck-loop">Loop deck</label>
             <input
@@ -422,6 +400,10 @@
               onchange={onDeckLoopToggle}
             />
           </div>
+          <p class="section-hint">
+            Auto-advance is per-slide — select a slide and set its “Auto-advance”
+            delay in the Properties panel. It applies to that slide only.
+          </p>
         </div>
 
         <div class="separator"></div>
@@ -720,6 +702,13 @@
     letter-spacing: 0.08em;
     text-transform: uppercase;
     color: rgba(255, 255, 255, 0.3);
+  }
+
+  .section-hint {
+    margin: 0.25rem 0 0;
+    font-size: 0.65rem;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.4);
   }
 
   .control-row {
