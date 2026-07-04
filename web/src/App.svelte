@@ -368,8 +368,7 @@
    * element (empty slide background). Targets the current slide and routes
    * through the existing slide ops (one undo entry + autosave each).
    */
-  function slideMenuItems(): MenuItem[] {
-    const slideEid = currentSlideEid;
+  function slideMenuItems(slideEid: string | null = currentSlideEid): MenuItem[] {
     if (!slideEid || !deckStore.model) return [];
     const section = findByEid(deckStore.model, slideEid);
     const hidden = section ? isSlideHidden(section) : false;
@@ -445,6 +444,25 @@
     );
   }
 
+  // Navigator slide-row right-click: the row already selected + jumped to the
+  // slide; open the slide-level menu (never the element menu) for that slide.
+  // The cursor sits left of the canvas pane (which clips its children), so the
+  // stack-local x is clamped to ≥ 0 — the menu lands at the pane's left edge at
+  // cursor height.
+  function openContextMenuFromNavigator(eid: string, clientX: number, clientY: number): void {
+    const items = slideMenuItems(eid);
+    if (items.length === 0) return;
+    const rect = canvasStackEl?.getBoundingClientRect();
+    ctxSelKey = selectionStore.eids.join(',');
+    ctxOpenNonce = deckStore.reloadNonce;
+    ctxMenu = {
+      open: true,
+      x: rect ? Math.max(0, clientX - rect.left) : clientX,
+      y: rect ? Math.max(0, clientY - rect.top) : clientY,
+      items,
+    };
+  }
+
   // Auto-dismiss: close when the selection changes or the deck reloads while the
   // menu is open (Escape + click-outside are handled inside ContextMenu).
   $effect(() => {
@@ -496,7 +514,11 @@
 
       <!-- Slide filmstrip (P6-1..P6-6). Fills the remaining height and scrolls. -->
       <div class="flex-1 min-h-0 overflow-y-auto border-t border-surface-overlay pt-2">
-        <Navigator iframeEl={canvasIframe} {onDeckCreated} />
+        <Navigator
+          iframeEl={canvasIframe}
+          {onDeckCreated}
+          onSlideContextMenu={openContextMenuFromNavigator}
+        />
       </div>
     </div>
   {/snippet}

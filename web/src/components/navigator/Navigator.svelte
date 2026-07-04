@@ -37,9 +37,16 @@
      * affordance. The shell should refresh the deck list and open the new deck.
      */
     onDeckCreated?: (name: string) => Promise<void>;
+    /**
+     * Right-click on a slide row (spec 06 "slide-level context menu"). The row
+     * selects + jumps to the slide first, then hands the shell the eid + the
+     * viewport cursor so it can open the shared slide menu. Absent → the
+     * browser's default menu is left alone.
+     */
+    onSlideContextMenu?: (eid: string, clientX: number, clientY: number) => void;
   }
 
-  let { iframeEl = null, onDeckCreated }: Props = $props();
+  let { iframeEl = null, onDeckCreated, onSlideContextMenu }: Props = $props();
 
   // ── Derived slide tree ──────────────────────────────────────────────────────
 
@@ -92,6 +99,18 @@
   function jump(eid: string | null, h: number, v: number): void {
     if (eid) selectionStore.select(eid);
     navigateToSlide(iframeEl, h, v);
+  }
+
+  /**
+   * Right-click on a slide row: behave like a click (select + jump) and then
+   * open the slide-level context menu at the cursor. Without a wired callback
+   * (or an eid to target) the browser's default menu is left alone.
+   */
+  function onRowContextMenu(eid: string | null, h: number, v: number, ev: MouseEvent): void {
+    if (!onSlideContextMenu || !eid) return;
+    ev.preventDefault();
+    jump(eid, h, v);
+    onSlideContextMenu(eid, ev.clientX, ev.clientY);
   }
 
   // ── Toolbar / per-slide commands (P6-3, P6-5, P6-6) ─────────────────────────
@@ -435,6 +454,7 @@
           ondrop={() => onDrop('')}
           ondragend={resetDrag}
           onclick={() => jump(slide.eid, slide.h, 0)}
+          oncontextmenu={(e) => onRowContextMenu(slide.eid, slide.h, 0, e)}
           onkeydown={(e) => {
             if (e.key === 'Enter' || e.key === ' ') {
               e.preventDefault();
@@ -537,6 +557,7 @@
                   ondrop={() => onDrop(slide.eid ?? '')}
                   ondragend={resetDrag}
                   onclick={() => jump(vert.eid, slide.h, vert.v)}
+                  oncontextmenu={(e) => onRowContextMenu(vert.eid, slide.h, vert.v, e)}
                   onkeydown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
