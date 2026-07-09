@@ -1,7 +1,9 @@
 # Authoring conventions for slides-builder decks
 
 Reference document for the `slides-authoring` Claude Code skill and for
-human authors editing reveal.js decks in this workspace.
+human authors editing reveal.js decks in this workspace. Installed into
+`.claude/skills/slides-authoring/` by the `slides` binary, so the contract
+described here always matches the binary that validates it.
 
 ---
 
@@ -302,7 +304,10 @@ HTTP (`POST /api/decks/{name}/validate`) and gates its own save path on them.
 
 ## Attribute cross-reference (implementation source)
 
-The canonical attribute names and allowed-value sets are defined in:
+The canonical attribute names and allowed-value sets are defined in the
+**slides-builder source tree** (not in this workspace — a decks workspace is
+usually a separate repo, and these paths are here to say where the contract is
+maintained, not to be opened from here):
 
 - `web/src/lib/model/layout.ts` — `LayValue`, `AlignValue`, `JustifyValue`, `LayoutProps`; chart, QR, and preset/slot accessors
 - `web/src/lib/model/theme.ts` — `THEME_NAMES` and the `data-background-*` set
@@ -312,3 +317,5 @@ The canonical attribute names and allowed-value sets are defined in:
 - `internal/deck/deck.go` — deck template, vendored asset structure, CLI commands
 - `specs/layout-vocabulary.md` — design intent and contract
 - `specs/principles-and-invariants.md` — offline-first, round-trip, never-destroy
+- `internal/skill/assets/slides-authoring/` — the source of truth for this document
+  and `SKILL.md`; the binary embeds them and installs a copy into each workspace

@@ -8,6 +8,7 @@
 //	slides upgrade <name>    re-vendor + migrate reveal config (Phase 15)
 //	slides add-slide <deck>  append a starter <section> to a deck (P8-1)
 //	slides validate <deck>   check a deck against the spec rules (P8-2)
+//	slides install-skill     (re)install the Claude Code authoring skill (P21-2)
 //
 // A global --dir <path> (before the subcommand) or $SLIDES_DIR selects the workspace;
 // otherwise it is found by walking up from the cwd.  See root.go and spec
@@ -28,6 +29,7 @@ import (
 	"slides-builder/internal/provider/giphy"
 	"slides-builder/internal/provider/unsplash"
 	"slides-builder/internal/server"
+	"slides-builder/internal/skill"
 	"slides-builder/internal/validate"
 	"slides-builder/internal/watch"
 	slideweb "slides-builder/web"
@@ -76,6 +78,8 @@ func main() {
 			fatalf("usage: slides validate <deck>")
 		}
 		runValidate(dir, args[1])
+	case args[0] == "install-skill":
+		runInstallSkill(dir)
 	default:
 		fatalf("unknown command %q\n\n%s", args[0], usage)
 	}
@@ -181,6 +185,14 @@ func runNew(flagDir, name string) {
 			log.Fatalf("workspace: %v", err)
 		}
 		fmt.Printf("Initialized slides workspace at %s\n", root)
+
+		// Install the authoring skill on workspace init only — never silently on
+		// every run (spec claude-code-integration). `slides install-skill` refreshes it.
+		res, err := skill.Install(root)
+		if err != nil {
+			log.Fatalf("install-skill: %v", err)
+		}
+		fmt.Printf("Installed the %s skill (%d files) at %s\n", skill.Name, res.Total, res.Dir)
 	}
 	log.Printf("workspace: %s", root)
 
@@ -288,6 +300,30 @@ func runValidate(flagDir, name string) {
 		fmt.Fprintf(os.Stderr, "  %s: %s%s%s\n", e.Code, e.Message, loc, eid)
 	}
 	os.Exit(1)
+}
+
+// runInstallSkill (re)installs the embedded Claude Code authoring skill into the
+// resolved workspace's .claude/skills/ (P21-2, spec claude-code-integration).
+//
+// This is the explicit refresh command: after upgrading the binary, run it so the skill
+// Claude Code reads matches the contract this binary's `validate` enforces.  It is a
+// byte-for-byte no-op when the installed copy is already current, so a decks repo that
+// commits the skill sees no spurious diff.
+func runInstallSkill(flagDir string) {
+	root := mustWorkspace(flagDir)
+
+	res, err := skill.Install(root)
+	if err != nil {
+		log.Fatalf("install-skill: %v", err)
+	}
+	if !res.Changed() {
+		fmt.Printf("ok: the %s skill is already current at %s (%d files)\n", skill.Name, res.Dir, res.Total)
+		return
+	}
+	fmt.Printf("Installed the %s skill at %s:\n", skill.Name, res.Dir)
+	for _, f := range res.Written {
+		fmt.Printf("  updated %s\n", f)
+	}
 }
 
 func fatalf(format string, args ...any) {

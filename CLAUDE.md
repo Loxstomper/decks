@@ -16,6 +16,7 @@ operational only (commands, gotchas).
 - Re-vendor reveal into an existing deck: `slides vendor <name>`.
 - Append a starter slide: `slides add-slide <name>`.
 - Validate a deck (layout contract, unique eids, asset existence, well-formedness, offline guard): `slides validate <name>` (exit 0 = clean, non-zero + diagnostics = invalid). **Run after editing a deck by hand or with Claude Code.**
+- (Re)install the authoring skill into the workspace's `.claude/skills/`: `slides install-skill` (auto-run by `slides new` on a fresh root; a no-op when already current).
 
 ## Workspace resolution
 Every command resolves a **workspace root** — the directory holding `decks/` — before doing
@@ -27,7 +28,12 @@ deck folder. The resolved root is always logged.
 - Testing against a throwaway root: `slides --dir /tmp/ws new intro` then `slides --dir /tmp/ws`.
 
 ## Deck authoring (for Claude Code)
-When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`.claude/skills/slides-authoring/SKILL.md`) and the full contract reference (`docs/AUTHORING.md`): the `data-*` layout vocabulary, `data-eid` rules, offline-first (no external URLs), and turn-taking. Always finish with `slides validate <name>`.
+When authoring/editing decks in `decks/`, follow the `slides-authoring` skill and its full contract reference (`AUTHORING.md`, installed beside it): the `data-*` layout vocabulary, `data-eid` rules, offline-first (no external URLs), and turn-taking. Always finish with `slides validate <name>`.
+
+**Edit the skill at its source, `internal/skill/assets/slides-authoring/`** — never at
+`.claude/skills/slides-authoring/`, which is a generated copy the binary installs (and this repo
+commits so a fresh clone has it). `TestRepoInstalledCopyIsCurrent` fails if they diverge; after
+changing the source, run `slides install-skill` from the repo root and commit both.
 
 ## Dev
 - `cd web && npm run dev` (Vite on :5173). Vite proxies `/api` and `/events` to the Go backend on **:3000** (override with `GO_PORT`). Run the Go server separately.
@@ -42,7 +48,7 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
   `mcr.microsoft.com/playwright` image via `npm run test:e2e:docker`. Specs live in `web/e2e/*.spec.ts`.
 
 ## Gotchas
-- **The layout contract is encoded four times.** Independent re-implementations of the same
+- **The layout contract is encoded five times.** Independent re-implementations of the same
   `data-*` vocabulary; changing it means changing all of them, or they silently disagree:
   - `web/src/lib/model/layout.ts` — TS, the editor's enums/getters/setters.
   - `internal/validate/validate.go` — Go, the CLI + save-path `validate` (allowed-sets must
@@ -51,6 +57,9 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
     (`data-gap/pad/cols/rows/grow/basis/span`, free `data-x/y/w/h/rot`) at runtime in the deck.
   - `web/src/lib/slides/thumbnail-layout.ts` — a static port of that same numeric vocabulary to
     inline styles, because navigator thumbnails are **script-free** and never run the init JS.
+  - `internal/skill/assets/slides-authoring/{SKILL.md,AUTHORING.md}` — prose, the copy the binary
+    installs into each workspace for Claude Code. A stale one is the worst kind: the deck looks
+    authored correctly and fails `validate`.
 - **Adding a vendored plugin or a `<head>` link only fixes *new* decks.** The scaffold template
   and `Vendor()` copy files; existing decks keep their old `deck.html`. Anything the editor can
   insert into *any* deck (chart, QR, per-slide themes) must also be injected into existing decks

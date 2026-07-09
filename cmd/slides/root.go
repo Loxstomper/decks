@@ -22,6 +22,7 @@ const usage = `Usage:
   slides [--dir <path>] upgrade <name> re-vendor + migrate an existing deck's reveal config
   slides [--dir <path>] add-slide <deck>  append a starter <section>
   slides [--dir <path>] validate <deck>   check a deck against the spec rules
+  slides [--dir <path>] install-skill  (re)install the Claude Code authoring skill
 
 Workspace resolution (in precedence order):
   --dir <path>   an existing directory; never created
