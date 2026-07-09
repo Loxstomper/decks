@@ -2,7 +2,7 @@
  * inline-marks.ts — Live-DOM range mark commands for in-place rich text
  * (P17-6 range marks, P17-9 links).
  *
- * WHY THIS EXISTS (spec 04 rich text, spec 12 byte-stability):
+ * WHY THIS EXISTS (spec canvas-interaction rich text, spec principles-and-invariants byte-stability):
  * ===========================================================
  * The floating selection toolbar (P17-7) and link UI (P17-10) format the user's
  * CURRENT selection while a leaf is in a contenteditable session. The way Lane A

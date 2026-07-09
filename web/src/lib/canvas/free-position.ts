@@ -1,12 +1,12 @@
 /**
  * free-position.ts — Read/write a free element's logical position (P3-9 nudge,
- * P3-8 snap for free drags / spec 03 `data-free`, spec 04 "Free → Move").
+ * P3-8 snap for free drags / spec layout-vocabulary `data-free`, spec canvas-interaction "Free → Move").
  *
  * WHY THIS EXISTS:
  * ================
  * A `data-free` element is positioned in LOGICAL coordinates via `data-x` /
- * `data-y` (spec 03 layout vocabulary). Nudging or dragging a free element edits
- * those attributes — and only those — so the byte-stable round-trip (spec 12 #4)
+ * `data-y` (spec layout-vocabulary layout vocabulary). Nudging or dragging a free element edits
+ * those attributes — and only those — so the byte-stable round-trip (spec principles-and-invariants #4)
  * holds: setAttribute marks just that element dirty.
  *
  * Pure model helpers (no DOM, no store) → unit-testable. The store command layer
@@ -74,7 +74,7 @@ export function getFreeSize(el: ElementNode): { width: number | null; height: nu
 /**
  * Write a free element's logical SIZE to `data-w`/`data-h`. Mirrors
  * {@link setFreePosition}: integer-valued sizes serialize without a trailing
- * `.0`. Only this element goes dirty (spec 12 #4 round-trip).
+ * `.0`. Only this element goes dirty (spec principles-and-invariants #4 round-trip).
  */
 export function setFreeSize(el: ElementNode, width: number, height: number): void {
   setAttribute(el, 'data-w', String(width));

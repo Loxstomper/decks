@@ -1,4 +1,4 @@
-# 05 — Scaling & resolution
+# Scaling & resolution
 
 **Status:** decided
 
@@ -37,7 +37,7 @@ promise above), a slide's `<section>` must *be* the full logical canvas at its o
 
 - **`center: false`** — reveal's default `center: true` vertically/horizontally centers each
   section's content box, giving a short section a non-zero `top`. The **layout vocabulary**
-  ([03](03-layout-vocabulary.md)) already owns alignment (a `stack` centers via
+  ([Layout vocabulary](layout-vocabulary.md)) already owns alignment (a `stack` centers via
   `justify-content`), so reveal centering is redundant *and* conflicting.
 - **`margin: 0`** — reveal's default `margin: 0.04` insets the usable area by 4% and rescales,
   so the rendered origin/scale no longer equals the raw logical canvas.
@@ -66,7 +66,7 @@ box) still track it, which is why the mismatch shows up **only in free mode**.
 ## Editor implications
 
 - **Canvas mirrors present-time scaling exactly** → true WYSIWYG. Same transform, different
-  denominator (see [04](04-canvas-interaction.md)).
+  denominator (see [Canvas & interaction](canvas-interaction.md)).
 - **Two zoom concepts, not conflated:** present-scale (auto fit-to-screen) vs editor-zoom
   (fit / 100% / custom for detail work).
 - **Target-output preview:** preview the deck letterboxed at a *different* target ratio
@@ -82,8 +82,8 @@ pinned to coordinates that assumed the old canvas). On change:
 - **Free elements are flagged**, with an offer to reposition/rescale.
 
 This is another reason structured layout is the default and `free` is the escape hatch
-(see [03](03-layout-vocabulary.md)).
+(see [Layout vocabulary](layout-vocabulary.md)).
 
 ## Related
 
-[03](03-layout-vocabulary.md) · [04](04-canvas-interaction.md) · [10](10-presenting-and-export.md)
+[Layout vocabulary](layout-vocabulary.md) · [Canvas & interaction](canvas-interaction.md) · [Presenting & export](presenting-and-export.md)

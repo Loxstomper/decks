@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * GridOverlay.svelte — Visual snap grid (P3-8 / spec 04 "Snap-to-grid").
+   * GridOverlay.svelte — Visual snap grid (P3-8 / spec canvas-interaction "Snap-to-grid").
    *
    * WHY THIS EXISTS:
    * ================

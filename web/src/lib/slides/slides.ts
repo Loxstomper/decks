@@ -1,16 +1,16 @@
 /**
- * slides.ts — Pure model operations for slide management (P6 / spec 06).
+ * slides.ts — Pure model operations for slide management (P6 / spec slide-management).
  *
  * WHY THIS EXISTS:
  * ================
  * Every "slide" is a `<section>` element directly under `.reveal > .slides`
- * (spec 06: "All operations are DOM operations on `<section>` elements"). reveal
+ * (spec slide-management: "All operations are DOM operations on `<section>` elements"). reveal
  * is 2D — a top-level `<section>` that itself contains `<section>` children is a
  * *vertical stack* and the wrapper's own content is NOT shown as a slide. These
  * functions add / duplicate / delete / reorder / nest / promote / hide slides by
  * splicing nodes in the source-preserving model tree.
  *
- * BYTE-STABILITY (spec 12 #4 — load-bearing, DO NOT break):
+ * BYTE-STABILITY (spec principles-and-invariants #4 — load-bearing, DO NOT break):
  * =========================================================
  * Mutations mark the *minimum* set of nodes dirty so untouched slides still
  * round-trip byte-for-byte:
@@ -275,7 +275,7 @@ function findSectionAndParent(
 
 /**
  * P6-3: Add a new slide. Inserts a `<section data-lay="stack">` with a starter
- * heading (spec 06) immediately after the top-level slide carrying `afterEid`,
+ * heading (spec slide-management) immediately after the top-level slide carrying `afterEid`,
  * or appended to the end when `afterEid` is omitted / unknown. Returns the new
  * (unstamped) section node, or null when the deck has no slides container.
  */
@@ -283,7 +283,7 @@ export function addSlide(model: DeckModel, afterEid?: string): ElementNode | nul
   const container = findSlidesContainer(model);
   if (!container) return null;
 
-  // Starter slide: data-lay="stack" (vertical-centred column, spec 03) with a
+  // Starter slide: data-lay="stack" (vertical-centred column, spec layout-vocabulary) with a
   // placeholder heading so the slide is visible in the canvas + thumbnail.
   const section = createElement('section', { 'data-lay': 'stack' });
   const heading = createElement('h2');
@@ -300,10 +300,10 @@ export function addSlide(model: DeckModel, afterEid?: string): ElementNode | nul
 }
 
 /**
- * P6-3 / spec 06: Duplicate the slide carrying `eid` (top-level or vertical),
+ * P6-3 / spec slide-management: Duplicate the slide carrying `eid` (top-level or vertical),
  * inserting the copy immediately after the original. The copy's `data-eid`s are
  * stripped (re-minted by the caller's stampEids) while `data-id`s are preserved
- * so auto-animate can pair the pair (spec 07). Returns the cloned section node,
+ * so auto-animate can pair the pair (spec motion-and-transitions). Returns the cloned section node,
  * or null when the eid is unknown.
  */
 export function duplicateSlide(model: DeckModel, eid: string): ElementNode | null {
@@ -483,7 +483,7 @@ export function setSlideFooterHidden(model: DeckModel, eid: string, hidden: bool
   return true;
 }
 
-// ── Layout presets (P14, spec 14) ────────────────────────────────────────────
+// ── Layout presets (P14, spec slide-management) ────────────────────────────────────────────
 //
 // A "layout preset" is a self-contained `<section data-layout="…">` snippet (the
 // bundled vendor/layouts/*.html, served via GET /api/templates). It composes the

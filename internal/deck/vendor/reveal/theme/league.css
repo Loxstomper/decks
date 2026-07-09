@@ -1,7 +1,7 @@
 /**
  * League theme for reveal.js 5.1.0 (MIT License, Hakim El Hattab).
  * Dark, dramatic with condensed headings. Bundled without external @import
- * to work offline (spec 12). Heading font falls back to Impact (system).
+ * to work offline (spec principles-and-invariants). Heading font falls back to Impact (system).
  */
 :root {
   --r-background-color: #1d1e2c;

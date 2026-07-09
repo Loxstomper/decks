@@ -1,4 +1,4 @@
-# 04 — Canvas & interaction
+# Canvas & interaction
 
 **Status:** decided
 
@@ -10,7 +10,7 @@ and the selection / drag / snapping / resize behaviors that make alignment feel 
 ## Rendering
 
 - reveal.js renders the deck inside a **sandboxed `<iframe>`** at the logical canvas size
-  (1920×1080, see [05](05-scaling-and-resolution.md)).
+  (1920×1080, see [Scaling & resolution](scaling-and-resolution.md)).
 - An **overlay layer** in the parent document sits over the iframe, drawing selection boxes,
   resize handles, and alignment guides.
 - **Text editing happens in-place** on the real nodes inside the iframe (`contenteditable`);
@@ -34,7 +34,7 @@ This is the first thing to prototype — everything visual depends on it.
 ## Selection
 
 - Click to select a leaf; click-through / outline panel to select containers.
-- **Outline/layers panel** (required by nesting, see [03](03-layout-vocabulary.md)): a tree of
+- **Outline/layers panel** (required by nesting, see [Layout vocabulary](layout-vocabulary.md)): a tree of
   `<section>` → containers → leaves. Click to select, drag to reparent, toggle visibility.
 - Marquee (drag-select) for multi-select.
 
@@ -48,8 +48,8 @@ This is the first thing to prototype — everything visual depends on it.
 - One delete = one undo entry = one autosave (consistent with every other command).
 - Deleting a **leaf** removes the node; deleting a **container** removes it and its subtree
   (the outline makes the scope visible before you commit). Whole-slide deletion stays in the
-  navigator ([06](06-slide-management.md)); this is element-level deletion *within* a slide.
-- **Passthrough** elements ([02](02-document-model.md)) can be deleted but never silently
+  navigator ([Slide management](slide-management.md)); this is element-level deletion *within* a slide.
+- **Passthrough** elements ([Document model](document-model.md)) can be deleted but never silently
   mangled — they go as a whole or not at all.
 
 ## Context menu
@@ -75,17 +75,17 @@ inspector/toolbar already use (single source of truth).
   - *Free:* Make structured · **Bring to front / Send to back** · Align/Distribute (multi).
   - *Container:* Insert block inside · Equal columns · quick align.
   - *Passthrough:* Delete · Jump to source only — **never** structural edits (never-destroy,
-    [12](12-principles-and-invariants.md)).
+    [Principles & invariants](principles-and-invariants.md)).
 - **Slide-level menu:** right-clicking empty slide background opens slide actions
   (Duplicate / Delete / Hide / Insert slide), reusing the navigator's slide ops
-  ([06](06-slide-management.md)).
+  ([Slide management](slide-management.md)).
 
 ### New element operations the menu introduces
 
 These are the only net-new model commands (each one undo entry + one autosave, byte-stable):
 
 - **Duplicate element** — clone the selected subtree, **regenerate its `data-eid`s** (uniqueness
-  per [02](02-document-model.md), as slide duplication already does), insert after the original.
+  per [Document model](document-model.md), as slide duplication already does), insert after the original.
 - **Z-order (free only)** — free elements paint in sibling order; *bring to front* / *send to
   back* reorder the element to last/first among its siblings (reuses the reorder op). Not shown
   for structured elements (they flow, not stack).
@@ -97,7 +97,7 @@ These are the only net-new model commands (each one undo entry + one autosave, b
 
 ## Rich text editing & formatting
 
-Text leaves are edited in place (`contenteditable`, [02](02-document-model.md)); formatting acts
+Text leaves are edited in place (`contenteditable`, [Document model](document-model.md)); formatting acts
 on the **current selection within** that edit, so a word or phrase can be styled independently —
 not only the whole element.
 
@@ -107,15 +107,15 @@ not only the whole element.
   mark on the selected range — a range wrap/unwrap, *not* `document.execCommand` (inconsistent
   across browsers).
 - **Allowlisted marks only.** Buttons map to the `strong` / `em` / `u` / `s` / `span[style]` /
-  `a` allowlist ([02](02-document-model.md)); writeback serializes them canonically and
+  `a` allowlist ([Document model](document-model.md)); writeback serializes them canonically and
   byte-stable, and pasted content is sanitized to the same allowlist
-  ([12](12-principles-and-invariants.md)).
+  ([Principles & invariants](principles-and-invariants.md)).
 - **Block-level controls** (whole-leaf, in the inspector — not the floating toolbar): **text
   alignment** (left / center / right / justify) and **list indent / outdent**.
 - **Links** target either a **selected text range** (wrap in `<a href>`) or a **whole selected
   element** (wrap the element); a small href editor adds / edits / removes the link. An external
   `href` is allowed — it is navigation, not an offline-breaking resource load
-  ([12](12-principles-and-invariants.md)) — only `javascript:` URLs are rejected. Add / edit /
+  ([Principles & invariants](principles-and-invariants.md)) — only `javascript:` URLs are rejected. Add / edit /
   remove is one undo entry + one autosave.
 
 ## Command palette & keyboard help
@@ -143,26 +143,26 @@ not only the whole element.
 - **Resize handles:** 8 handles; Shift = preserve aspect; Alt = resize from center.
 - **Keyboard nudge:** arrows = 1 logical unit; Shift+arrows = 10.
 - **Align / distribute:** for free elements → coordinate ops; for structured elements → set
-  container `data-align` / `data-justify` / `data-grow` ([03](03-layout-vocabulary.md)).
+  container `data-align` / `data-justify` / `data-grow` ([Layout vocabulary](layout-vocabulary.md)).
 
 ## Undo/redo
 
 Snapshot-based: each command pushes the serialized model onto a history stack. Cheap for
-slide-sized documents; session-only (git is durable history, see [13](13-project-structure.md)).
+slide-sized documents; session-only (git is durable history, see [Project structure](project-structure.md)).
 
 ## Canvas reload preserves view state
 
 The canvas reflects the **on-disk bytes**: after each autosave, undo/redo, or external
 (SSE/Claude) change, the iframe reloads the deck from the server rather than patching the live
 DOM (so relative assets resolve and the canvas matches persisted source — see
-[01](01-architecture.md) data flow). reveal re-initialises on reload and, left alone, returns
+[Architecture](architecture.md) data flow). reveal re-initialises on reload and, left alone, returns
 to the **first slide**.
 
 - **Invariant: a same-deck reload must preserve the viewer's current slide.** The current
   `(h, v)` indices are captured before the reload and restored once reveal is ready again, so
   committing an edit on slide 5 (e.g. pressing **Enter** to confirm an in-place text edit)
   leaves you on slide 5 — not slide 1. This applies to every reload cause: autosave,
-  undo/redo, and external changes ([11](11-claude-code-integration.md)).
+  undo/redo, and external changes ([Claude Code integration](claude-code-integration.md)).
 - **Only switching decks resets to the first slide** (a new `deck.html`, not a refresh of the
   current one).
 - The restore happens while the iframe is still hidden, so the intermediate first-slide render
@@ -174,9 +174,9 @@ to the **first slide**.
 
 ## Panes / layout
 
-Four zones: **Navigator** (slide filmstrip, [06](06-slide-management.md)) · **Canvas**
+Four zones: **Navigator** (slide filmstrip, [Slide management](slide-management.md)) · **Canvas**
 (iframe + overlay) · **Outline + Properties** · **Source** (CodeMirror 6, toggle/split with
-properties). The source pane and canvas stay synced ([02](02-document-model.md)).
+properties). The source pane and canvas stay synced ([Document model](document-model.md)).
 
 ### Collapsible & resizable chrome
 
@@ -207,4 +207,4 @@ Selection is two-way with the source pane, not just the canvas and outline:
 
 ## Related
 
-[02](02-document-model.md) · [03](03-layout-vocabulary.md) · [05](05-scaling-and-resolution.md) · [06](06-slide-management.md)
+[Document model](document-model.md) · [Layout vocabulary](layout-vocabulary.md) · [Scaling & resolution](scaling-and-resolution.md) · [Slide management](slide-management.md)

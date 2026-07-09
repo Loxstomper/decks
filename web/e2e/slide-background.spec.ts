@@ -20,7 +20,7 @@
  *     asset file name.  No need to enter the sandboxed frame.
  *
  *  4. Offline guard: the present route must make zero external http(s) requests even
- *     when a background-image slide is in the deck (the asset is local — spec 12 /
+ *     when a background-image slide is in the deck (the asset is local — spec principles-and-invariants /
  *     P9-2 invariant).
  *
  *  5. Vertical-stack cascade (P16-5 + propagateVerticalBackground in

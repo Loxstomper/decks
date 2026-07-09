@@ -10,7 +10,7 @@
  * insert seam places it — preserving the one-undo / autosave / select-new-block /
  * byte-stable contract every other insert follows.
  *
- * The emitted node is offline-first (spec 12): Chart.js + the chart plugin are
+ * The emitted node is offline-first (spec principles-and-invariants): Chart.js + the chart plugin are
  * vendored into the deck by the scaffold (Lane GO / P17-14); the markup carries
  * zero external URLs.
  *

@@ -7,7 +7,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Editor chrome colors — backed by CSS custom properties (spec 09).
+        // Editor chrome colors — backed by CSS custom properties (spec theming-and-styles).
         // Variables hold space-separated RGB channel triplets so Tailwind's
         // opacity modifier syntax (e.g. bg-surface/20) works correctly.
         surface: {

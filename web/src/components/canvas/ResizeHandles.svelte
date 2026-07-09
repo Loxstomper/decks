@@ -2,7 +2,7 @@
   /**
    * ResizeHandles.svelte — The eight resize handles around a free element (P4-3).
    *
-   * WHY THIS EXISTS (spec 04 "Resize handles: 8 handles"):
+   * WHY THIS EXISTS (spec canvas-interaction "Resize handles: 8 handles"):
    * ======================================================
    * Purely presentational: given a screen-space rect (already projected from the
    * element's LOGICAL rect × the coords.ts transform by the controller), it draws

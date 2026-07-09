@@ -10,7 +10,7 @@
  * insert seam places it — preserving the one-undo / autosave / select-new-block
  * / byte-stable contract every other insert follows.
  *
- * The emitted node is offline-first (spec 12): the QR generator + plugin are
+ * The emitted node is offline-first (spec principles-and-invariants): the QR generator + plugin are
  * vendored into the deck by the scaffold (P19-1); the markup carries zero
  * external URLs.
  *

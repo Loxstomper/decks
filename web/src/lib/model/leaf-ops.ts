@@ -1,7 +1,7 @@
 /**
  * leaf-ops.ts — Whole-leaf structural mark ops on the MODEL (P17-8, P17-10).
  *
- * WHY THIS EXISTS (spec 04 rich text, spec 12 byte-stability):
+ * WHY THIS EXISTS (spec canvas-interaction rich text, spec principles-and-invariants byte-stability):
  * ===========================================================
  * The floating toolbar formats a sub-string RANGE in the live DOM (inline-marks.ts)
  * and commits via the sanitizer. But two affordances act on a WHOLE text leaf even
@@ -13,7 +13,7 @@
  * These run as deck-store commands over the parsed model (no live DOM), so they
  * live here as pure model mutations: feed an ElementNode leaf, mutate its child
  * subtree, and let the standard command path re-serialize + persist. The byte-
- * stable round-trip (spec 12 #4) is preserved because only the edited leaf's
+ * stable round-trip (spec principles-and-invariants #4) is preserved because only the edited leaf's
  * subtree goes dirty; every untouched element still emits its original bytes.
  *
  * Mark/href canonicalisation is still owned by inline.ts: an href written here is

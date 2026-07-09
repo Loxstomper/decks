@@ -1,9 +1,9 @@
 /**
- * notes.ts — Speaker notes model operations (P7-2 / spec 10).
+ * notes.ts — Speaker notes model operations (P7-2 / spec presenting-and-export).
  *
  * Reveal.js stores speaker notes as `<aside class="notes">` inside each
  * `<section>`. These pure helpers get/set/remove that element while preserving
- * byte-stability (spec 12 #4):
+ * byte-stability (spec principles-and-invariants #4):
  *
  *   • Untouched sections round-trip verbatim — we only mark nodes dirty when
  *     their content actually changes.
@@ -14,7 +14,7 @@
  *     section's children list and the section is marked dirty.
  *
  * WHY `<aside class="notes">`:
- * This is reveal.js's canonical speaker-notes element (spec 10). The built-in
+ * This is reveal.js's canonical speaker-notes element (spec presenting-and-export). The built-in
  * speaker window (S key) picks it up automatically on the present route.
  */
 

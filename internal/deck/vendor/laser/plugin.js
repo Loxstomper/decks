@@ -9,7 +9,7 @@
  * Behaviour: press `l` to toggle "laser mode". While active, a red dot follows
  * the pointer and the cursor is hidden. The dot is a transient DOM node injected
  * into the reveal element — it is NEVER written to deck.html (present-mode
- * annotations are ephemeral, spec 10 / byte-stability invariant).
+ * annotations are ephemeral, spec presenting-and-export / byte-stability invariant).
  *
  * Enabled ONLY on the present route (the editor never loads this plugin).
  */

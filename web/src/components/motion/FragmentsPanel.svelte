@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * FragmentsPanel.svelte — Per-slide fragment (step reveal) control panel (P6-7 / spec 07).
+   * FragmentsPanel.svelte — Per-slide fragment (step reveal) control panel (P6-7 / spec motion-and-transitions).
    *
    * WHY A SEPARATE PANEL:
    * Fragment authoring has two distinct UI modes:

@@ -1,5 +1,5 @@
 // Package validate implements `slides validate`: an independent, spec-driven
-// checker for deck.html files (spec 11 "the sleeper feature", spec 12 validation
+// checker for deck.html files (spec claude-code-integration "the sleeper feature", spec principles-and-invariants validation
 // + offline-first).
 //
 // WHY a separate Go validator (it does NOT reuse the TS model):
@@ -9,21 +9,21 @@
 // *editing*. This Go package deliberately re-implements the SAME spec rules
 // independently so that decks authored OUTSIDE the editor — by Claude Code or a
 // human hand-editing HTML — can be gated before they reach the canvas
-// (spec 11: "Run by both Claude Code and the editor's save path, so malformed
+// (spec claude-code-integration: "Run by both Claude Code and the editor's save path, so malformed
 // decks are caught instead of silently breaking the canvas"). Two independent
 // implementations of one contract is intentional: it catches drift in either.
 //
-// The checks (spec 11 / 12 / 03):
+// The checks (spec claude-code-integration / principles-and-invariants / layout-vocabulary):
 //
 //	(a) data-lay / data-align / data-justify and numeric data-* values are in
-//	    the ALLOWED sets (the layout contract, spec 03).
+//	    the ALLOWED sets (the layout contract, spec layout-vocabulary).
 //	(b) data-eid uniqueness (no duplicates — stable ids must be unique to target).
 //	(c) asset existence: referenced relative srcs/hrefs resolve to files that
 //	    exist under the deck folder (excluding http(s):// and data: URLs).
 //	(d) parse / well-formedness: the HTML parses and tags are balanced enough to
 //	    be safe to render. We use golang.org/x/net/html's tokenizer to detect
 //	    gross malformation (mismatched / unclosed / stray tags, tokenizer errors).
-//	(e) offline guard (cross-cutting X-1, spec 12): ZERO external http(s):// (or
+//	(e) offline guard (cross-cutting X-1, spec principles-and-invariants): ZERO external http(s):// (or
 //	    protocol-relative //) resource URLs — every dependency must be vendored.
 package validate
 
@@ -58,7 +58,7 @@ type Result struct {
 	Errors []Issue `json:"errors"`
 }
 
-// Allowed enum sets — the layout contract (spec 03). These mirror the TS
+// Allowed enum sets — the layout contract (spec layout-vocabulary). These mirror the TS
 // LayValue / AlignValue / JustifyValue unions in web/src/lib/model/layout.ts,
 // kept in sync by hand (see package doc on why duplication is intentional).
 //
@@ -168,7 +168,7 @@ tokenize:
 				break tokenize
 			}
 			// A non-EOF tokenizer error means the bytes could not be tokenized at
-			// all — gross malformation (spec 11 (d)).
+			// all — gross malformation (spec claude-code-integration (d)).
 			issues = append(issues, Issue{
 				Code:    "malformed-html",
 				Message: "HTML could not be tokenized: " + err.Error(),
@@ -195,7 +195,7 @@ tokenize:
 
 			issues = append(issues, checkElement(name, attrs, line, seenEIDs, deckDir)...)
 
-			// Tag-balance bookkeeping (well-formedness, spec 11 (d)).
+			// Tag-balance bookkeeping (well-formedness, spec claude-code-integration (d)).
 			// SelfClosingTagToken (<x/>) and void elements never open a scope.
 			if tt == html.StartTagToken && !voidElements[name] && !optionalEndElements[name] {
 				openStack = append(openStack, openTag{name: name, line: line})
@@ -287,7 +287,7 @@ func checkElement(name string, attrs map[string]string, line int, seenEIDs map[s
 			"black|white|league|beige|night|moon|solarized|solarized-dark|dracula|sky", line, eid))
 	}
 
-	// data-background-* set (reveal.js per-slide background, spec 16). ALL of
+	// data-background-* set (reveal.js per-slide background, spec theming-and-styles). ALL of
 	// these are TOLERATED with no enum: -color, -size, -position, -repeat,
 	// -opacity, -gradient, -video-loop, -video-muted are plain pass-through
 	// strings reveal.js renders natively in 5.x. The two that reference loadable
@@ -506,12 +506,12 @@ func checkResourceURL(tag, attr, url string, line int, eid, deckDir string) []Is
 
 	lower := strings.ToLower(raw)
 
-	// (e) Offline guard (X-1, spec 12): zero external resource URLs. http(s)://
+	// (e) Offline guard (X-1, spec principles-and-invariants): zero external resource URLs. http(s)://
 	// and protocol-relative // both reach the network.
 	if strings.HasPrefix(lower, "http://") || strings.HasPrefix(lower, "https://") || strings.HasPrefix(raw, "//") {
 		return []Issue{{
 			Code:    "external-url",
-			Message: fmt.Sprintf("<%s %s=%q> is an external URL; decks must be offline-first (vendor it locally, spec 12)", tag, attr, url),
+			Message: fmt.Sprintf("<%s %s=%q> is an external URL; decks must be offline-first (vendor it locally, spec principles-and-invariants)", tag, attr, url),
 			Line:    line,
 			EID:     eid,
 		}}
@@ -537,7 +537,7 @@ func checkResourceURL(tag, attr, url string, line int, eid, deckDir string) []Is
 
 	// Resolve relative to the deck folder and confine to it: a reference that
 	// escapes the deck (../../etc/passwd) is itself an error — decks are
-	// self-contained (spec 12).
+	// self-contained (spec principles-and-invariants).
 	resolved := filepath.Join(deckDir, path)
 	rel, err := filepath.Rel(deckDir, resolved)
 	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {

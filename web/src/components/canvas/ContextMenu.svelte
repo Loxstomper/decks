@@ -2,7 +2,7 @@
   /**
    * ContextMenu.svelte — Cursor-positioned context menu for the canvas (P13-1).
    *
-   * WHY THIS EXISTS (spec 13 "Right-click context menu"):
+   * WHY THIS EXISTS (spec project-structure "Right-click context menu"):
    * ======================================================
    * Presentational component that renders a right-click menu at arbitrary
    * canvas-pane-relative coordinates with:

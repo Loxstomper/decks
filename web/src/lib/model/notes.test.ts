@@ -1,5 +1,5 @@
 /**
- * notes.test.ts — Speaker notes model ops (P7-2 / spec 10).
+ * notes.test.ts — Speaker notes model ops (P7-2 / spec presenting-and-export).
  *
  * Invariants under test:
  *   1. getSlideNotes — reads decoded text from <aside class="notes">; returns ''

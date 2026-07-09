@@ -6,7 +6,7 @@
  *  • valid model (classify lands in the expected class; nodes are dirty so they
  *    render canonically),
  *  • byte-stable round-trip: serialize(build()) re-parses and re-serializes to
- *    the SAME bytes (spec 12 #4 — inserted content round-trips like authored).
+ *    the SAME bytes (spec principles-and-invariants #4 — inserted content round-trips like authored).
  *
  * Plus the registry contract (registration / idempotency / grouping) and the
  * insert-target resolver.

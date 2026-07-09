@@ -1,6 +1,6 @@
 /* slides-layout-init.js — Applies numeric data-* layout attributes to CSS.
  *
- * Companion script for slides-layout.css (spec 03, offline-first spec 12).
+ * Companion script for slides-layout.css (spec layout-vocabulary, offline-first spec principles-and-invariants).
  * Load this BEFORE Reveal.initialize() so layout is applied before reveal
  * measures slide dimensions.
  *
@@ -8,7 +8,7 @@
  *   CSS attr() currently cannot assign numeric values to gap, padding, or
  *   flex-grow in all browsers. This script reads the data-* source-of-truth
  *   attributes and writes them as inline styles, keeping data-* as the
- *   editor's canonical representation (spec 03 § "Why data-attributes").
+ *   editor's canonical representation (spec layout-vocabulary § "Why data-attributes").
  *   The model layer (layout.ts) reads data-* back for the properties panel
  *   and writes them via setAttribute — inline styles here are a rendering
  *   concern only and never become the source of truth.
@@ -20,7 +20,7 @@
  *   Free coords:       data-x → left; data-y → top; data-w → width; data-h → height;
  *                      data-rot → transform:rotate(Ndeg)
  *
- * All numeric attributes are in LOGICAL PIXELS (spec 05 §"Coordinate system").
+ * All numeric attributes are in LOGICAL PIXELS (spec scaling-and-resolution §"Coordinate system").
  * The reveal.js viewport transform handles scaling from logical to screen coords.
  */
 (function slidesLayoutInit() {
@@ -180,11 +180,11 @@
     applyAll();
   }
 
-  // ── Deck-level transition override (P6-8, spec 07) ────────────────────────
+  // ── Deck-level transition override (P6-8, spec motion-and-transitions) ────────────────────────
   // The slides-builder motion panel stores the deck default transition as
   // data-transition / data-transition-speed on <div class="reveal">.  We cannot
   // modify the passthrough Reveal.initialize() <script> from the model layer
-  // (spec 12 — never destroy the unknown), so we call Reveal.configure() here
+  // (spec principles-and-invariants — never destroy the unknown), so we call Reveal.configure() here
   // after Reveal is ready to apply the stored preference.
   //
   // We use window.load (fires after ALL scripts have been parsed and executed,

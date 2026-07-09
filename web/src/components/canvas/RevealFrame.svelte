@@ -2,7 +2,7 @@
   /**
    * RevealFrame.svelte — Sandboxed reveal.js iframe renderer (P1-2, P1-3).
    *
-   * WHY THIS EXISTS (specs 01, 04, 05):
+   * WHY THIS EXISTS (specs architecture, canvas-interaction, scaling-and-resolution):
    * =====================================
    * reveal.js registers global keyboard listeners and injects global CSS. Running
    * it in a sandboxed <iframe> gives us two critical isolation properties:
@@ -22,7 +22,7 @@
    *                         iframe, which is acceptable because the deck is served
    *                         from our own Go backend — it is not untrusted content.
    *
-   * Scaling strategy (spec 05 — WYSIWYG):
+   * Scaling strategy (spec scaling-and-resolution — WYSIWYG):
    *   The iframe is always sized at the LOGICAL canvas (default 1920×1080). CSS
    *   `transform: scale()` + translate shrinks/grows the whole iframe to fill the
    *   container, exactly mirroring what reveal.js does in present mode. From
@@ -56,13 +56,13 @@
     deckUrl?: string;
 
     /**
-     * Logical canvas width in px (spec 05 default: 1920).
+     * Logical canvas width in px (spec scaling-and-resolution default: 1920).
      * Must match the reveal.js `width` config inside deck.html.
      */
     width?: number;
 
     /**
-     * Logical canvas height in px (spec 05 default: 1080).
+     * Logical canvas height in px (spec scaling-and-resolution default: 1080).
      * Must match the reveal.js `height` config inside deck.html.
      */
     height?: number;
@@ -70,8 +70,8 @@
     /**
      * User zoom multiplier applied on top of the fit-to-container scale.
      *   1.0  = fit (default) — logical canvas fills the container.
-     *   2.0  = 200% — useful for fine-grained editing (spec 04 "editor-zoom").
-     * This is NOT the same as reveal's present-scale (spec 05).
+     *   2.0  = 200% — useful for fine-grained editing (spec canvas-interaction "editor-zoom").
+     * This is NOT the same as reveal's present-scale (spec scaling-and-resolution).
      */
     zoom?: number;
 
@@ -153,7 +153,7 @@
   /**
    * The fit+zoom transform: maps the logical 1920×1080 canvas into the
    * available container space at the current zoom level.
-   * coords.ts owns this math (spec 04 "Two zoom concepts").
+   * coords.ts owns this math (spec canvas-interaction "Two zoom concepts").
    */
   const appliedTransform = $derived(
     computeZoomTransform(containerWidth, containerHeight, zoom, width, height),
@@ -229,7 +229,7 @@
    * Force the iframe to reload the current deck URL from the server.
    *
    * Useful when the Go backend emits an SSE "file changed" event for the deck
-   * (spec 11 "External (Claude Code) → canvas" flow).  The integrator should
+   * (spec claude-code-integration "External (Claude Code) → canvas" flow).  The integrator should
    * call this via `bind:this` on the component, e.g.:
    *
    *   let revealFrame: ReturnType<typeof RevealFrame>;

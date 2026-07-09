@@ -1,18 +1,18 @@
 /**
  * aspect.ts — Pure aspect-ratio → logical-size mapping + free-element reposition
- * math (P4-7, spec 05 "Scaling & resolution").
+ * math (P4-7, spec scaling-and-resolution "Scaling & resolution").
  *
- * WHY THIS EXISTS (spec 05 "Aspect-ratio change behavior"):
+ * WHY THIS EXISTS (spec scaling-and-resolution "Aspect-ratio change behavior"):
  * =========================================================
  * Slides are authored against a fixed LOGICAL canvas. Changing the aspect ratio
  * (e.g. 16:9 → 4:3) changes that canvas's width/height. Two consequences, both
- * spec 05:
+ * spec scaling-and-resolution:
  *
  *   1. STRUCTURED content reflows automatically — it is laid out with flex/grid
  *      RELATIVE to the canvas, so a smaller/larger canvas just re-wraps. Nothing
  *      to compute here (verified: layout uses no absolute logical coords).
  *   2. FREE elements are pinned to absolute logical coordinates that assumed the
- *      OLD canvas, so they can fall off-canvas or bunch up. Spec 05 says we must
+ *      OLD canvas, so they can fall off-canvas or bunch up. Spec scaling-and-resolution says we must
  *      NOT silently move them — we FLAG them and OFFER a reposition. This module
  *      computes the suggested repositioned rects; the UI accepts/declines.
  *
@@ -52,7 +52,7 @@ export interface FreeRect {
 export type RepositionMode = 'proportional' | 'uniform';
 
 /**
- * Aspect PRESETS (spec 05 table). The key is the canonical preset id; the value is
+ * Aspect PRESETS (spec scaling-and-resolution table). The key is the canonical preset id; the value is
  * the absolute logical canvas size. These are an explicit table — NOT derived from
  * the ratio — because the chosen logical sizes are deliberate (e.g. 16:10 is
  * 1920×1200, not 1728×1080) to keep the coordinate numbers intuitive.
@@ -65,7 +65,7 @@ export const ASPECT_PRESETS: Record<string, LogicalSize> = {
   '1:1': { width: 1080, height: 1080 },  // square
 };
 
-/** The default aspect when none is configured (spec 05). */
+/** The default aspect when none is configured (spec scaling-and-resolution). */
 export const DEFAULT_ASPECT = '16:9';
 
 /** Round to 2 decimals so derived coords stay clean (avoids 0.30000000004). */
@@ -123,7 +123,7 @@ export function aspectToLogicalSize(aspect: string): LogicalSize {
  * Compute the suggested repositioned rect for a single free element when the
  * canvas changes from `oldSize` to `newSize`.
  *
- * Pure proportional rescale (spec 05 "offer to reposition/rescale"). See
+ * Pure proportional rescale (spec scaling-and-resolution "offer to reposition/rescale"). See
  * {@link RepositionMode} for the two strategies. Size keys absent on input stay
  * absent on output (we never invent a size for a content-sized element).
  */

@@ -186,7 +186,7 @@
   /**
    * When the primary selection changes and the source pane is visible, scroll
    * the matching `data-eid="…"` occurrence into view. Coarse, attribute-anchored
-   * (spec 04) — not a full source map. Un-stamped / passthrough elements yield
+   * (spec canvas-interaction) — not a full source map. Un-stamped / passthrough elements yield
    * no index and so do not scroll. Never steals focus from an active edit.
    */
   $effect(() => {

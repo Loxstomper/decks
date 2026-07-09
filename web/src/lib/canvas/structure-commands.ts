@@ -2,7 +2,7 @@
  * structure-commands.ts — Undoable store commands for structural drags + nudge
  * (P3-6 reorder, P3-7 reparent, P3-9 nudge).
  *
- * WHY THIS EXISTS (spec 04 + the deck store command contract):
+ * WHY THIS EXISTS (spec canvas-interaction + the deck store command contract):
  * ============================================================
  * The pure model ops (structure-ops.ts, free-position.ts) mutate the tree; this
  * layer wraps each one in the deck store's COMMAND protocol so a drop or a nudge

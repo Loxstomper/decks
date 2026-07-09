@@ -1,5 +1,5 @@
 /**
- * fragments.ts — Reveal.js fragment (step reveal) model operations (P6-7 / spec 07).
+ * fragments.ts — Reveal.js fragment (step reveal) model operations (P6-7 / spec motion-and-transitions).
  *
  * WHY:
  * Reveal fragments are driven purely by HTML attributes on elements inside a
@@ -8,7 +8,7 @@
  * (fade-up, highlight-red, …) select animation styles.
  *
  * All mutations go through edit.ts setAttribute/removeAttribute so that:
- *  • only the modified element's `dirty` flag is set (spec 12 #4 byte-stability)
+ *  • only the modified element's `dirty` flag is set (spec principles-and-invariants #4 byte-stability)
  *  • class lists are never wholesale-replaced — only the `fragment` token and
  *    style tokens are touched, leaving any user/author classes intact
  *

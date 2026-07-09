@@ -99,7 +99,7 @@ func (s *Server) routes(staticFS fs.FS) {
 	// Asset upload (P5-3, P5-14)
 	s.mux.HandleFunc("POST /api/decks/{name}/assets", s.handleAssetUpload)
 
-	// Validation (P8-2, spec 11/12): check a deck against the layout contract,
+	// Validation (P8-2, spec claude-code-integration/principles-and-invariants): check a deck against the layout contract,
 	// eid uniqueness, asset existence, well-formedness, and the offline guard.
 	s.mux.HandleFunc("POST /api/decks/{name}/validate", s.handleValidate)
 
@@ -258,7 +258,7 @@ func (s *Server) handleDeckCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Scaffold using the same function the CLI uses — single source of truth,
-	// no duplicated logic (spec 12 / P9-11 invariant).
+	// no duplicated logic (spec principles-and-invariants / P9-11 invariant).
 	if err := deck.New(s.root, name); err != nil {
 		http.Error(w, "create deck: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -400,7 +400,7 @@ func max(a, b int) int {
 	return b
 }
 
-// ── Validation (P8-2, spec 11/12) ─────────────────────────────────────────────
+// ── Validation (P8-2, spec claude-code-integration/principles-and-invariants) ─────────────────────────────────────────────
 
 // handleValidate validates a deck against the spec rules and returns JSON.
 //
@@ -410,7 +410,7 @@ func max(a, b int) int {
 //   - empty            → validate the on-disk decks/<name>/deck.html.
 //   - raw HTML bytes   → validate those bytes against decks/<name>/ for asset
 //     resolution.  This lets the editor's save path validate a candidate
-//     document BEFORE writing it (spec 12: validation gates the save path).
+//     document BEFORE writing it (spec principles-and-invariants: validation gates the save path).
 //
 // Response: {"ok":bool,"errors":[{"code","message","line"?,"eid"?}]}
 //
@@ -659,7 +659,7 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 // resolution; the iframe's src IS this URL, so relative links inside deck.html
 // resolve here without extra config.
 //
-// Path-traversal safety (spec 12 — never escape the workspace): the deck name
+// Path-traversal safety (spec principles-and-invariants — never escape the workspace): the deck name
 // is validated as a single safe segment (deck.ValidName), and the remaining
 // path is served through os.DirFS rooted at the deck folder. os.DirFS rejects
 // any path that fails fs.ValidPath (absolute paths or ".." segments), so a
@@ -931,7 +931,7 @@ func (s *Server) handleSlideNumber(w http.ResponseWriter, r *http.Request) {
 // ── Font localization (P6-13) ──────────────────────────────────────────────────
 
 // handleFontLocalize downloads a Google Font and localizes it into the deck's
-// assets/fonts/ directory so the deck renders offline (spec 12).
+// assets/fonts/ directory so the deck renders offline (spec principles-and-invariants).
 //
 //	POST /api/decks/{name}/fonts
 //	Body: {"family":"Inter","weights":"400;700"}
@@ -1083,7 +1083,7 @@ func (s *Server) handleTemplateList(w http.ResponseWriter, r *http.Request) {
 // mode.  /present/ gives the presenter a stable, bookmarkable URL that is
 // clearly distinct from the editing entry point.  Internally it uses the same
 // os.DirFS mechanism as handleDeckStatic so the bytes served are IDENTICAL to
-// the on-disk file (spec 10: "present exactly the file").
+// the on-disk file (spec presenting-and-export: "present exactly the file").
 //
 // Asset resolution: relative hrefs in deck.html (assets/vendor/reveal/…,
 // custom.css, etc.) resolve against the entry document's base URL, which the
@@ -1094,7 +1094,7 @@ func (s *Server) handleTemplateList(w http.ResponseWriter, r *http.Request) {
 // (GET /present/{name}/assets/vendor/reveal/reveal.js) are served from the
 // deck folder by this same handler. All relative URLs then resolve with zero
 // additional config and no in-document <base> tag (keeping the served bytes
-// identical to the on-disk file, per spec 10).
+// identical to the on-disk file, per spec presenting-and-export).
 func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")
 	if !deck.ValidName(name) {
@@ -1134,7 +1134,7 @@ func (s *Server) handlePresent(w http.ResponseWriter, r *http.Request) {
 
 	// The entry document is served with the present-only annotation/laser
 	// plugins injected in-memory (P17-19). The on-disk deck.html is NEVER
-	// modified — present-mode annotations are ephemeral (spec 10) — so we read
+	// modified — present-mode annotations are ephemeral (spec presenting-and-export) — so we read
 	// the bytes, augment a COPY, and serve that. Asset sub-paths fall through to
 	// the plain file server below.
 	if rel == "deck.html" {
@@ -1350,7 +1350,7 @@ func (s *Server) handleExportPDF(w http.ResponseWriter, r *http.Request) {
 //	…
 //
 // WHY include the full assets/vendor/ tree: every deck is self-contained
-// (spec 12 offline-first).  The zip must open in any browser without a server.
+// (spec principles-and-invariants offline-first).  The zip must open in any browser without a server.
 //
 // Traversal safety: we walk the deck directory with os.DirFS and only include
 // paths that pass fs.ValidPath; the deck name itself is validated by

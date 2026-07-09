@@ -1,4 +1,4 @@
-# 09 — Theming & styles
+# Theming & styles
 
 **Status:** decided
 
@@ -19,7 +19,7 @@ backed by CSS custom properties. All fonts are self-hosted for offline use.
 - **CSS custom properties** back the editor's color/font controls, so pickers and stylesheet
   stay in sync (e.g., `--accent`, `--heading-font`).
 - **Ownership:** styling (Tailwind / inline / `custom.css`) is owned by the user and Claude
-  Code; the editor owns only *layout* (see [03](03-layout-vocabulary.md)). The text-color
+  Code; the editor owns only *layout* (see [Layout vocabulary](layout-vocabulary.md)). The text-color
   control below is the one *narrow, explicit* appearance exception (see "Text appearance").
 
 ## Per-slide theme override
@@ -84,8 +84,8 @@ once: the `--r-*` vars inherit via CSS, and reveal already propagates a stack's
   vars are plain attributes; writing them marks only that section `dirty` (one undo + one
   autosave) and round-trips byte-stable. Claude Code can author `data-theme` directly.
 - **`data-theme` is a recognized attribute**, accepted by `validate` and the editor model
-  ([12](12-principles-and-invariants.md)); its value must name a bundled theme. It is *not* a
-  layout primitive ([03](03-layout-vocabulary.md)) — it carries no reflow semantics.
+  ([Principles & invariants](principles-and-invariants.md)); its value must name a bundled theme. It is *not* a
+  layout primitive ([Layout vocabulary](layout-vocabulary.md)) — it carries no reflow semantics.
 - **Offline.** `slides-slide-themes.css` and its `name → background` map are generated at
   vendor time from the bundled theme CSS (`:root`/`.reveal` `--r-*` values) and shipped
   locally — zero external URLs.
@@ -97,7 +97,7 @@ once: the `--r-*` vars inherit via CSS, and reveal already propagates a stack's
 - **UI.** The theme picker gains a **Whole deck / This slide** scope toggle (the latter
   enabled when a slide is selected): a named-theme dropdown plus free-form color swatches
   (heading / text / link / background) and a **Clear override → inherit deck** action. Slides
-  that override show a small badge in the navigator/thumbnail ([06](06-slide-management.md)).
+  that override show a small badge in the navigator/thumbnail ([Slide management](slide-management.md)).
 - **Fidelity caveat.** A named per-slide bundle reproduces a theme's color/font *variables* +
   background — the visible essence — not 100% of its structural CSS. Per-slide theming is for
   accenting individual slides, not byte-identical theme cloning.
@@ -115,7 +115,7 @@ them WYSIWYG and present/PDF match. Color (above) and the other types are one su
     `data-background-opacity`.
   - *Gradient* — `data-background-gradient` (a CSS gradient string).
   - *Video* — `data-background-video` (a **localized** asset), with loop / muted options.
-- **Offline (see [08](08-assets-and-media.md), [12](12-principles-and-invariants.md)):** image
+- **Offline (see [Assets & media](assets-and-media.md), [Principles & invariants](principles-and-invariants.md)):** image
   and video backgrounds are localized through the **same asset pipeline** as inserted media
   (`uploadAsset` → `assets/…`; upload / drag / paste / `shared/` library / provider sources) —
   never an external URL.
@@ -124,10 +124,10 @@ them WYSIWYG and present/PDF match. Color (above) and the other types are one su
 - **Cascade to verticals:** reveal propagates a stack's background to verticals that don't set
   their own — consistent with the per-slide theme cascade.
 - **Thumbnails:** the static thumbnail builder paints the background (color / image / gradient)
-  as the section's CSS background so navigator thumbnails match ([06](06-slide-management.md));
+  as the section's CSS background so navigator thumbnails match ([Slide management](slide-management.md));
   video shows a poster/first-frame or placeholder.
 - **Surface:** a "Slide background" section in the inspector (keyed to the current slide) plus a
-  "Set background…" item in the slide context menu ([04](04-canvas-interaction.md)), with a
+  "Set background…" item in the slide context menu ([Canvas & interaction](canvas-interaction.md)), with a
   Clear action.
 
 ## Text appearance (colour & inline formatting)
@@ -137,16 +137,16 @@ touches styling rather than layout. Two scopes:
 
 - **Whole-element** — a **text colour** control for the selected text leaf
   (heading / paragraph / list), writing inline `style="color: …"`; plus block-level
-  **text-align** and **list indent / outdent** ([04](04-canvas-interaction.md)).
+  **text-align** and **list indent / outdent** ([Canvas & interaction](canvas-interaction.md)).
 - **Inline run** — within an in-place edit, a selected **word or phrase** can be made
   **bold / italic / underlined / struck-through**, **resized**, **coloured**, or **linked**, via
   the allowlisted inline marks (`strong` / `em` / `u` / `s` / `span[style]` / `a`) of the inline
-  content model ([02](02-document-model.md)) and the floating formatting toolbar
-  ([04](04-canvas-interaction.md)).
+  content model ([Document model](document-model.md)) and the floating formatting toolbar
+  ([Canvas & interaction](canvas-interaction.md)).
 
 Inline `style` and marks round-trip through the model like any other content (the node becomes
 `dirty`, serializes canonically, one undo + one autosave) and survive validation + sanitization
-([12](12-principles-and-invariants.md)). This is still a *deliberately small* appearance
+([Principles & invariants](principles-and-invariants.md)). This is still a *deliberately small* appearance
 surface — common emphasis, colour, size, alignment, and links, **not** arbitrary CSS —
 everything beyond it remains `custom.css` / classes. (Earlier specs scoped this to whole-element
 colour only; inline runs are the planned superset, not a contradiction.)
@@ -159,7 +159,7 @@ without duplicating an element into every `<section>`.
 - **Slide numbers** use reveal's native **`slideNumber`** (set in the deck's reveal config): a
   deck-level toggle with the usual formats (e.g. `c/t`). It shows in edit and present, and the
   same setting drives the on-screen number in present mode
-  ([10](10-presenting-and-export.md)).
+  ([Presenting & export](presenting-and-export.md)).
 - **Footer / header** is **CSS-based**, not a per-slide element: a deck-level footer string
   (and optional logo) rendered as a fixed overlay via a **managed `custom.css`** rule, so it
   lives in one place, stays byte-stable, and never churns every section. A slide can opt out
@@ -196,4 +196,4 @@ shell itself** — navigator, panels, toolbars, source pane chrome.
 
 ## Related
 
-[03](03-layout-vocabulary.md) · [08](08-assets-and-media.md) · [12](12-principles-and-invariants.md)
+[Layout vocabulary](layout-vocabulary.md) · [Assets & media](assets-and-media.md) · [Principles & invariants](principles-and-invariants.md)

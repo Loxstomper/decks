@@ -1,8 +1,8 @@
 /**
- * slides.test.ts — Pure slide-management model ops (P6, spec 06).
+ * slides.test.ts — Pure slide-management model ops (P6, spec slide-management).
  *
  * Verifies correctness of add / duplicate / delete / move / nest / promote / hide
- * AND the byte-stable round-trip invariant (spec 12 #4): every untouched sibling
+ * AND the byte-stable round-trip invariant (spec principles-and-invariants #4): every untouched sibling
  * slide serializes verbatim after an operation.
  */
 
@@ -106,7 +106,7 @@ describe('addSlide (P6-3)', () => {
   });
 });
 
-describe('duplicateSlide (P6-3 / spec 07 pairing)', () => {
+describe('duplicateSlide (P6-3 / spec motion-and-transitions pairing)', () => {
   it('clones after the original, strips data-eid, preserves data-id', () => {
     const model = parseDeck(DECK);
     const clone = duplicateSlide(model, 's1');
@@ -387,7 +387,7 @@ describe('addSlideFromLayout (P14-3)', () => {
     const at = out.indexOf('data-layout="title-body"');
     expect(at).toBeGreaterThan(out.indexOf(S1));
     expect(at).toBeLessThan(out.indexOf(S2));
-    // Untouched siblings round-trip verbatim (spec 12 #4).
+    // Untouched siblings round-trip verbatim (spec principles-and-invariants #4).
     expect(out).toContain(S1);
     expect(out).toContain(S2);
     expect(out).toContain(S3);
@@ -493,7 +493,7 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).toContain('<base href="/decks/My%20Deck/">');
     expect(doc).toContain('assets/vendor/reveal/reveal.css');
     expect(doc).toContain('<h1>One</h1>');
-    // No external URLs (offline-first, spec 12).
+    // No external URLs (offline-first, spec principles-and-invariants).
     expect(doc).not.toMatch(/https?:\/\//);
   });
 
@@ -731,7 +731,7 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
       expect(doc).toContain('grid-template-columns: repeat(3, 1fr)');
       // Gap is applied (logical px).
       expect(doc).toContain('gap: 24px');
-      // No external URLs (offline-first, spec 12).
+      // No external URLs (offline-first, spec principles-and-invariants).
       expect(doc).not.toMatch(/https?:\/\//);
     });
 

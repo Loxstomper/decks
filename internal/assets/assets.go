@@ -1,13 +1,13 @@
 // Package assets implements the asset copy pipeline for slides-builder.
 //
-// # Storage model (spec 08, spec 12)
+// # Storage model (spec assets-and-media, spec principles-and-invariants)
 //
 // Assets are stored per-deck under decks/<name>/assets/ so each deck is
 // self-contained and portable.  Shared library files (shared/) are COPIED
 // into the deck's assets/ on insert — never referenced cross-deck — keeping
 // decks offline-capable without dependencies on each other.
 //
-// # Traversal safety (spec 12)
+// # Traversal safety (spec principles-and-invariants)
 //
 // All paths are constructed from deck.DeckPath + a program-controlled subdir.
 // The original filename is sanitised through SafeFilename which strips every
@@ -208,7 +208,7 @@ func ListShared(root string) ([]SharedEntry, error) {
 
 // CopyFromShared copies a file from root/shared/<filename> into the deck's
 // assets/ directory and returns the relative src.  Never creates a cross-deck
-// reference (spec 08).
+// reference (spec assets-and-media).
 func CopyFromShared(root, deckName, filename string) (string, error) {
 	// Sanitise filename to prevent traversal within shared/.
 	safe := SafeFilename(filename)

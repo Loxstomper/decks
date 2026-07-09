@@ -15,11 +15,11 @@ const starterSection = "<section>\n" +
 	"%[1]s  <p>Edit this slide.</p>\n" +
 	"%[1]s</section>"
 
-// AddSlide appends a starter <section> to decks/<name>/deck.html (spec 11
+// AddSlide appends a starter <section> to decks/<name>/deck.html (spec claude-code-integration
 // `slides add-slide`).  It inserts the new slide just before the closing
 // </div> of the `.slides` container, matching the existing child indentation,
 // and leaves every other byte of the file untouched (byte-stability is a core
-// invariant — spec 12 idempotent round-trip — so the editor and Claude Code do
+// invariant — spec principles-and-invariants idempotent round-trip — so the editor and Claude Code do
 // not churn each other's files).
 func AddSlide(root, name string) error {
 	if err := validateName(name); err != nil {
@@ -44,7 +44,7 @@ func AddSlide(root, name string) error {
 // unit-testable for byte-stability of the surrounding bytes.
 //
 // WHY locate the close by depth-matching <div>: the `.slides` div nests
-// arbitrary <div> containers (the layout primitives, spec 03).  Counting div
+// arbitrary <div> containers (the layout primitives, spec layout-vocabulary).  Counting div
 // depth from the opening tag finds the correct matching </div> regardless of
 // how deeply slides nest, rather than guessing at the last </div>.
 func insertStarterSlide(src []byte) ([]byte, error) {

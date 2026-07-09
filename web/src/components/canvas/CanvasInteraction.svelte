@@ -3,7 +3,7 @@
    * CanvasInteraction.svelte — Selection / overlay / in-place editing controller
    * (P2-3, P2-4, P2-5, P2-6).
    *
-   * WHY THIS EXISTS (spec 04 "edit-in-place for content, overlay for geometry"):
+   * WHY THIS EXISTS (spec canvas-interaction "edit-in-place for content, overlay for geometry"):
    * ============================================================================
    * This is the parent-side controller that turns clicks inside the reveal.js
    * iframe into editor selection + editing, and draws the tracking overlay. It is
@@ -528,7 +528,7 @@
   }
 
   /**
-   * Paste sanitization (P17-2 / spec 12 security). The browser would otherwise
+   * Paste sanitization (P17-2 / spec principles-and-invariants security). The browser would otherwise
    * drop raw clipboard HTML — `<script>`, `on*` handlers, `javascript:` hrefs,
    * external resource URLs, style soup — straight into the contenteditable DOM.
    * We intercept, run it through the inline allowlist serializer (the same gate
@@ -543,7 +543,7 @@
     e.preventDefault();
 
     // Pasted image FILES → upload to the deck's assets, insert a LOCAL <img>.
-    // Never embed the external/data source (spec 08 / X-1 offline-first).
+    // Never embed the external/data source (spec assets-and-media / X-1 offline-first).
     const images = Array.from(dt.files).filter((f) => f.type.startsWith('image/'));
     if (images.length > 0) {
       const deck = deckStore.name;

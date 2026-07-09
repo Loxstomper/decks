@@ -1,7 +1,7 @@
 /**
  * coords.ts — Coordinate / scale transform for the slide canvas.
  *
- * WHY THIS EXISTS (per spec 04 + 05):
+ * WHY THIS EXISTS (per spec canvas-interaction + 05):
  * ====================================
  * reveal.js renders the logical canvas (default 1920×1080) at a fixed logical
  * size, then applies a single uniform CSS `transform: scale()` to fit any
@@ -20,7 +20,7 @@
  *
  * where `offset` handles both letterboxing/pillarboxing *and* pan.
  *
- * Two zoom concepts (spec 05) — never conflated:
+ * Two zoom concepts (spec scaling-and-resolution) — never conflated:
  *   1. present-scale: auto fit-to-screen (uniform, no user control).
  *   2. editor-zoom:   pane-fit × userZoom (user can zoom in for detail work).
  *
@@ -55,7 +55,7 @@ export interface Transform {
   offsetY: number;
 }
 
-/** Default logical canvas size (spec 05). */
+/** Default logical canvas size (spec scaling-and-resolution). */
 export const LOGICAL_WIDTH = 1920;
 export const LOGICAL_HEIGHT = 1080;
 
@@ -92,7 +92,7 @@ export function logicalToScreen(point: Point, transform: Transform): Point {
  * large as possible while preserving the aspect ratio (letterboxing /
  * pillarboxing).  Centers the result.
  *
- * This mirrors exactly what reveal.js does at present time (spec 05), giving
+ * This mirrors exactly what reveal.js does at present time (spec scaling-and-resolution), giving
  * true WYSIWYG alignment between the iframe content and the overlay layer.
  *
  * @param viewportWidth  Available CSS width in screen pixels.
@@ -125,7 +125,7 @@ export function computeFitTransform(
  * an additional `userZoom` multiplier is applied (1.0 = fit, 2.0 = 200%, etc.)
  * and the result is kept centered in the pane.
  *
- * Editor zoom ≠ present-scale (spec 05): the user can zoom in/out for detail
+ * Editor zoom ≠ present-scale (spec scaling-and-resolution): the user can zoom in/out for detail
  * work without affecting how the deck will look when presented.
  *
  * @param paneWidth   Width of the canvas pane in CSS pixels.

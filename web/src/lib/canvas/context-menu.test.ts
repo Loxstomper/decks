@@ -334,7 +334,7 @@ describe('menuItemsFor', () => {
     });
 
     /**
-     * Passthrough guard — never-destroy (spec 12):
+     * Passthrough guard — never-destroy (spec principles-and-invariants):
      * The FULL set of structural / kind-specific actions that must never appear
      * for a passthrough element, covering every branch of menuItemsFor that is
      * guarded by the passthrough early-return.
@@ -348,7 +348,7 @@ describe('menuItemsFor', () => {
      *
      * Also asserts that no items carry a `submenu` (passthrough gets no submenus).
      */
-    it('passthrough guard (never-destroy, spec 12): no structural/z-order/container/text actions', () => {
+    it('passthrough guard (never-destroy, spec principles-and-invariants): no structural/z-order/container/text actions', () => {
       const allForbidden = [
         // clipboard
         'Duplicate',

@@ -1,5 +1,5 @@
 /**
- * buildOutlineTree.ts — Pure model-to-view-tree mapping (P3-3 / spec 04).
+ * buildOutlineTree.ts — Pure model-to-view-tree mapping (P3-3 / spec canvas-interaction).
  *
  * WHY A PURE FUNCTION (not embedded in a Svelte component):
  * ==========================================================

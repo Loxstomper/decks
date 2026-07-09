@@ -1,11 +1,11 @@
 /**
- * snap-grid.ts — Snap-to-grid math (P3-8 / spec 04 "Snap-to-grid").
+ * snap-grid.ts — Snap-to-grid math (P3-8 / spec canvas-interaction "Snap-to-grid").
  *
- * WHY THIS EXISTS (spec 04 "Alignment tools", spec 05 logical units):
+ * WHY THIS EXISTS (spec canvas-interaction "Alignment tools", spec scaling-and-resolution logical units):
  * ===================================================================
- * Spec 04 offers an OPTIONAL grid (default 8 logical units) that drags snap to
- * when enabled. All snapping math operates in LOGICAL coordinates (spec 04
- * "Coordinate/scale system" + spec 05) so the behaviour is identical at any
+ * Spec canvas-interaction offers an OPTIONAL grid (default 8 logical units) that drags snap to
+ * when enabled. All snapping math operates in LOGICAL coordinates (spec canvas-interaction
+ * "Coordinate/scale system" + spec scaling-and-resolution) so the behaviour is identical at any
  * editor zoom or output resolution — we never snap in screen pixels, only in the
  * authoritative 1920×1080 logical space.
  *
@@ -16,7 +16,7 @@
 import type { Point } from '$lib/coords.ts';
 
 /**
- * Default grid spacing in LOGICAL units (spec 04: "optional grid, default 8
+ * Default grid spacing in LOGICAL units (spec canvas-interaction: "optional grid, default 8
  * logical px"). Chosen as the single source of truth so the overlay renderer and
  * the snapping math never disagree.
  */

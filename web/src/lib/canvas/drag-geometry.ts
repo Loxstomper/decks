@@ -1,8 +1,8 @@
 /**
  * drag-geometry.ts — Pure drop-target resolution for structural drags
- * (P3-6 reorder, P3-7 reparent / spec 04 "Two drag semantics").
+ * (P3-6 reorder, P3-7 reparent / spec canvas-interaction "Two drag semantics").
  *
- * WHY THIS EXISTS (spec 04 "Coordinate/scale system" — all hit-testing in
+ * WHY THIS EXISTS (spec canvas-interaction "Coordinate/scale system" — all hit-testing in
  * LOGICAL space):
  * ====================================================================
  * Dragging a structured child means "drop it into a position among its siblings,

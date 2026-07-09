@@ -1,12 +1,12 @@
 /**
  * writeback.ts — Canvas rich-text edit → model mutation (P2-6 / P17-3).
  *
- * WHY THIS EXISTS (spec 02 byte-stability, spec 04 "edit-in-place"):
+ * WHY THIS EXISTS (spec document-model byte-stability, spec canvas-interaction "edit-in-place"):
  * ==================================================================
  * When the user commits an in-place contenteditable edit, we must push the new
  * content into the *model* — not by re-parsing the whole document, but by
  * surgically replacing the children of the one leaf identified by `data-eid`.
- * This keeps the byte-stable round-trip invariant (spec 12 #4) intact: only the
+ * This keeps the byte-stable round-trip invariant (spec principles-and-invariants #4) intact: only the
  * edited leaf's child subtree goes dirty and re-serializes canonically; the
  * leaf's OWN tag bytes, every sibling, and every other slide are emitted verbatim
  * from their original bytes.
@@ -14,7 +14,7 @@
  * INLINE-PRESERVING (P17-3): the contenteditable hands us the leaf's `innerHTML`,
  * which may contain inline marks (strong/em/u/s/a/span/br) plus browser junk and
  * pasted hostile content. We route it through {@link parseInlineNodes}, which
- * sanitises + canonicalises to the fixed allowlist (spec 12 security) and returns
+ * sanitises + canonicalises to the fixed allowlist (spec principles-and-invariants security) and returns
  * dirty model nodes. So `<strong>` SURVIVES (it is no longer flattened to text);
  * `<script>`/`on*`/`javascript:` are stripped; `<b>`→`<strong>` etc.
  *

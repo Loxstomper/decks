@@ -1,13 +1,13 @@
 /**
  * structure-ops.ts — Model reorder/reparent operations (P3-6 / P3-7).
  *
- * WHY THIS EXISTS (spec 04 "Two drag semantics" + spec 02 byte-stability):
+ * WHY THIS EXISTS (spec canvas-interaction "Two drag semantics" + spec document-model byte-stability):
  * ========================================================================
  * Dragging a STRUCTURED child reorders it among its siblings (P3-6) or moves it
  * into a different container/cell (P3-7). Both are MODEL operations on the
  * source-preserving tree: we splice the child node to its new array position and
  * mark the minimum set of nodes dirty so the byte-stable round-trip invariant
- * (spec 12 #4) is preserved — every untouched subtree still serializes verbatim.
+ * (spec principles-and-invariants #4) is preserved — every untouched subtree still serializes verbatim.
  *
  * DIRTY MINIMISATION (the load-bearing detail, see serialize.ts):
  *   • Reorder within one parent: marking ONLY the moved element dirty is enough.
@@ -166,21 +166,21 @@ export function reparentChild(
 }
 
 /**
- * P9-7: Delete the element carrying `eid` from its parent (spec 04 "Deleting
+ * P9-7: Delete the element carrying `eid` from its parent (spec canvas-interaction "Deleting
  * elements").
  *
  * Removing a node removes its entire subtree by construction, so this one op
  * covers every class:
  *   • LEAF        → the node is removed.
  *   • CONTAINER   → the node and all its descendants are removed.
- *   • PASSTHROUGH → removed whole-or-nothing (never partially mangled, spec 04).
+ *   • PASSTHROUGH → removed whole-or-nothing (never partially mangled, spec canvas-interaction).
  *
  * The single immediately-preceding whitespace text node (indentation) goes with
  * it via {@link detach}, so no orphaned blank line is left behind. The parent is
  * marked dirty so it re-serializes WITHOUT the removed child, while every
- * remaining sibling round-trips byte-for-byte (spec 12 #4).
+ * remaining sibling round-trips byte-for-byte (spec principles-and-invariants #4).
  *
- * SLIDE GUARD: whole-slide deletion lives in the navigator (spec 04), not here.
+ * SLIDE GUARD: whole-slide deletion lives in the navigator (spec canvas-interaction), not here.
  * A `<section>` is a slide root, so deleting one through the element-level path
  * is refused (returns false) — the navigator's deleteSlide owns that.
  *

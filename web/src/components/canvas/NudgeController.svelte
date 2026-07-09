@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
    * NudgeController.svelte — Keyboard manipulation of the selection: nudge
-   * (P3-9 / spec 04 "Keyboard nudge: arrows = 1 logical unit; Shift+arrows = 10")
-   * and delete (P9-7 / spec 04 "Deleting elements").
+   * (P3-9 / spec canvas-interaction "Keyboard nudge: arrows = 1 logical unit; Shift+arrows = 10")
+   * and delete (P9-7 / spec canvas-interaction "Deleting elements").
    *
    * WHY THIS EXISTS:
    * ================
@@ -19,7 +19,7 @@
    * deckStore.deleteElements (multi-select deletes all) — one undo entry + one
    * autosave, byte-stable.
    *
-   * GUARD (spec 04): we must NOT hijack these keys while the user is typing — in a
+   * GUARD (spec canvas-interaction): we must NOT hijack these keys while the user is typing — in a
    * P2-5 in-place edit, a native form input, any contenteditable, or the
    * CodeMirror source pane. nudge.isEditingContext() encodes exactly that test, so
    * Delete/Backspace never swallows a character while editing text. When guarded,

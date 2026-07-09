@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * FreeTransformOverlay.svelte — Absolute drag-move + resize for free elements
-   * (P4-2 move, P4-3 resize handles / spec 04 "Free → Move", "Resize handles").
+   * (P4-2 move, P4-3 resize handles / spec canvas-interaction "Free → Move", "Resize handles").
    *
    * WHY THIS EXISTS:
    * ================
@@ -16,7 +16,7 @@
    * sees the pointer-down, and when no free element is selected this overlay
    * renders nothing and the iframe handlers run unchanged.
    *
-   * COORDINATE MODEL (spec 04 + 05, all geometry LOGICAL):
+   * COORDINATE MODEL (spec canvas-interaction + 05, all geometry LOGICAL):
    *   • The element's authoritative rect is its LOGICAL data-x/y/w/h (falling back
    *     to a measured getBoundingClientRect, which is logical inside the iframe).
    *   • Pointer events fire on the PARENT window (the handles live in the parent

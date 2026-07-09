@@ -5,7 +5,7 @@
  * Extracted as pure functions so they are unit-testable without a DOM or
  * Svelte rendering environment.
  *
- * THE ACTION REGISTRY (P13-3, spec 04 "Context menu", spec 12):
+ * THE ACTION REGISTRY (P13-3, spec canvas-interaction "Context menu", spec principles-and-invariants):
  * ============================================================
  * `menuItemsFor(selection, lookup, opts)` is a PURE mapping from a selection +
  * its element classification to the list of `MenuItem`s the menu should show.
@@ -16,10 +16,10 @@
  *   • The kind→items mapping is pure and unit-testable: the labels and the
  *     `disabled` flags are derivable WITHOUT executing any `run` callback.
  *   • Each `run` callback dispatches to an EXISTING `deckStore` command — the
- *     menu introduces no new mutation path (spec 04 "a UI surface over existing
+ *     menu introduces no new mutation path (spec canvas-interaction "a UI surface over existing
  *     commands"). The single source of truth stays in the store.
  *   • Passthrough elements get ONLY Delete + Jump-to-source — never a structural
- *     edit (never-destroy, spec 12).
+ *     edit (never-destroy, spec principles-and-invariants).
  */
 
 import type { DeckModel } from '$lib/model';
@@ -144,7 +144,7 @@ export interface MenuItemsOptions {
 }
 
 /**
- * Text-colour presets offered in the Text-colour submenu (spec 09 "Text
+ * Text-colour presets offered in the Text-colour submenu (spec theming-and-styles "Text
  * appearance" — the single deliberate per-element appearance exception). The
  * first entry clears the inline colour (restores the theme default).
  */
@@ -246,7 +246,7 @@ function textColorItem(eid: string): MenuItem {
  * popover (prefilled when the leaf already carries a link); "Remove link" unwraps
  * any anchors. Both route to existing whole-leaf deck commands — the offline
  * guard is unaffected by an external href (only external RESOURCE loads are
- * forbidden, spec 12).
+ * forbidden, spec principles-and-invariants).
  */
 function linkItem(eid: string): MenuItem {
   return {
@@ -312,12 +312,12 @@ function sendToBackItem(eid: string): MenuItem {
  * and `disabled` flags are computed up front (never require running `run`), so
  * the kind→items mapping is fully unit-testable.
  *
- * Item sets (spec 04):
+ * Item sets (spec canvas-interaction):
  *   • multi (>1 selected): Delete all · Duplicate · Copy · Cut
  *       (single-element-only actions — Paste, z-order, Make free, Text colour,
  *        container actions — are hidden).
  *   • passthrough / unknown: Delete · Jump to source ONLY (never structural —
- *        never-destroy, spec 12).
+ *        never-destroy, spec principles-and-invariants).
  *   • any other single element: Delete · Duplicate · Copy · Cut · Paste, then
  *        kind-specific extras:
  *          - text-leaf : + Text color

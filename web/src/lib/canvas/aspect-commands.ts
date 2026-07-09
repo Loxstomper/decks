@@ -1,6 +1,6 @@
 /**
  * aspect-commands.ts — Model/DOM adapters + undoable store command for an
- * aspect-ratio change (P4-7, spec 05).
+ * aspect-ratio change (P4-7, spec scaling-and-resolution).
  *
  * WHY THIS EXISTS:
  * ================
@@ -10,12 +10,12 @@
  *   • collectFreeRects(model)   — read every free element's stored logical rect
  *                                 (data-x/y/w/h) so the offer can be computed.
  *   • persistAspectChange(...)  — write the new canvas size into the reveal init
- *                                 script (spec 05 single source of truth) AND the
+ *                                 script (spec scaling-and-resolution single source of truth) AND the
  *                                 accepted reposition offers (data-x/y/w/h), then
  *                                 commit as ONE undo entry + one autosave (the same
  *                                 command pattern as structure-commands.ts).
  *
- * PERSISTENCE DECISION (spec 05 "Config lives in the reveal init script inside
+ * PERSISTENCE DECISION (spec scaling-and-resolution "Config lives in the reveal init script inside
  * deck.html — single source of truth; no sidecar"): the logical canvas size is
  * persisted as `width`/`height` in the `Reveal.initialize({ … })` call. We rewrite
  * those keys in the init <script> (a raw-text element, emitted verbatim — so its JS
@@ -59,7 +59,7 @@ function readFreeRect(el: ElementNode): FreeRect {
  * Enumerate every FREE element in the model (classify === 'free') that carries a
  * data-eid, paired with its stored logical rect. This is the candidate list for
  * computeRepositionOffers(). Structured elements are intentionally excluded — they
- * reflow automatically (spec 05) and have no absolute coords to remap.
+ * reflow automatically (spec scaling-and-resolution) and have no absolute coords to remap.
  */
 export function collectFreeRects(model: DeckModel): { eid: string; rect: FreeRect }[] {
   const out: { eid: string; rect: FreeRect }[] = [];

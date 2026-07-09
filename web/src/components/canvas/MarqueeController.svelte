@@ -2,7 +2,7 @@
   /**
    * MarqueeController.svelte — Marquee (rubber-band) multi-select controller (P4-5).
    *
-   * WHY THIS EXISTS (spec 04 "Marquee (drag-select) for multi-select"):
+   * WHY THIS EXISTS (spec canvas-interaction "Marquee (drag-select) for multi-select"):
    * ===================================================================
    * Dragging on EMPTY canvas space draws a selection rectangle; on release every
    * element whose LOGICAL rect is touched by (intersect) or enclosed in (contain)
@@ -12,7 +12,7 @@
    * pointer listeners to the same-origin iframe document, and renders the band in
    * an overlay layer over (but outside) the iframe.
    *
-   * COORDINATE MODEL (spec 04 "all hit-testing in logical space"):
+   * COORDINATE MODEL (spec canvas-interaction "all hit-testing in logical space"):
    *   • Pointer events INSIDE the iframe report clientX/Y in the iframe's own
    *     viewport = LOGICAL space (iframe is sized 1920×1080, reveal at scale 1).
    *   • Pointer events on the PARENT window (cursor left the iframe mid-drag) are

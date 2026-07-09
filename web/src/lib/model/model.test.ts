@@ -1,5 +1,5 @@
 /**
- * model.test.ts — Golden round-trip + serializer determinism (P1-6, spec 12).
+ * model.test.ts — Golden round-trip + serializer determinism (P1-6, spec principles-and-invariants).
  *
  * These tests are LOAD-BEARING: they pin the idempotent round-trip / never-
  * destroy-the-unknown invariant (spec principle #4). The editor and Claude Code
@@ -53,7 +53,7 @@ function loadFixture(name: string): string {
   return readFileSync(new URL(`./__fixtures__/${name}`, import.meta.url), 'utf8');
 }
 
-describe('golden round-trip (spec 12 — idempotent, never-destroy)', () => {
+describe('golden round-trip (spec principles-and-invariants — idempotent, never-destroy)', () => {
   for (const name of FIXTURES) {
     it(`${name}: serialize(parse(html)) is byte-identical with no edits`, () => {
       const html = loadFixture(name);

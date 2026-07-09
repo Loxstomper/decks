@@ -1,16 +1,16 @@
 /**
- * diff.ts — Pure structural diff between two deck models (P8-7 / spec 11, 02).
+ * diff.ts — Pure structural diff between two deck models (P8-7 / spec claude-code-integration, document-model).
  *
  * WHY THIS EXISTS:
  * ================
- * Claude Code edits `deck.html` on disk between human turns (spec 11 turn-taking).
+ * Claude Code edits `deck.html` on disk between human turns (spec claude-code-integration turn-taking).
  * After the editor re-parses an external write it must show the user *what
- * changed* ("highlight what Claude changed" — spec 11 §"Targeting & change
+ * changed* ("highlight what Claude changed" — spec claude-code-integration §"Targeting & change
  * visibility"). This module is the load-bearing pure core of that feature: given
  * the model BEFORE the external write and the model AFTER, it returns the set of
  * managed `data-eid`s that were added, removed, or had their content change.
  *
- * It deliberately keys on `data-eid` (spec 02 "stable IDs"): both models are
+ * It deliberately keys on `data-eid` (spec document-model "stable IDs"): both models are
  * stamped (deck store stamps on every load/adopt), so an element keeps the same
  * eid across the reload and we can match it pre/post even if it moved in the
  * tree. An element whose eid disappears was removed; a brand-new eid was added;

@@ -1,5 +1,5 @@
 /**
- * serialize.ts — Deterministic serializer (P1-5 / spec 02).
+ * serialize.ts — Deterministic serializer (P1-5 / spec document-model).
  *
  * Two emission paths, chosen per node:
  *
@@ -9,7 +9,7 @@
  *
  *   2. CANONICAL (edited): emit deterministic markup — attributes in a fixed,
  *      input-order-independent order with stable double-quoting. Same model
- *      always yields identical bytes (spec 02 / principle #4).
+ *      always yields identical bytes (spec document-model / principle #4).
  *
  * A clean element that merely *contains* an edited descendant keeps its OWN
  * original tag bytes (rawOpen/rawClose) and only re-renders the changed child —
@@ -92,7 +92,7 @@ function renderLeaf(node: Exclude<SlideNode, ElementNode>): string {
  *   0. `id`
  *   1. `class`
  *   2. other (non-data, non-style) attributes, alphabetical
- *   3. `data-*` attributes, grouped, alphabetical (spec 02: "data-* grouping")
+ *   3. `data-*` attributes, grouped, alphabetical (spec document-model: "data-* grouping")
  *   4. `style` last
  * Equal group + equal name keeps original relative order (stable sort).
  */

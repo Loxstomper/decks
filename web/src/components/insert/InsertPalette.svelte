@@ -2,7 +2,7 @@
   /**
    * InsertPalette.svelte — Insert palette / block menu (P5-1).
    *
-   * WHY THIS EXISTS (spec 03 "Leaf block types are insertable"):
+   * WHY THIS EXISTS (spec layout-vocabulary "Leaf block types are insertable"):
    * ===========================================================
    * The single UI seam for adding content. It lists every block type in the
    * REGISTRY (blocks/registry.ts) — never a hard-coded list — so Lane FE-B's
@@ -182,7 +182,7 @@
   async function placeNode(node: ElementNode, placement: 'flow' | 'free'): Promise<void> {
     const model = deckStore.model;
     if (!model) return;
-    // The block lands on the slide the canvas is presenting (spec 06 "current
+    // The block lands on the slide the canvas is presenting (spec slide-management "current
     // slide"), not slide 1, when nothing on the viewed slide is selected.
     const viewedEid = indicesToEid(model, viewedSlide.h, viewedSlide.v);
     const target = resolveInsertTarget(model, selectionStore.eid, placement, viewedEid);

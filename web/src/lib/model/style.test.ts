@@ -44,7 +44,7 @@ describe('inline text colour (P9-8)', () => {
     expect(serializeDeck(model)).toContain('style="margin: 0"');
   });
 
-  it('does not touch untouched siblings (spec 12 #4)', () => {
+  it('does not touch untouched siblings (spec principles-and-invariants #4)', () => {
     const model = parseDeck(`<section data-eid="s1"><h1 data-eid="h">T</h1><p data-eid="p1">x</p></section>`);
     setInlineColor(findByEid(model, 'p1')!, 'green');
     const out = serializeDeck(model);

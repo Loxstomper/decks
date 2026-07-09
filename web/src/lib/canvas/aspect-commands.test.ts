@@ -72,7 +72,7 @@ describe('collectFreeRects', () => {
   });
 });
 
-describe('byte-stability of untouched content (spec 12 #4)', () => {
+describe('byte-stability of untouched content (spec principles-and-invariants #4)', () => {
   it('parse → serialize is identity for the fixture', () => {
     const model = parseDeck(DECK_WITH_FREE);
     expect(serializeDeck(model)).toBe(DECK_WITH_FREE);
@@ -91,7 +91,7 @@ describe('applyAspectChangeToModel', () => {
     expect(applyAspectChangeToModel(model, newSize, accepted)).toBe(true);
     const out = serializeDeck(model);
 
-    // Reveal init size updated (spec 05 source of truth).
+    // Reveal init size updated (spec scaling-and-resolution source of truth).
     expect(out).toContain('width: 1440');
     expect(out).toContain('height: 1080');
     // f1 repositioned (x 960→720, w 400→300 at sx=0.75; y/h unchanged at sy=1).

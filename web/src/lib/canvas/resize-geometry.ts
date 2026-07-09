@@ -1,12 +1,12 @@
 /**
  * resize-geometry.ts — Pure geometry for free-element move + resize (P4-2 / P4-3).
  *
- * WHY THIS EXISTS (spec 04 "Resize handles: 8 handles; Shift = preserve aspect;
- * Alt = resize from center", "Free → Move"; spec 05 logical coordinates):
+ * WHY THIS EXISTS (spec canvas-interaction "Resize handles: 8 handles; Shift = preserve aspect;
+ * Alt = resize from center", "Free → Move"; spec scaling-and-resolution logical coordinates):
  * =====================================================================
  * Dragging or resizing a `data-free` element changes its logical geometry
- * (`data-x`/`data-y`/`data-w`/`data-h` — spec 03). ALL of that math happens in
- * the authoritative LOGICAL 1920×1080 space (spec 04 "all snapping, guides, and
+ * (`data-x`/`data-y`/`data-w`/`data-h` — spec layout-vocabulary). ALL of that math happens in
+ * the authoritative LOGICAL 1920×1080 space (spec canvas-interaction "all snapping, guides, and
  * handle math operate in logical coordinates"), so behaviour is identical at any
  * editor zoom or output resolution — the overlay only re-projects the result to
  * screen pixels for drawing.
@@ -112,7 +112,7 @@ export function hitTestHandle(point: Point, rect: Rect, radius: number): Handle 
 }
 
 /**
- * Translate a rect by a logical delta (free MOVE — spec 04 "Free → Move"). Size
+ * Translate a rect by a logical delta (free MOVE — spec canvas-interaction "Free → Move"). Size
  * is preserved; only the origin (data-x/data-y) changes. When `snap > 0` the new
  * origin snaps to the grid (same rule as the nudge/drag path), so a moved element
  * lands on grid lines just like snapToGrid does for a point.
@@ -130,7 +130,7 @@ export function dragRect(orig: Rect, dxLogical: number, dyLogical: number, snap 
 /**
  * Resize a rect by dragging `handle` a logical delta `(dx, dy)` (P4-3).
  *
- * Modifiers (spec 04):
+ * Modifiers (spec canvas-interaction):
  *   • `aspect` (Shift)     — keep the original width/height ratio. For a corner
  *     the axis with the larger proportional change drives; for an edge handle the
  *     dragged axis drives and the other axis grows symmetrically about center.

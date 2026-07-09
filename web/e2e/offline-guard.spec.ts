@@ -1,5 +1,5 @@
 /**
- * e2e/offline-guard.spec.ts — Live offline-guard assertion (P9-2, spec 12 X-1).
+ * e2e/offline-guard.spec.ts — Live offline-guard assertion (P9-2, spec principles-and-invariants X-1).
  *
  * Promotes the static X-1 offline guard (which checks the deck template for
  * external URL strings) to a LIVE check over real browser-loaded pages.
@@ -10,7 +10,7 @@
  *    URL that is NOT localhost / 127.0.0.1.
  *  - Allows: relative URLs, localhost:*, 127.0.0.1:*.
  *
- * Why this matters (spec 12):
+ * Why this matters (spec principles-and-invariants):
  *  "Core editing and presenting work with zero network."
  *  reveal.js, fonts, themes are all vendored offline. If any of them slip a
  *  CDN URL in, this test will catch it immediately in a real browser.

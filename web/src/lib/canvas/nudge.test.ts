@@ -20,14 +20,14 @@ describe('isArrowKey', () => {
 });
 
 describe('freeNudgeDelta', () => {
-  it('moves 1 logical unit by default (spec 04)', () => {
+  it('moves 1 logical unit by default (spec canvas-interaction)', () => {
     expect(freeNudgeDelta('ArrowUp', false)).toEqual({ dx: 0, dy: -NUDGE_STEP });
     expect(freeNudgeDelta('ArrowDown', false)).toEqual({ dx: 0, dy: NUDGE_STEP });
     expect(freeNudgeDelta('ArrowLeft', false)).toEqual({ dx: -NUDGE_STEP, dy: 0 });
     expect(freeNudgeDelta('ArrowRight', false)).toEqual({ dx: NUDGE_STEP, dy: 0 });
   });
 
-  it('moves 10 logical units with Shift (spec 04)', () => {
+  it('moves 10 logical units with Shift (spec canvas-interaction)', () => {
     expect(NUDGE_STEP_LARGE).toBe(10);
     expect(freeNudgeDelta('ArrowRight', true)).toEqual({ dx: NUDGE_STEP_LARGE, dy: 0 });
     expect(freeNudgeDelta('ArrowUp', true)).toEqual({ dx: 0, dy: -NUDGE_STEP_LARGE });

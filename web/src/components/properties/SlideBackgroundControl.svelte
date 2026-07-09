@@ -14,7 +14,7 @@
    * Every change calls `deckStore.applySlideBackground(slideEid, delta)` — one
    * undo entry + autosave. Asset localization (upload, copy-from-shared, provider
    * fetch) runs first so the stored src is always a deck-relative path (offline-
-   * first; spec 08 / 12).
+   * first; spec assets-and-media / principles-and-invariants).
    *
    * EXCLUSIVE TYPES:
    * Switching to Color clears image / gradient / video. Switching to Image /

@@ -1,4 +1,4 @@
-# 10 — Presenting & export
+# Presenting & export
 
 **Status:** decided
 
@@ -25,22 +25,22 @@ PDF, and HTML bundle are reveal-native and largely free.
 ## Presenter tools (reveal plugins, offline)
 
 Live aids during a presentation — vendored offline like every other plugin
-([12](12-principles-and-invariants.md)) and active only on the present route:
+([Principles & invariants](principles-and-invariants.md)) and active only on the present route:
 
 - **Drawing / annotation** — a chalkboard / pen overlay to draw on slides while presenting
   (toggle, colours, erase). Annotations are **ephemeral**: never written back to `deck.html`, so
-  byte-stability ([02](02-document-model.md)) is untouched. Persisting them is explicitly out of
+  byte-stability ([Document model](document-model.md)) is untouched. Persisting them is explicitly out of
   scope — they are a live aid, not deck content.
 - **Laser pointer** — hold a key to turn the cursor into a highlighted pointer dot. Ephemeral,
   no deck mutation.
-- **On-screen slide number** — reveal's `slideNumber` ([09](09-theming-and-styles.md)); the same
+- **On-screen slide number** — reveal's `slideNumber` ([Theming & styles](theming-and-styles.md)); the same
   deck-level setting that shows page numbers in the editor.
 - **Auto-advance** — the present route honors `data-autoslide` / loop
-  ([07](07-motion-and-transitions.md)).
+  ([Motion & transitions](motion-and-transitions.md)).
 
 ## Offline presenting
 
-It's a local file served by the local binary — works with no network ([12](12-principles-and-invariants.md)).
+It's a local file served by the local binary — works with no network ([Principles & invariants](principles-and-invariants.md)).
 
 ## Export
 
@@ -51,4 +51,4 @@ It's a local file served by the local binary — works with no network ([12](12-
 
 ## Related
 
-[05](05-scaling-and-resolution.md) · [12](12-principles-and-invariants.md)
+[Scaling & resolution](scaling-and-resolution.md) · [Principles & invariants](principles-and-invariants.md)

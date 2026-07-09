@@ -1,12 +1,12 @@
 /**
  * inline.ts — Canonical inline-HTML serializer + sanitizer (P17-1 / P17-2).
  *
- * WHY THIS EXISTS (spec 04 rich text, spec 12 security + byte-stability):
+ * WHY THIS EXISTS (spec canvas-interaction rich text, spec principles-and-invariants security + byte-stability):
  * ======================================================================
  * When the user edits a text leaf in place (contenteditable), the browser hands
  * us `innerHTML` full of junk: `<div>`/`<font>` wrappers, `&nbsp;`, style soup,
  * arbitrary classes, pasted `<script>`/`on*` handlers, `javascript:` hrefs, and
- * external resource URLs. None of that may reach the model (spec 12 #5 security;
+ * external resource URLs. None of that may reach the model (spec principles-and-invariants #5 security;
  * X-1 offline-first). This module is the ONE gate that turns any such fragment
  * into a fixed, deterministic ALLOWLIST of inline marks:
  *
@@ -21,7 +21,7 @@
  *   • span[style] keeps ONLY `color` + `font-size`; an empty span is unwrapped
  *   • on* handlers, class, id, any other attribute → stripped (allowlist only)
  *
- * BYTE-STABILITY (spec 12 #4): instead of hand-rolling a second HTML emitter we
+ * BYTE-STABILITY (spec principles-and-invariants #4): instead of hand-rolling a second HTML emitter we
  * REUSE the model's own parser + serializer. We parse the fragment with the
  * existing source-preserving {@link parseDeck}, rewrite the node tree into the
  * allowlist using the canonical {@link createElement}/{@link createText} helpers
@@ -79,7 +79,7 @@ const ALLOWED_STYLE_PROPS = new Set(['color', 'font-size']);
 /**
  * True when `href` is safe to keep on an `<a>`: relative paths, in-page
  * fragments, and the http(s)/mailto/tel navigation schemes are allowed (external
- * <a> NAVIGATION is fine — spec 12 only forbids external RESOURCE loads). Script
+ * <a> NAVIGATION is fine — spec principles-and-invariants only forbids external RESOURCE loads). Script
  * URLs (javascript:, vbscript:) and `data:` URLs are rejected.
  *
  * Exposed for Lane C (link UI) so the "insert link" affordance can validate a

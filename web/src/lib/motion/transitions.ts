@@ -1,5 +1,5 @@
 /**
- * transitions.ts — Reveal.js transition model operations (P6-8 / spec 07).
+ * transitions.ts — Reveal.js transition model operations (P6-8 / spec motion-and-transitions).
  *
  * WHY:
  * Reveal transitions are controlled via:
@@ -11,14 +11,14 @@
  *
  * WHY USE THE .REVEAL DIV FOR DECK DEFAULTS:
  * The `Reveal.initialize({transition:'slide'})` call is inside a raw-text `<script>`
- * element that our source-preserving parser treats as passthrough (spec 12 —
+ * element that our source-preserving parser treats as passthrough (spec principles-and-invariants —
  * never destroy the unknown).  We cannot safely parse JS to update it.  Storing
  * the preference as a data attribute on a well-known HTML element (`.reveal`) and
  * reading it at runtime via Reveal.configure() is the offline-safe alternative.
  *
  * BYTE STABILITY:
  * All mutations go through setAttribute / removeAttribute (edit.ts), so only the
- * modified element is marked dirty.  Untouched nodes serialize verbatim (spec 12 #4).
+ * modified element is marked dirty.  Untouched nodes serialize verbatim (spec principles-and-invariants #4).
  */
 
 import { getAttribute, setAttribute, removeAttribute, walk } from '$lib/model/edit';

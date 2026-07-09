@@ -9,7 +9,7 @@
  *  5. classify() returns original class after setFree(el, false).
  *  6. toggleFree() toggles on then off correctly.
  *  7. toggleFree() returns null for unknown eid.
- *  8. Only the target element goes dirty (spec 12 #4 — siblings stay clean).
+ *  8. Only the target element goes dirty (spec principles-and-invariants #4 — siblings stay clean).
  *  9. Round-trip: setFree + serializeDeck preserves geometry in output bytes.
  * 10. setFree(el, true) on an already-free element is idempotent.
  * 11. setFree(el, false) on a non-free element is a no-op (no extra dirty).
@@ -167,7 +167,7 @@ describe('toggleFree() unknown eid', () => {
   });
 });
 
-// ─── 8: scoped dirty — siblings stay clean (spec 12 #4) ─────────────────────
+// ─── 8: scoped dirty — siblings stay clean (spec principles-and-invariants #4) ─────────────────────
 
 describe('setFree() scoped dirty', () => {
   it('only the toggled element is dirty; its siblings remain clean', () => {

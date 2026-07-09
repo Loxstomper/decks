@@ -1,5 +1,5 @@
 /**
- * theme.test.ts — Unit tests for the theme-props model (P10 / spec 16).
+ * theme.test.ts — Unit tests for the theme-props model (P10 / spec theming-and-styles).
  *
  * Test goals:
  *   1. THEME_NAMES contains exactly the 10 bundled theme names (cross-check
@@ -160,7 +160,7 @@ describe('setThemeProps() round-trip', () => {
   });
 });
 
-// ─── 4b. Full data-background-* set (spec 16) ──────────────────────────────
+// ─── 4b. Full data-background-* set (spec theming-and-styles) ──────────────────────────────
 
 describe('data-background-* set', () => {
   // [ThemeProps key, attribute name, sample value]

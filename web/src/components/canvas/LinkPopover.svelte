@@ -2,7 +2,7 @@
   /**
    * LinkPopover.svelte — Href add/edit/remove popover (P17-10).
    *
-   * WHY THIS EXISTS (spec 04 rich text, spec 12 security):
+   * WHY THIS EXISTS (spec canvas-interaction rich text, spec principles-and-invariants security):
    * ======================================================
    * The single href editor shared by the floating selection toolbar (range link)
    * and the text-leaf context menu (whole-leaf link). It is purely presentational

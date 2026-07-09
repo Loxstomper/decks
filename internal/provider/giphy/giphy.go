@@ -1,8 +1,8 @@
-// Package giphy implements the Giphy GIF provider (spec 08 / P5-8).
+// Package giphy implements the Giphy GIF provider (spec assets-and-media / P5-8).
 //
 // The Giphy API key is read from the GIPHY_API_KEY environment variable.
 // If absent, Enabled() returns false and the provider is omitted from the
-// /api/providers listing (graceful degradation, spec 12).
+// /api/providers listing (graceful degradation, spec principles-and-invariants).
 //
 // All fetched GIFs are localized into the deck's assets/img/ directory as
 // .gif files so they are available offline after the initial download.
@@ -184,6 +184,6 @@ func (p *Provider) Fetch(id, root, deckName string) (string, error) {
 	}
 
 	filename := id + ".gif"
-	// Localize into deck assets (spec 08 – offline after fetch).
+	// Localize into deck assets (spec assets-and-media – offline after fetch).
 	return assets.LocalizeReader(root, deckName, imgResp.Body, filename, "image/gif")
 }

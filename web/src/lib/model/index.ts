@@ -1,5 +1,5 @@
 /**
- * model/index.ts — Public surface of the DOM-as-model core (P1-4/5/6, spec 02).
+ * model/index.ts — Public surface of the DOM-as-model core (P1-4/5/6, spec document-model).
  *
  * The load-bearing correctness core: parse a deck into a source-preserving tree,
  * mutate it, and serialize it back deterministically with byte-stable

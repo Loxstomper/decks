@@ -2,7 +2,7 @@
 .DS_Store
 Thumbs.db
 
-# Secrets & local config (spec 12 — secrets hygiene)
+# Secrets & local config (spec principles-and-invariants — secrets hygiene)
 .env
 .env.*
 *.local

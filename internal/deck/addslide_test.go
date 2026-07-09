@@ -9,7 +9,7 @@ import (
 )
 
 // TestInsertStarterSlide_ByteStableRest verifies that inserting a slide leaves
-// every byte outside the insertion point untouched (spec 12 round-trip).
+// every byte outside the insertion point untouched (spec principles-and-invariants round-trip).
 func TestInsertStarterSlide_ByteStableRest(t *testing.T) {
 	src := strings.ReplaceAll(deckHTML, "{{DECK_NAME}}", "sample")
 	out, err := insertStarterSlide([]byte(src))

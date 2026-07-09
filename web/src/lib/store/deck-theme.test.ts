@@ -1,5 +1,5 @@
 /**
- * deck-theme.test.ts — Per-slide theming commands (P10-3 / P10-4, spec 16).
+ * deck-theme.test.ts — Per-slide theming commands (P10-3 / P10-4, spec theming-and-styles).
  *
  * Covers the two deckStore commands that theme an individual slide <section>:
  *   • applySlideTheme(eid, name|null)  — named bundled theme: writes data-theme

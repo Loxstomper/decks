@@ -3,7 +3,7 @@
  *
  * WHY THESE TESTS MATTER:
  * The SSE client is the sole path for external-change awareness in the editor
- * (spec 11 turn-taking).  Bugs here would silently break the Claude Code ↔
+ * (spec claude-code-integration turn-taking).  Bugs here would silently break the Claude Code ↔
  * editor handoff — the editor would never see external file changes.
  *
  * Coverage:

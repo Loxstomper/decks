@@ -1,11 +1,11 @@
 /**
- * blocks/embed.ts — Embed / iframe builder (P5-13 / spec 03 "Embed / iframe").
+ * blocks/embed.ts — Embed / iframe builder (P5-13 / spec layout-vocabulary "Embed / iframe").
  *
  * Inserts an `<iframe>` embed (YouTube / Maps / etc.). Like shapes, the embed is
  * a FREE element (data-free + 16:9 default rect) so it is immediately
  * positionable/resizable on the canvas.
  *
- * OFFLINE CAVEAT (spec 08 / spec 12):
+ * OFFLINE CAVEAT (spec assets-and-media / spec principles-and-invariants):
  *   Embeds are the ONE documented exception to "zero external URLs in deck.html"
  *   — an iframe is inherently a live reference and cannot be localized like an
  *   image. This is acceptable: the embed needs network *at present time*, but the
@@ -23,7 +23,7 @@ import type { ElementNode } from '$lib/model/types';
 /** A neutral placeholder so an empty insert still yields a valid, visible box. */
 const PLACEHOLDER_SRC = 'about:blank';
 
-/** 16:9 default box, centred on the 1920×1080 logical canvas (spec 05). */
+/** 16:9 default box, centred on the 1920×1080 logical canvas (spec scaling-and-resolution). */
 const DEFAULT_W = 960;
 const DEFAULT_H = 540;
 

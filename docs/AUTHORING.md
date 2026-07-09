@@ -82,7 +82,7 @@ These go on an element that is a direct child of a container:
 ### Free-element attributes
 
 These go on any element that carries `data-free`. Coordinates use the 1920×1080
-logical space (spec 05: reveal.js scales this to any physical screen at present time).
+logical space (spec scaling-and-resolution: reveal.js scales this to any physical screen at present time).
 
 | Attribute   | Values               |
 |-------------|----------------------|
@@ -310,5 +310,5 @@ The canonical attribute names and allowed-value sets are defined in:
 - `web/src/lib/model/classify.ts` — element classification rules (container / leaf / free / passthrough)
 - `internal/validate/validate.go` — the Go re-implementation of the same allowed-sets (keep in sync)
 - `internal/deck/deck.go` — deck template, vendored asset structure, CLI commands
-- `specs/03-layout-vocabulary.md` — design intent and contract
-- `specs/12-principles-and-invariants.md` — offline-first, round-trip, never-destroy
+- `specs/layout-vocabulary.md` — design intent and contract
+- `specs/principles-and-invariants.md` — offline-first, round-trip, never-destroy

@@ -1,7 +1,7 @@
 /**
  * deck.svelte.ts — Current-deck store (P1-3, P1-8, P1-9, P2-7, P2-8).
  *
- * WHY THIS EXISTS (specs 02, 11):
+ * WHY THIS EXISTS (specs document-model, claude-code-integration):
  * ================================
  * One deck is open at a time. This store is the single source of truth that
  * binds together the three Phase-1 surfaces:
@@ -15,14 +15,14 @@
  * Data-flow invariants:
  *   1. `source` is canonical for what the user is editing. We SAVE the exact
  *      bytes of `source` (never a re-serialization) so the byte-stable
- *      round-trip invariant (spec 12 #4) is preserved end-to-end.
+ *      round-trip invariant (spec principles-and-invariants #4) is preserved end-to-end.
  *   2. `model` is a *derived* view, recomputed (debounced) from `source`. A parse
  *      failure never throws into the UI — the last good model is retained.
  *   3. The canvas reflects the SERVER copy. We only bump `reloadNonce` (which the
  *      shell turns into an iframe reload) AFTER a successful PUT, so the iframe
  *      always shows persisted, well-formed bytes rather than mid-keystroke HTML.
  *
- * Turn-taking (spec 11 §4/§5): an external write (Claude Code) arrives via SSE.
+ * Turn-taking (spec claude-code-integration §4/§5): an external write (Claude Code) arrives via SSE.
  * onExternalChange() re-reads the disk copy. If the user has no unsaved edits we
  * adopt it and re-render; if they DO have unsaved edits we surface the `external`
  * status instead of clobbering their work (no silent merge in v1).
@@ -137,7 +137,7 @@ const SYNC_DEBOUNCE_MS = 400;
 let elementClipboard: ElementNode[] = [];
 
 /**
- * Status surfaced to the UI (spec 11 §5 "synced / external change / unsaved").
+ * Status surfaced to the UI (spec claude-code-integration §5 "synced / external change / unsaved").
  *   empty    — no deck open.
  *   synced   — source matches the on-disk copy.
  *   unsaved  — local edits pending the debounced autosave.
@@ -175,7 +175,7 @@ function safeParse(html: string): DeckModel | null {
 /**
  * P16-1: Per-slide background delta — the UI-facing vocabulary for the unified
  * Slide Background command. Each key maps to one reveal.js `data-background-*`
- * attribute (spec 16). Per-key semantics (identical convention to setThemeProps):
+ * attribute (spec theming-and-styles). Per-key semantics (identical convention to setThemeProps):
  *   • `undefined` (key absent) → leave that attribute untouched.
  *   • `null`                   → clear just that one attribute.
  *   • a string                 → set/override that one attribute.
@@ -505,7 +505,7 @@ class DeckStore {
    * commits, passing the leaf's `innerHTML`. We sanitise + canonicalise it to the
    * inline allowlist and replace ONLY the leaf carrying `eid` (writeback.ts →
    * inline.ts), so just that leaf's child subtree goes dirty and the rest of the
-   * deck round-trips byte-for-byte (spec 12 #4). We then funnel through the
+   * deck round-trips byte-for-byte (spec principles-and-invariants #4). We then funnel through the
    * standard command path so the edit becomes one undo entry and is persisted
    * immediately:
    *   updateFromModel()  → reserialize model into source
@@ -533,7 +533,7 @@ class DeckStore {
    * The properties panel (Lane C) fires onApplyLayoutChange → this method. We
    * mutate ONLY the targeted element's data-* attrs via setLayoutProps (which
    * marks just that subtree dirty), reserialize, and commit. Untouched siblings
-   * round-trip byte-for-byte (spec 12 #4). Unknown eid is a safe no-op — a stale
+   * round-trip byte-for-byte (spec principles-and-invariants #4). Unknown eid is a safe no-op — a stale
    * selection after an external reload must not throw into the UI.
    */
   async applyLayoutChange(eid: string, delta: Partial<LayoutProps>): Promise<void> {
@@ -547,7 +547,7 @@ class DeckStore {
 
   /**
    * P3-4 "Equal columns/rows": set data-grow="1" on every element child of the
-   * container so a row/stack distributes free space evenly (spec 03 intent,
+   * container so a row/stack distributes free space evenly (spec layout-vocabulary intent,
    * no pixel arithmetic). One undo entry + one autosave. Unknown eid = no-op.
    */
   async applyEqualColumns(containerEid: string): Promise<void> {
@@ -575,7 +575,7 @@ class DeckStore {
    * This intentionally mirrors the pattern of applyLayoutChange: mutate model →
    * updateFromModel → commitCommand.  All element mutations go through
    * setFreePosition (which calls setAttribute → marks only that element dirty),
-   * so the byte-stable round-trip (spec 12 #4) is preserved for every unchanged
+   * so the byte-stable round-trip (spec principles-and-invariants #4) is preserved for every unchanged
    * element.
    */
   async applyFreeGeometryBatch(
@@ -604,7 +604,7 @@ class DeckStore {
    * LOGICAL rect and passes it here. On enable we stamp data-free + data-x/y/w/h
    * from that rect so the element does not visually jump; on disable toggleFree
    * strips all five attributes (the rect is ignored). Only the toggled element
-   * goes dirty (spec 12 #4) — every sibling round-trips byte-for-byte.
+   * goes dirty (spec principles-and-invariants #4) — every sibling round-trips byte-for-byte.
    *
    * Returns the new state (true = now free, false = now structured) or null when
    * the eid is unknown (e.g. a stale selection after an external reload) — the
@@ -622,7 +622,7 @@ class DeckStore {
   /**
    * P6-10: Switch the active reveal.js theme by rewriting the theme <link> in
    * the source HTML. The bundled themes live at
-   * assets/vendor/reveal/theme/{name}.css (spec 12 offline-first).
+   * assets/vendor/reveal/theme/{name}.css (spec principles-and-invariants offline-first).
    *
    * WHY SOURCE REGEX INSTEAD OF MODEL:
    * The theme link is in <head>, not inside <section> slides. parseDeck/
@@ -683,7 +683,7 @@ class DeckStore {
     return true;
   }
 
-  // ── Per-slide theming (P10-3 / P10-4, spec 16) ────────────────────────────
+  // ── Per-slide theming (P10-3 / P10-4, spec theming-and-styles) ────────────────────────────
   //
   // Two complementary commands set theming on a slide <section>:
   //   • applySlideTheme    — pick a NAMED bundled theme (data-theme + its bg).
@@ -691,7 +691,7 @@ class DeckStore {
   //                           layered over (or independent of) a named theme.
   // Both follow the standard command pattern (mutate model → updateFromModel →
   // commitCommand): one undo entry + one autosave, byte-stable for everything
-  // else (spec 12 #4). Unknown eids are safe no-ops (stale selection guard).
+  // else (spec principles-and-invariants #4). Unknown eids are safe no-ops (stale selection guard).
 
   /**
    * Fetch + memoise the theme-name → background-colour map (P10-3).
@@ -812,7 +812,7 @@ class DeckStore {
 
   /**
    * P16-1: Apply (or clear) the UNIFIED slide background on the section with
-   * `eid` as ONE undo entry + ONE autosave (spec 16).
+   * `eid` as ONE undo entry + ONE autosave (spec theming-and-styles).
    *
    * The `delta` carries any of { color, image, size, position, repeat, opacity,
    * gradient, video, videoLoop, videoMuted }; per-key undefined=untouched,
@@ -827,7 +827,7 @@ class DeckStore {
    * thin upload-then-apply convenience.
    *
    * Only the targeted section goes dirty, so every other element round-trips
-   * byte-for-byte (spec 12 #4). Unknown eid is a safe no-op (stale selection).
+   * byte-for-byte (spec principles-and-invariants #4). Unknown eid is a safe no-op (stale selection).
    */
   async applySlideBackground(eid: string, delta: SlideBackgroundDelta): Promise<void> {
     if (!this.model) return;
@@ -861,7 +861,7 @@ class DeckStore {
    * `index` when given. One call == one undo entry + one autosave + selection of
    * the new block.
    *
-   * Byte-stability (spec 12 §4): the new subtree is `dirty` (createElement/
+   * Byte-stability (spec principles-and-invariants §4): the new subtree is `dirty` (createElement/
    * createText set it), so the serializer re-renders ONLY it. The parent keeps
    * its own original tag bytes and every existing sibling round-trips verbatim —
    * we splice the node in rather than mark the parent dirty.
@@ -924,11 +924,11 @@ class DeckStore {
     return eid;
   }
 
-  // ── Slide management (P6, spec 06) ────────────────────────────────────────
+  // ── Slide management (P6, spec slide-management) ────────────────────────────────────────
   //
   // Every slide op follows the same command pattern as insertBlock / applyLayout-
   // Change: mutate the model via the pure ops in $lib/slides (which mark only the
-  // affected subtree dirty, preserving the byte-stable round-trip — spec 12 #4),
+  // affected subtree dirty, preserving the byte-stable round-trip — spec principles-and-invariants #4),
   // then funnel through #commitStructure() so each is exactly ONE undo entry +
   // ONE autosave. Methods that create a section return its freshly-minted
   // data-eid (post-stamp); reorder/hide return a boolean. Unknown eids are safe
@@ -1004,7 +1004,7 @@ class DeckStore {
   /**
    * P6-3: Duplicate the slide carrying `eid` (top-level or vertical). The copy's
    * data-eids are regenerated while data-ids are preserved for auto-animate
-   * pairing (spec 07). Returns the copy's new data-eid, or null when `eid` is
+   * pairing (spec motion-and-transitions). Returns the copy's new data-eid, or null when `eid` is
    * unknown.
    */
   async duplicateSlide(eid: string): Promise<string | null> {
@@ -1033,14 +1033,14 @@ class DeckStore {
 
   /**
    * P9-7: Delete one or more elements (by eid) as ONE undo entry + ONE autosave
-   * (spec 04 "Deleting elements"). Used by the Delete/Backspace keyboard handler,
+   * (spec canvas-interaction "Deleting elements"). Used by the Delete/Backspace keyboard handler,
    * which passes the current selection set (multi-select deletes all).
    *
    * Each eid is removed via deleteElementOp (structure-ops): a leaf drops the
    * node, a container drops it and its subtree, passthrough goes whole-or-nothing,
    * and slide <section>s are refused (whole-slide deletion lives in the navigator).
    * Only the affected parents go dirty, so every untouched sibling round-trips
-   * byte-for-byte (spec 12 #4) and undo restores the deleted markup verbatim.
+   * byte-for-byte (spec principles-and-invariants #4) and undo restores the deleted markup verbatim.
    *
    * Unknown / non-removable eids are skipped. Returns true when at least one
    * element was removed (the selection is then cleared); false when nothing
@@ -1059,11 +1059,11 @@ class DeckStore {
     return true;
   }
 
-  // ── Element duplicate / z-order / clipboard (P13-5/6/7, spec 04) ───────────
+  // ── Element duplicate / z-order / clipboard (P13-5/6/7, spec canvas-interaction) ───────────
   //
   // All follow the one-command = one-undo + one-autosave pattern: mutate the
   // model (marking only the affected subtree dirty so untouched siblings round-
-  // trip byte-for-byte, spec 12 #4) → updateFromModel() → commitCommand(). They
+  // trip byte-for-byte, spec principles-and-invariants #4) → updateFromModel() → commitCommand(). They
   // reuse the existing insert seam (#commitInsert) and structure-ops (moveChild).
 
   /**
@@ -1072,7 +1072,7 @@ class DeckStore {
    *
    * The clone is a deep, eid-stripped copy (cloneSubtreeStripEids): stampEids
    * re-mints fresh unique data-eids on insert while `data-id` is preserved for
-   * auto-animate pairing (spec 07). The clone is `dirty` so it serializes
+   * auto-animate pairing (spec motion-and-transitions). The clone is `dirty` so it serializes
    * canonically and is byte-stable; undo removes it.
    *
    * Refuses a `<section>` (returns null): whole-slide duplication lives in the
@@ -1232,12 +1232,12 @@ class DeckStore {
 
   /**
    * P9-8: Set (or clear, when `color` is null) the inline `style="color: …"` on
-   * the TEXT leaf with `eid` as ONE undo entry + ONE autosave (spec 09 "Text
+   * the TEXT leaf with `eid` as ONE undo entry + ONE autosave (spec theming-and-styles "Text
    * appearance" — the single deliberate appearance exception).
    *
    * Whole-element scope (no sub-string runs): setInlineColor mutates only this
    * element's `style` attribute, so it goes dirty and serializes canonically
-   * while every other element round-trips byte-for-byte (spec 12 #4). Unknown
+   * while every other element round-trips byte-for-byte (spec principles-and-invariants #4). Unknown
    * eid is a safe no-op (stale selection after an external reload).
    */
   async applyTextColor(eid: string, color: string | null): Promise<void> {
@@ -1286,7 +1286,7 @@ class DeckStore {
    * P17-10: Wrap the ENTIRE text leaf `eid` in a single `<a href>` (context-menu
    * "Add/Edit link…"). Rejects unsafe hrefs (`javascript:` etc.) via isSafeHref —
    * an external http(s)/mailto/tel href is allowed (only external RESOURCE loads
-   * are forbidden, spec 12). ONE undo entry + ONE autosave, byte-stable. Returns
+   * are forbidden, spec principles-and-invariants). ONE undo entry + ONE autosave, byte-stable. Returns
    * false when the eid is unknown or the href is rejected.
    */
   async applyLinkToLeaf(eid: string, href: string): Promise<boolean> {
@@ -1316,7 +1316,7 @@ class DeckStore {
 
   /**
    * P17-11: Set the `alt` attribute on the IMG element with `eid` as ONE undo
-   * entry + ONE autosave (spec 08 / spec 12 byte-stability — only the element's
+   * entry + ONE autosave (spec assets-and-media / spec principles-and-invariants byte-stability — only the element's
    * `alt` attribute goes dirty).
    *
    * Empty string is valid: `alt=""` is a legitimate accessibility value for
@@ -1347,7 +1347,7 @@ class DeckStore {
    *
    * Whole-element scope: only this canvas's two marker attributes change, so it
    * goes dirty and serializes canonically while every other element round-trips
-   * byte-for-byte (spec 12 #4).
+   * byte-for-byte (spec principles-and-invariants #4).
    */
   async applyChartData(eid: string, type: string, dataJson: string): Promise<void> {
     if (!this.model) return;
@@ -1368,7 +1368,7 @@ class DeckStore {
    * P19: Update a QR code block's `data-qr` payload + `data-qr-*` encoding
    * options as ONE undo entry + ONE autosave, byte-stable (mirrors
    * {@link applyChartData}). Also keeps the block's `aria-label` in sync with the
-   * payload so the code stays described to assistive tech (spec 03 "QR code").
+   * payload so the code stays described to assistive tech (spec layout-vocabulary "QR code").
    *
    * GUARDS (never throw into the UI):
    *   • unknown eid → safe no-op (stale selection after an external reload);
@@ -1381,7 +1381,7 @@ class DeckStore {
    *
    * Whole-element scope: only this div's marker attributes change, so it goes
    * dirty and serializes canonically while every other element round-trips
-   * byte-for-byte (spec 12 #4).
+   * byte-for-byte (spec principles-and-invariants #4).
    */
   async applyQrData(eid: string, delta: Partial<QrProps>): Promise<void> {
     if (!this.model) return;
@@ -1439,7 +1439,7 @@ class DeckStore {
 
   /**
    * Alias for {@link nestSlide} — "demote" a horizontal slide one level into the
-   * preceding vertical stack (spec 06 nest/promote/demote vocabulary).
+   * preceding vertical stack (spec slide-management nest/promote/demote vocabulary).
    */
   async demoteSlide(eid: string): Promise<string | null> {
     return await this.nestSlide(eid);
@@ -1533,7 +1533,7 @@ class DeckStore {
   //
   // Each command follows the same one-undo / autosave pattern: find element(s)
   // in the model → apply the pure-op mutation (marks only affected nodes dirty,
-  // byte-stable per spec 12 #4) → updateFromModel() → commitCommand().
+  // byte-stable per spec principles-and-invariants #4) → updateFromModel() → commitCommand().
   //
   // Unknown eids are safe no-ops — stale selections after external reloads must
   // not throw into the UI.
@@ -1614,7 +1614,7 @@ class DeckStore {
    * The companion slides-layout-init.js picks up `data-transition` and
    * `data-transition-speed` from the reveal div at runtime and calls
    * `Reveal.configure()` to apply them as the deck default, overriding the
-   * hardcoded value in the passthrough `<script>` block (spec 12 offline-safe).
+   * hardcoded value in the passthrough `<script>` block (spec principles-and-invariants offline-safe).
    *
    * Returns `false` when the reveal div is not found in the model (malformed
    * deck — safe no-op for the caller).
@@ -1636,7 +1636,7 @@ class DeckStore {
    *
    * Sets `data-auto-animate` on both the target slide and its previous sibling
    * section, then derives `data-id` values (from `data-eid`) for matched element
-   * pairs so reveal can tween them automatically (spec 07 "signature feature").
+   * pairs so reveal can tween them automatically (spec motion-and-transitions "signature feature").
    *
    * Returns `true` on success, `false` when the slide is not found or has no
    * previous sibling (e.g. the first slide in the deck).
@@ -1667,7 +1667,7 @@ class DeckStore {
     return true;
   }
 
-  // ── Speaker notes (P7-2 / spec 10) ──────────────────────────────────────────
+  // ── Speaker notes (P7-2 / spec presenting-and-export) ──────────────────────────────────────────
   //
   // Notes are stored as <aside class="notes"> inside each slide <section>.
   // The reveal speaker window (S key on the present route) reads them. We expose
@@ -1697,7 +1697,7 @@ class DeckStore {
    *   • Empty string   → remove the aside if present (no-op if absent).
    *
    * Only the affected aside (or the section when the aside is removed) is
-   * marked dirty — all other elements round-trip byte-for-byte (spec 12 #4).
+   * marked dirty — all other elements round-trip byte-for-byte (spec principles-and-invariants #4).
    * Unknown `slideEid` is a safe no-op (stale selection after external reload).
    */
   async setSlideNotes(slideEid: string, text: string): Promise<void> {
@@ -1718,7 +1718,7 @@ class DeckStore {
    * bytes (and stamps eids). Both models are eid-stamped, so diffModels matches
    * elements across the reload and yields added/removed/changed eids, which we
    * hand to the highlight store. The canvas overlay + outline then flash them so
-   * the human can see exactly what Claude Code changed (spec 11).
+   * the human can see exactly what Claude Code changed (spec claude-code-integration).
    */
   #adoptExternal(html: string): void {
     const prev = this.model;
@@ -1805,7 +1805,7 @@ class DeckStore {
     // the model. This fast, offline-first guard runs parse + round-trip + the
     // layout contract BEFORE we touch the network. On failure we surface the
     // errors and keep the user's edits in memory rather than clobbering disk with
-    // malformed markup (spec 11 "caught instead of silently breaking the canvas";
+    // malformed markup (spec claude-code-integration "caught instead of silently breaking the canvas";
     // "show the errors and let the user decide"). The Go endpoint remains the
     // single source of truth: the PUT below is the server's validate-on-write
     // seam, and an explicit re-check is available via validateRemote().
@@ -1859,7 +1859,7 @@ class DeckStore {
       if (!res.ok) return;
       const html = await res.text();
 
-      // Pure turn-taking decision (spec 11 §4-5) — keeps the rule testable.
+      // Pure turn-taking decision (spec claude-code-integration §4-5) — keeps the rule testable.
       const decision = decideExternalChange({
         current: this.source,
         saved: this.#savedSource,

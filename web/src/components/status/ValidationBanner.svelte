@@ -1,13 +1,13 @@
 <script lang="ts">
   /**
-   * ValidationBanner.svelte — Save-blocked validation surface (P8-3 / spec 11).
+   * ValidationBanner.svelte — Save-blocked validation surface (P8-3 / spec claude-code-integration).
    *
    * When validate-on-save rejects the editor's bytes (parse failure, unstable
    * round-trip, or a layout-contract violation), the deck store does NOT persist
    * and records the problems in `validationErrors`. This banner makes that
    * legible: it lists each problem so the user can see WHY the deck stopped
    * saving and fix it — "show the errors and let the user decide; don't clobber"
-   * (spec 11). It renders nothing when there are no problems.
+   * (spec claude-code-integration). It renders nothing when there are no problems.
    *
    * Resolution is implicit: once the user fixes the source the next debounced
    * save validates clean and the banner disappears. A dismiss button hides it

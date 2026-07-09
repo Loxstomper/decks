@@ -1,5 +1,5 @@
 /**
- * auto-animate.ts — Reveal.js auto-animate authoring operations (P6-9 / spec 07).
+ * auto-animate.ts — Reveal.js auto-animate authoring operations (P6-9 / spec motion-and-transitions).
  *
  * WHY AUTO-ANIMATE IS A SIGNATURE FEATURE HERE:
  * Reveal's auto-animate matches elements between two consecutive `data-auto-animate`
@@ -30,7 +30,7 @@
  *
  * BYTE STABILITY:
  * Only modified elements are marked dirty (setAttribute/removeAttribute via
- * edit.ts).  All untouched nodes continue to serialize verbatim (spec 12 #4).
+ * edit.ts).  All untouched nodes continue to serialize verbatim (spec principles-and-invariants #4).
  */
 
 import { getAttribute, setAttribute, removeAttribute, walk } from '$lib/model/edit';

@@ -28,7 +28,7 @@ import { registerBlock } from './registry';
 // ── Images (P5-4 local / P5-5 shared / P5-7+P5-8 providers) ───────────────────
 // Grouped under "Media". Each opens a different acquisition panel but all emit a
 // localized <img src="assets/…"> (the panels download/copy into the deck first),
-// so the deck stays self-contained and offline-first (spec 08, 12).
+// so the deck stays self-contained and offline-first (spec assets-and-media, principles-and-invariants).
 
 registerBlock({
   id: 'image-local',

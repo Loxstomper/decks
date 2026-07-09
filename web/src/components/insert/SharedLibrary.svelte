@@ -3,7 +3,7 @@
    * SharedLibrary.svelte — P5-5: browse the shared/ image library and
    * copy-on-insert into the deck's assets/.
    *
-   * WHY COPY-ON-INSERT (spec 08):
+   * WHY COPY-ON-INSERT (spec assets-and-media):
    *   The shared/ directory is an optional source library, NOT a shared asset
    *   store.  Inserting from it COPIES the file into decks/{name}/assets/ so
    *   that the deck remains self-contained and offline-capable.  No cross-deck

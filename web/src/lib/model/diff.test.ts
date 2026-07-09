@@ -3,7 +3,7 @@
  *
  * Verifies diffModels() correctly classifies added / removed / changed managed
  * elements by data-eid between two parsed models — the core of "highlight what
- * Claude changed" (spec 11). All pure, node-env friendly.
+ * Claude changed" (spec claude-code-integration). All pure, node-env friendly.
  */
 
 import { describe, it, expect } from 'vitest';

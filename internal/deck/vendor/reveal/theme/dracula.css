@@ -1,7 +1,7 @@
 /**
  * Dracula theme for reveal.js 5.1.0 (MIT License).
  * Classic Dracula color scheme — dark purple background, vibrant accents.
- * Bundled without external @import to work offline (spec 12).
+ * Bundled without external @import to work offline (spec principles-and-invariants).
  */
 :root {
   --r-background-color: #282a36;

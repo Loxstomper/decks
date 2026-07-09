@@ -1,10 +1,10 @@
 /**
- * motion/index.ts — Public surface of the motion library (P6-7, P6-8, P6-9 / spec 07).
+ * motion/index.ts — Public surface of the motion library (P6-7, P6-8, P6-9 / spec motion-and-transitions).
  *
  * Exports all pure model operations for fragments, transitions, and auto-animate.
  * The store commands in deck.svelte.ts import from here and wrap these ops in
  * the standard "mutate model → updateFromModel → commitCommand" pattern so they
- * become undoable autosaved commands (spec 12 byte-stable).
+ * become undoable autosaved commands (spec principles-and-invariants byte-stable).
  */
 
 // ── Fragments (P6-7) ─────────────────────────────────────────────────────────

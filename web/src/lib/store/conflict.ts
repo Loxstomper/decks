@@ -1,9 +1,9 @@
 /**
- * conflict.ts — Turn-taking decision + line diff (P8-6 / spec 11 §4-5, spec 02).
+ * conflict.ts — Turn-taking decision + line diff (P8-6 / spec claude-code-integration §4-5, spec document-model).
  *
  * WHY THIS EXISTS:
  * ================
- * v1 concurrency is "turn-taking + reload" (spec 02 "Concurrency"): the human
+ * v1 concurrency is "turn-taking + reload" (spec document-model "Concurrency"): the human
  * edits in memory, Claude Code edits the file on disk. When an external write
  * arrives via SSE the editor must decide what to do WITHOUT a true merge:
  *
@@ -13,7 +13,7 @@
  *                truth: reload it and highlight what changed (P8-7).
  *   • conflict — we DO have unsaved edits; adopting would clobber them. Surface a
  *                prompt (keep mine / take theirs / view diff) and let the user
- *                decide (spec 11 "prompt on conflict"; spec 02 "dirty guard").
+ *                decide (spec claude-code-integration "prompt on conflict"; spec document-model "dirty guard").
  *
  * Keeping this decision PURE (no store, no DOM, no fetch) makes the core
  * turn-taking rule unit-testable (conflict.test.ts) independently of the Svelte

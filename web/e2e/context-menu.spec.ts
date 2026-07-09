@@ -1,6 +1,6 @@
 /**
  * e2e/context-menu.spec.ts — Playwright spec for the right-click context menu
- * (P13: spec 04, spec 12 "never-destroy").
+ * (P13: spec canvas-interaction, spec principles-and-invariants "never-destroy").
  *
  * WHAT IS TESTED:
  * ===============

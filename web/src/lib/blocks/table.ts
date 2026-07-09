@@ -1,5 +1,5 @@
 /**
- * blocks/table.ts — Table block builder (P5-11 / spec 03 "Table").
+ * blocks/table.ts — Table block builder (P5-11 / spec layout-vocabulary "Table").
  *
  * Builds a standard `<table><thead?><tbody>` subtree. Every cell holds a text
  * node so each is individually editable via the Phase-2 contenteditable surface

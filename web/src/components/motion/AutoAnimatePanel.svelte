@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AutoAnimatePanel.svelte — Auto-animate authoring control (P6-9 / spec 07).
+   * AutoAnimatePanel.svelte — Auto-animate authoring control (P6-9 / spec motion-and-transitions).
    *
    * WHY THIS EXISTS:
    * Reveal's auto-animate is the "signature feature" of this editor: it tweens

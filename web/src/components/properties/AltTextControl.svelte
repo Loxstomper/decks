@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * AltTextControl.svelte — Per-image alt text control (P17-11 / spec 08
+   * AltTextControl.svelte — Per-image alt text control (P17-11 / spec assets-and-media
    * "Assets and media" — accessibility alt attribute).
    *
    * PURELY PRESENTATIONAL (like TextColorControl): it receives the current alt

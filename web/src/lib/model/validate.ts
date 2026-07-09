@@ -1,9 +1,9 @@
 /**
- * validate.ts — Client-side deck validation (P8-3 / spec 11 "slides validate").
+ * validate.ts — Client-side deck validation (P8-3 / spec claude-code-integration "slides validate").
  *
  * WHY THIS EXISTS:
  * ================
- * Both Claude Code and the editor's save path write `deck.html`; spec 11 says a
+ * Both Claude Code and the editor's save path write `deck.html`; spec claude-code-integration says a
  * malformed deck must be "caught instead of silently breaking the canvas". The
  * single source of truth for validation is the Go `slides validate` /
  * POST /api/decks/{name}/validate endpoint, but the editor ALSO keeps this fast,
@@ -17,7 +17,7 @@
  * This mirrors the layout-contract checks already enforced (by THROWING) in
  * layout.ts, but here they are NON-throwing: we collect every problem so the UI
  * can show the user the full list and let THEM decide, rather than aborting on
- * the first error (spec 11 "show the errors and let the user decide").
+ * the first error (spec claude-code-integration "show the errors and let the user decide").
  *
  * PURE: parse + tree walk only, no DOM, fully unit-testable (validate.test.ts).
  */
@@ -43,7 +43,7 @@ export interface ValidationResult {
   errors: ValidationError[];
 }
 
-// ─── Layout-contract allowed value sets (spec 03) ───────────────────────────
+// ─── Layout-contract allowed value sets (spec layout-vocabulary) ───────────────────────────
 
 const LAY_VALUES = new Set(['stack', 'row', 'grid', 'layers']);
 const ALIGN_VALUES = new Set(['start', 'center', 'end', 'stretch']);
@@ -60,7 +60,7 @@ function asInt(raw: string): number | null {
 }
 
 /**
- * Validate the layout contract (spec 03) across a parsed model: enum values are
+ * Validate the layout contract (spec layout-vocabulary) across a parsed model: enum values are
  * legal, numeric attributes are well-formed and in-range, and every `data-eid`
  * is unique. Returns ALL problems found (does not stop at the first).
  *
@@ -76,10 +76,10 @@ export function validateModel(model: DeckModel): ValidationResult {
     const el = node as ElementNode;
     const eid = getAttribute(el, 'data-eid') ?? undefined;
 
-    // ── Unique data-eid (spec 02): a duplicate breaks selection + Claude targeting.
+    // ── Unique data-eid (spec document-model): a duplicate breaks selection + Claude targeting.
     if (eid) seenEids.set(eid, (seenEids.get(eid) ?? 0) + 1);
 
-    // ── Enum attributes (spec 03 LAYOUT CONTRACT) ──────────────────────────
+    // ── Enum attributes (spec layout-vocabulary LAYOUT CONTRACT) ──────────────────────────
     checkEnum(errors, el, eid, 'data-lay', LAY_VALUES);
     checkEnum(errors, el, eid, 'data-align', ALIGN_VALUES);
     checkEnum(errors, el, eid, 'data-justify', JUSTIFY_VALUES);
@@ -185,7 +185,7 @@ function checkNumber(
  *   2. ROUND-TRIP IDEMPOTENCY — serialize(model) then re-parse+serialize must be
  *      byte-identical. If they diverge, persisting `source` would silently alter
  *      the document on the next load (a "save that would break the model"), so
- *      we surface it (spec 02 idempotent-round-trip invariant; spec 11 "HTML
+ *      we surface it (spec document-model idempotent-round-trip invariant; spec claude-code-integration "HTML
  *      parses and round-trips").
  *   3. LAYOUT CONTRACT — see {@link validateModel}.
  *
@@ -233,7 +233,7 @@ export function validateSource(html: string): ValidationResult {
 // ─── Remote (Go) validation — single source of truth, best-effort ───────────
 
 /**
- * Call Lane A's `POST /api/decks/{name}/validate` (spec 11 "slides validate").
+ * Call Lane A's `POST /api/decks/{name}/validate` (spec claude-code-integration "slides validate").
  *
  * Contract assumed (tolerant): the endpoint receives the HTML body and returns
  * JSON `{ ok: boolean, errors?: Array<{ code?, message, eid? }> }`. We map that
@@ -242,7 +242,7 @@ export function validateSource(html: string): ValidationResult {
  * Returns `null` (NOT a failure) when the endpoint is UNAVAILABLE — 404 (not yet
  * implemented), a non-2xx, a network error, or non-JSON. A null result means
  * "fall back to the client-side guard as the sole authority" so the editor keeps
- * working offline / before the backend lands the route (spec 12 offline-first).
+ * working offline / before the backend lands the route (spec principles-and-invariants offline-first).
  */
 export async function validateRemote(
   name: string,

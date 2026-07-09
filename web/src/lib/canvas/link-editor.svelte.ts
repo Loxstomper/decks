@@ -1,7 +1,7 @@
 /**
  * link-editor.svelte.ts — Shared state for the href popover (P17-10).
  *
- * WHY THIS EXISTS (spec 04 "a UI surface over existing commands"):
+ * WHY THIS EXISTS (spec canvas-interaction "a UI surface over existing commands"):
  * ===============================================================
  * The link popover has TWO entry points that must not each grow their own
  * component: the floating selection toolbar (range link, mid-edit) and the

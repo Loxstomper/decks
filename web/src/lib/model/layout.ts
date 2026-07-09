@@ -1,9 +1,9 @@
 /**
- * layout.ts — Layout-props model for the properties panel (P3-4 / spec 03).
+ * layout.ts — Layout-props model for the properties panel (P3-4 / spec layout-vocabulary).
  *
  * WHY THIS MODULE EXISTS:
  * =======================
- * Spec 03 encodes layout intent as `data-*` attributes rather than pixel
+ * Spec layout-vocabulary encodes layout intent as `data-*` attributes rather than pixel
  * positions.  This module is the single translation layer between those raw
  * attribute strings and the typed `LayoutProps` object the UI controls bind to.
  *
@@ -12,7 +12,7 @@
  *   setLayoutProps(el, delta)  → write changed props back as data-* attrs
  *   findParentOf(model, eid)   → walk upward to find the container ancestor
  *                                that the panel should target when a leaf is
- *                                selected (spec 03 "operate on selected leaf's
+ *                                selected (spec layout-vocabulary "operate on selected leaf's
  *                                parent container")
  *
  * Attribute round-trip is handled by the existing edit.ts helpers:
@@ -27,7 +27,7 @@ import { classify } from './classify';
 // ─── Container kind (P3-2) ──────────────────────────────────────────────────
 
 /**
- * The container kind for a layout element (spec 03 "The five primitives").
+ * The container kind for a layout element (spec layout-vocabulary "The five primitives").
  *
  * 'section' — the slide root element (always a container; no data-lay needed).
  * 'stack'|'row'|'grid'|'layers' — the four structured layout primitives.
@@ -63,9 +63,9 @@ export function getContainerKind(el: ElementNode): ContainerKind | null {
   return null;
 }
 
-// ─── Value unions (spec 03 tables) ─────────────────────────────────────────
+// ─── Value unions (spec layout-vocabulary tables) ─────────────────────────────────────────
 
-/** The `data-lay` layout primitives (spec 03 "The five primitives"). */
+/** The `data-lay` layout primitives (spec layout-vocabulary "The five primitives"). */
 export type LayValue = 'stack' | 'row' | 'grid' | 'layers';
 
 /**
@@ -77,7 +77,7 @@ export type AlignValue = 'start' | 'center' | 'end' | 'stretch';
 
 /**
  * Main-axis justification for stack/row (CSS justify-content).
- * `around` is included per spec 03 table; the toolbar may choose not to surface
+ * `around` is included per spec layout-vocabulary table; the toolbar may choose not to surface
  * it if space is tight — the type still covers it so round-trips are lossless.
  */
 export type JustifyValue = 'start' | 'center' | 'end' | 'between' | 'around';
@@ -88,7 +88,7 @@ export type JustifyValue = 'start' | 'center' | 'end' | 'between' | 'around';
  * Typed snapshot of all layout-related `data-*` attributes on an element.
  * `null` means the attribute is absent on the element (default/unset).
  *
- * `gap` and `pad` are logical-pixel integers (spec 05 "1920×1080 logical").
+ * `gap` and `pad` are logical-pixel integers (spec scaling-and-resolution "1920×1080 logical").
  * `cols` and `rows` are strings because CSS grid templates can be arbitrary
  * ("3", "1fr 2fr", "repeat(3, 1fr)"); we display them as free-text inputs.
  */
@@ -109,7 +109,7 @@ export interface LayoutProps {
   rows: string | null;
   /**
    * `data-grow` — flex-grow factor for this element as a child of a row/stack.
-   * Encodes "equal columns" intent without pixel arithmetic (spec 03).
+   * Encodes "equal columns" intent without pixel arithmetic (spec layout-vocabulary).
    */
   grow: number | null;
   /**
@@ -464,13 +464,13 @@ export function setChartProps(el: ElementNode, type: string, dataJson: string): 
 // These have NO layout/reflow semantics; they are functional INPUTS to QR
 // generation (the vendored plugin reads them to draw scannable modules) — stored
 // as data-qr-* attributes rather than CSS, a deliberate exception to the
-// editor-owns-layout / you-own-styling split (spec 03 "QR code").
+// editor-owns-layout / you-own-styling split (spec layout-vocabulary "QR code").
 //
 // Dual-encoded: the Go validator (internal/validate/validate.go) and classify.ts
 // recognise the same markers. Keep the allowed-sets in sync on attribute names
 // and the EC enum.
 
-/** Error-correction levels accepted by the QR generator (spec 03 "QR code"). */
+/** Error-correction levels accepted by the QR generator (spec layout-vocabulary "QR code"). */
 export type QrEcLevel = 'L' | 'M' | 'Q' | 'H';
 
 /** Guard: is the string a valid QR error-correction level? */
@@ -595,7 +595,7 @@ export function setFooterHidden(section: ElementNode, hidden: boolean): void {
  * Find the nearest ancestor `ElementNode` of the element carrying `eid`.
  *
  * WHY: when a *leaf* is selected the alignment toolbar should operate on its
- * enclosing container (spec 03 / spec 04 "Alignment tools"), not on the leaf
+ * enclosing container (spec layout-vocabulary / spec canvas-interaction "Alignment tools"), not on the leaf
  * itself.  We walk the model tree recording parent pointers, then return the
  * nearest element ancestor of the target.
  *
@@ -625,7 +625,7 @@ export function findParentOf(model: DeckModel, eid: string): ElementNode | null 
  * Given a selected `eid`, return the container element whose layout props
  * should be shown in the panel.
  *
- * Logic (spec 03 / P3-5):
+ * Logic (spec layout-vocabulary / P3-5):
  *   • If `eid` is a CONTAINER  → return it directly.
  *   • If `eid` is a LEAF/FREE  → walk up to find the nearest container ancestor.
  *   • Otherwise (passthrough)  → return null (panel shows empty state).

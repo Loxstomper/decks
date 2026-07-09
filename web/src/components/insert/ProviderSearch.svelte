@@ -11,11 +11,11 @@
    * EMPTY STATE: when no provider has an API key configured (enabled: false for
    * all), we show a friendly "set UNSPLASH_ACCESS_KEY / GIPHY_API_KEY" message
    * instead of a broken search box.  Keys live in the server env, never the
-   * frontend (spec 12 §5).
+   * frontend (spec principles-and-invariants §5).
    *
    * OFFLINE-FIRST: the "fetch" step (POST /api/providers/{name}/fetch)
    * downloads the image into decks/{name}/assets/ so the inserted src is always
-   * a local relative path (spec 08, 12).
+   * a local relative path (spec assets-and-media, principles-and-invariants).
    *
    * DEBOUNCE: search fires 350 ms after the user stops typing to avoid
    * hammering the API on every keystroke.

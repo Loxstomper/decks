@@ -1,4 +1,4 @@
-# 03 — Layout vocabulary
+# Layout vocabulary
 
 **Status:** decided
 
@@ -84,7 +84,7 @@ coordinates instead.)
 > **The editor owns *layout* (`data-*`); you and Claude Code own *styling* (Tailwind / inline
 > / CSS).**
 
-Styling classes the editor doesn't recognize pass through verbatim ([02](02-document-model.md)).
+Styling classes the editor doesn't recognize pass through verbatim ([Document model](document-model.md)).
 
 ## Leaf block types
 
@@ -95,18 +95,18 @@ Each is insertable, selectable, individually styleable, and knows how to seriali
 ### Chart (data-bound)
 
 A chart leaf renders from declarative data via reveal's bundled **Chart.js** plugin (vendored
-offline, [01](01-architecture.md) / [13](13-project-structure.md)):
+offline, [Architecture](architecture.md) / [Project structure](project-structure.md)):
 `<canvas data-chart="bar|line|pie|…" data-chart-data='…'>`, with the dataset + options as a JSON
 config the inspector edits. Because Chart.js draws to `<canvas>` at runtime, the chart renders
 correctly in the editor, the present route, and PDF (all run JS) — but **not** in the
 script-free navigator thumbnail, where it shows a placeholder, joining code-highlight and KaTeX
-as a documented thumbnail-only fidelity gap ([06](06-slide-management.md)).
+as a documented thumbnail-only fidelity gap ([Slide management](slide-management.md)).
 
 ### QR code (data-bound)
 
 A QR leaf encodes a URL or text into a scannable code, generated **locally** (offline-first, no
-network) by a vendored QR plugin (vendored offline, [01](01-architecture.md) /
-[13](13-project-structure.md)): `<div data-qr="https://…" data-qr-ec="L|M|Q|H">`, empty on disk
+network) by a vendored QR plugin (vendored offline, [Architecture](architecture.md) /
+[Project structure](project-structure.md)): `<div data-qr="https://…" data-qr-ec="L|M|Q|H">`, empty on disk
 and rendered to an inline **SVG** at runtime (SVG, not `<canvas>` — it stays crisp under the
 logical-canvas scaling). The encoded payload stays human- and Claude-readable in the source and
 edits like any attribute, so the round-trip is byte-stable — the data-bound model the Chart leaf
@@ -122,21 +122,21 @@ so the code isn't an opaque blob to assistive tech.
 
 Like Chart / code-highlight / KaTeX, the QR renders in the editor, the present route, and PDF (all
 run JS) — but **not** in the script-free navigator thumbnail, where it shows a placeholder, joining
-the documented thumbnail-only fidelity gap ([06](06-slide-management.md)).
+the documented thumbnail-only fidelity gap ([Slide management](slide-management.md)).
 
 ### Inline marks (rich text)
 
 Within a text leaf, a sub-range can carry inline emphasis / colour / size / links — the inline
-content model in [02](02-document-model.md), driven by the formatting toolbar in
-[04](04-canvas-interaction.md). This is leaf *content*, not a layout primitive (no reflow
+content model in [Document model](document-model.md), driven by the formatting toolbar in
+[Canvas & interaction](canvas-interaction.md). This is leaf *content*, not a layout primitive (no reflow
 semantics).
 
 ## Nesting → requires a layers/outline panel
 
 Containers nest arbitrarily (a row whose cell is a stack). You can't grab a parent container
 by clicking the canvas alone, so the UI needs an **outline/layers tree**. See
-[04](04-canvas-interaction.md).
+[Canvas & interaction](canvas-interaction.md).
 
 ## Related
 
-[02](02-document-model.md) · [04](04-canvas-interaction.md) · [05](05-scaling-and-resolution.md)
+[Document model](document-model.md) · [Canvas & interaction](canvas-interaction.md) · [Scaling & resolution](scaling-and-resolution.md)

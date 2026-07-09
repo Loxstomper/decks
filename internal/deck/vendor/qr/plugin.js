@@ -16,13 +16,13 @@
  * The matrix is produced by qrcode.js (Kazuhiko Arase, MIT, vendored alongside
  * and loaded first → exposes the global `qrcode`). We build the SVG OURSELVES
  * from getModuleCount()/isDark() so fg/bg/quiet-zone are honoured exactly — the
- * encoding inputs the editor stores as data-qr-* attributes (spec 03). SVG (not
+ * encoding inputs the editor stores as data-qr-* attributes (spec layout-vocabulary). SVG (not
  * <canvas>) so the code stays crisp under reveal's logical-canvas scaling, and
  * renders in the editor, the present route, and PDF (all run JS) — but NOT the
  * script-free navigator thumbnail, where the builder paints a placeholder
  * (documented thumbnail-only gap, joining Chart/code/KaTeX).
  *
- * Everything is local — zero external URLs (spec 12 offline-first).
+ * Everything is local — zero external URLs (spec principles-and-invariants offline-first).
  */
 (function () {
   'use strict';

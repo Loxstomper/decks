@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * TextColorControl.svelte — Per-element text colour control (P9-8 / spec 09
+   * TextColorControl.svelte — Per-element text colour control (P9-8 / spec theming-and-styles
    * "Text appearance").
    *
    * WHY THIS EXISTS:
    * ================
    * The one deliberate appearance exception to the editor's layout-only ownership
-   * (spec 09): a whole-element text colour for the selected text leaf. It writes
+   * (spec theming-and-styles): a whole-element text colour for the selected text leaf. It writes
    * an inline `style="color: …"` via the parent's callback, which routes to
    * deckStore.applyTextColor (one undo entry + one autosave, byte-stable).
    *

@@ -1,11 +1,11 @@
 <script lang="ts">
   /**
-   * ConflictPrompt.svelte — Dirty-guard conflict dialog (P8-6 / spec 11 §4).
+   * ConflictPrompt.svelte — Dirty-guard conflict dialog (P8-6 / spec claude-code-integration §4).
    *
    * When an external (Claude Code) write arrives WHILE the editor has unsaved
    * edits, the deck store records a `conflict` instead of clobbering the user's
    * work. This component renders the prompt for that conflict and offers the
-   * three turn-taking choices (spec 11 "prompt on conflict"):
+   * three turn-taking choices (spec claude-code-integration "prompt on conflict"):
    *
    *   • Keep mine   — reject the external write; my edits will overwrite on save.
    *   • Take theirs — discard my edits and adopt the external version.

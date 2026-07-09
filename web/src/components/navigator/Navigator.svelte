@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * Navigator.svelte — 2D slide filmstrip (P6-1..P6-6, spec 06).
+   * Navigator.svelte — 2D slide filmstrip (P6-1..P6-6, spec slide-management).
    *
    * Lives in the left "Navigator" zone of PaneLayout. Shows every top-level slide
    * as a thumbnail, with any vertical stack's nested slides indented below it
@@ -39,7 +39,7 @@
      */
     onDeckCreated?: (name: string) => Promise<void>;
     /**
-     * Right-click on a slide row (spec 06 "slide-level context menu"). The row
+     * Right-click on a slide row (spec slide-management "slide-level context menu"). The row
      * selects + jumps to the slide first, then hands the shell the eid + the
      * viewport cursor so it can open the shared slide menu. Absent → the
      * browser's default menu is left alone.

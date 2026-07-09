@@ -2,7 +2,7 @@
   /**
    * MarqueeOverlay.svelte — The rubber-band selection rectangle (P4-5).
    *
-   * WHY THIS EXISTS (spec 04 "Marquee (drag-select) for multi-select"):
+   * WHY THIS EXISTS (spec canvas-interaction "Marquee (drag-select) for multi-select"):
    * ===================================================================
    * Purely presentational: given a screen-space rect (the controller computed it
    * from the LOGICAL marquee × the coords.ts transform), draw the dashed band. It

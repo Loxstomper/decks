@@ -1,7 +1,7 @@
-// Package deck — font.go implements Google Font localization (P6-13, spec 12).
+// Package deck — font.go implements Google Font localization (P6-13, spec principles-and-invariants).
 //
 // WHY THIS EXISTS:
-// The offline-first invariant (spec 12) forbids CDN @import in saved decks.
+// The offline-first invariant (spec principles-and-invariants) forbids CDN @import in saved decks.
 // LocalizeFont downloads a chosen Google Font once while online, writes the
 // woff2 files into the deck's assets/fonts/{slug}/ directory, generates a
 // local @font-face CSS, and returns the relative path so the deck can render
@@ -102,7 +102,7 @@ func LocalizeFont(root, deckName, family, weights string) (*FontResult, error) {
 	// Fetch the @font-face CSS from Google Fonts.
 	// WHY Chrome UA: the Google Fonts API serves woff2 only to modern browsers.
 	// Without the right UA we get woff or ttf instead of the smallest/widest-
-	// compatible woff2 format (spec 12 § offline-first).
+	// compatible woff2 format (spec principles-and-invariants § offline-first).
 	apiURL := fmt.Sprintf("%s?family=%s:wght@%s&display=swap",
 		googleFontsBaseURL,
 		strings.ReplaceAll(family, " ", "+"),
@@ -172,7 +172,7 @@ func LocalizeFont(root, deckName, family, weights string) (*FontResult, error) {
 	// local relative path so the resulting file has ZERO external URLs.
 	localCSS := rewriteFontURLs(googleCSS, urlToLocal)
 
-	// Verify the rewrite produced no external URLs (spec 12 offline invariant).
+	// Verify the rewrite produced no external URLs (spec principles-and-invariants offline invariant).
 	if extURLRe.MatchString(localCSS) {
 		os.RemoveAll(fontDir)
 		return nil, fmt.Errorf("font: rewritten CSS still contains external URL — refusing to write")

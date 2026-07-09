@@ -149,7 +149,7 @@ func TestRead_NotFound(t *testing.T) {
 // ── Offline-first / vendor tests ──────────────────────────────────────────────
 
 // TestNew_VendorFilesPresent verifies that slides new copies all required
-// reveal.js vendor files into assets/vendor/reveal/ (spec 12 – offline-first).
+// reveal.js vendor files into assets/vendor/reveal/ (spec principles-and-invariants – offline-first).
 func TestNew_VendorFilesPresent(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -217,7 +217,7 @@ func TestNew_QrPluginVendored(t *testing.T) {
 
 // TestNew_DeckHTMLUsesRelativeRevealPaths asserts that the scaffolded deck.html
 // references reveal.js assets via relative paths (assets/vendor/reveal/…) rather
-// than absolute CDN URLs — required for offline-first rendering (spec 12).
+// than absolute CDN URLs — required for offline-first rendering (spec principles-and-invariants).
 func TestNew_DeckHTMLUsesRelativeRevealPaths(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -234,7 +234,7 @@ func TestNew_DeckHTMLUsesRelativeRevealPaths(t *testing.T) {
 	// This is checked first so the error message is clear.
 	externalURL := regexp.MustCompile(`https?://`)
 	if externalURL.Match(html) {
-		t.Errorf("deck.html contains an external http(s):// URL — violates offline-first invariant (spec 12).\n"+
+		t.Errorf("deck.html contains an external http(s):// URL — violates offline-first invariant (spec principles-and-invariants).\n"+
 			"Offending snippet: %s",
 			findMatchContext(html, externalURL))
 	}
@@ -269,7 +269,7 @@ func TestNew_OfflineGuard_NoExternalURLs(t *testing.T) {
 
 	re := regexp.MustCompile(`https?://\S+`)
 	if matches := re.FindAll(html, -1); len(matches) > 0 {
-		t.Errorf("deck.html contains %d external URL(s) — violates offline-first (spec 12, X-1):", len(matches))
+		t.Errorf("deck.html contains %d external URL(s) — violates offline-first (spec principles-and-invariants, X-1):", len(matches))
 		for _, m := range matches {
 			t.Errorf("  %s", m)
 		}
@@ -278,7 +278,7 @@ func TestNew_OfflineGuard_NoExternalURLs(t *testing.T) {
 
 // TestSolarizedDark_VendoredAndOffline verifies that the solarized-dark reveal
 // theme (P9-9) is (a) vendored into a new deck and (b) contains zero external
-// http(s):// URLs (offline-first invariant, spec 12 X-1).
+// http(s):// URLs (offline-first invariant, spec principles-and-invariants X-1).
 func TestSolarizedDark_VendoredAndOffline(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -298,7 +298,7 @@ func TestSolarizedDark_VendoredAndOffline(t *testing.T) {
 	// Offline guard: the theme CSS must contain no external URLs.
 	re := regexp.MustCompile(`https?://\S+`)
 	if matches := re.FindAll(css, -1); len(matches) > 0 {
-		t.Errorf("solarized-dark.css contains %d external URL(s) — violates offline-first (spec 12):", len(matches))
+		t.Errorf("solarized-dark.css contains %d external URL(s) — violates offline-first (spec principles-and-invariants):", len(matches))
 		for _, m := range matches {
 			t.Errorf("  %s", m)
 		}
@@ -375,7 +375,7 @@ func TestEnsureSharedVendor(t *testing.T) {
 // ── Layout CSS / P3-1 vendor tests ───────────────────────────────────────────
 
 // TestNew_LayoutCSSPresent verifies that slides new copies slides-layout.css
-// and slides-layout-init.js into assets/vendor/ (spec 03, spec 12 offline-first).
+// and slides-layout-init.js into assets/vendor/ (spec layout-vocabulary, spec principles-and-invariants offline-first).
 func TestNew_LayoutCSSPresent(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -398,7 +398,7 @@ func TestNew_LayoutCSSPresent(t *testing.T) {
 }
 
 // TestNew_DeckHTMLLinksLayoutCSS asserts that the scaffolded deck.html references
-// slides-layout.css via a relative path (offline-first, spec 12).
+// slides-layout.css via a relative path (offline-first, spec principles-and-invariants).
 func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -424,7 +424,7 @@ func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
 	// The offline invariant still holds: no external http(s):// URLs.
 	re := regexp.MustCompile(`https?://`)
 	if re.Match(html) {
-		t.Errorf("deck.html contains an external URL after adding layout CSS — violates spec 12:\n%s",
+		t.Errorf("deck.html contains an external URL after adding layout CSS — violates spec principles-and-invariants:\n%s",
 			findMatchContext(html, re))
 	}
 }
@@ -461,7 +461,7 @@ func TestVendor_LayoutCSSRevendored(t *testing.T) {
 }
 
 // TestLayoutCSS_NoExternalURLs is an invariant guard: the bundled layout CSS
-// must contain zero http(s):// URLs (spec 12 offline-first, X-1).
+// must contain zero http(s):// URLs (spec principles-and-invariants offline-first, X-1).
 func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -478,7 +478,7 @@ func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 			t.Fatalf("read %s: %v", f, err)
 		}
 		if matches := re.FindAll(content, -1); len(matches) > 0 {
-			t.Errorf("%s contains external URL(s) — violates spec 12:", f)
+			t.Errorf("%s contains external URL(s) — violates spec principles-and-invariants:", f)
 			for _, m := range matches {
 				t.Errorf("  %s", m)
 			}
@@ -489,7 +489,7 @@ func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 // ── Highlight + KaTeX plugin vendor tests (P5-9, P5-10) ─────────────────────
 
 // TestNew_HighlightPluginPresent verifies that slides new copies the highlight
-// plugin files into assets/vendor/highlight/ (P5-9, spec 12 offline-first).
+// plugin files into assets/vendor/highlight/ (P5-9, spec principles-and-invariants offline-first).
 func TestNew_HighlightPluginPresent(t *testing.T) {
 	root := makeWorkspace(t)
 	if err := deck.New(root, "hltest"); err != nil {
@@ -556,7 +556,7 @@ func TestNew_KaTeXPluginPresent(t *testing.T) {
 
 // TestNew_DeckHTMLLinksHighlightAndKaTeX asserts that the scaffolded deck.html
 // references the highlight and math plugins via relative paths (offline-first,
-// spec 12) and enables them in Reveal.initialize.
+// spec principles-and-invariants) and enables them in Reveal.initialize.
 func TestNew_DeckHTMLLinksHighlightAndKaTeX(t *testing.T) {
 	root := makeWorkspace(t)
 	if err := deck.New(root, "plugin-link"); err != nil {
@@ -571,7 +571,7 @@ func TestNew_DeckHTMLLinksHighlightAndKaTeX(t *testing.T) {
 	// The offline invariant must still hold (no external http URLs).
 	re := regexp.MustCompile(`https?://`)
 	if re.Match(html) {
-		t.Errorf("deck.html contains an external URL — violates spec 12 offline-first:\n%s",
+		t.Errorf("deck.html contains an external URL — violates spec principles-and-invariants offline-first:\n%s",
 			findMatchContext(html, re))
 	}
 

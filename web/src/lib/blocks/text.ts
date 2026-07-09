@@ -1,5 +1,5 @@
 /**
- * blocks/text.ts — Text block builders (P5-2 / spec 03 "Text (heading / paragraph / list)").
+ * blocks/text.ts — Text block builders (P5-2 / spec layout-vocabulary "Text (heading / paragraph / list)").
  *
  * Pure functions that return fresh model subtrees built only from the edit.ts
  * factories. Every node comes back `dirty` (createElement/createText set it), so

@@ -2,7 +2,7 @@
   /**
    * FreeAlignBar.svelte — Align/distribute toolbar for free multi-selection (P4-6).
    *
-   * WHY THIS EXISTS (spec 04 "Align / distribute"):
+   * WHY THIS EXISTS (spec canvas-interaction "Align / distribute"):
    * ================================================
    * When the user selects 2+ `data-free` elements (via Shift+click on the canvas
    * or from the outline panel), this floating bar appears with buttons to:

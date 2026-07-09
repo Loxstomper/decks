@@ -2,7 +2,7 @@
  * free-geometry-commands.ts — Undoable store commands for free-element move +
  * resize (P4-2 absolute drag move, P4-3 resize handles).
  *
- * WHY THIS EXISTS (spec 04 "Undo/redo: each command pushes the serialized model";
+ * WHY THIS EXISTS (spec canvas-interaction "Undo/redo: each command pushes the serialized model";
  * deck store command contract):
  * =====================================================================
  * The pure geometry (resize-geometry.ts) computes a new LOGICAL rect; the pure
@@ -14,7 +14,7 @@
  *   mutate model → deckStore.updateFromModel() → deckStore.commitCommand()
  *
  * Because only the touched elements go dirty, every other node round-trips
- * byte-for-byte (spec 12 #4).
+ * byte-for-byte (spec principles-and-invariants #4).
  *
  * Each command is a no-op (returns false, NO undo entry / NO save) when nothing
  * actually changed or the eid is unknown, so a click that didn't move, or a
@@ -82,7 +82,7 @@ export interface FreeGeometryEntry {
  * and there is a single autosave round-trip rather than N.
  *
  * Coded for multi-select now even though the selection store is single-select
- * today (spec 04 "Marquee … for multi-select" lands later) — the controller
+ * today (spec canvas-interaction "Marquee … for multi-select" lands later) — the controller
  * passes a one-entry array in the meantime, exercising the same path.
  */
 export function applyFreeGeometryBatch(entries: FreeGeometryEntry[]): boolean {

@@ -123,7 +123,7 @@ func TestLocalizeFont_WritesLocalFiles(t *testing.T) {
 	// Offline invariant: no external http(s):// URLs in the generated CSS.
 	extURLRe := regexp.MustCompile(`https?://`)
 	if extURLRe.Match(cssData) {
-		t.Errorf("font-face.css contains external URL — violates spec 12 offline-first:\n%s", cssData)
+		t.Errorf("font-face.css contains external URL — violates spec principles-and-invariants offline-first:\n%s", cssData)
 	}
 
 	// Verify woff2 files were written.
@@ -328,7 +328,7 @@ func TestBundledThemes_AllPresentAfterNew(t *testing.T) {
 }
 
 // TestBundledThemes_NoExternalURLs verifies that none of the bundled theme
-// CSS files contain external http(s):// URLs (spec 12 offline invariant).
+// CSS files contain external http(s):// URLs (spec principles-and-invariants offline invariant).
 func TestBundledThemes_NoExternalURLs(t *testing.T) {
 	root := makeWorkspace(t)
 	if err := deck.New(root, "theme-offline"); err != nil {
@@ -345,7 +345,7 @@ func TestBundledThemes_NoExternalURLs(t *testing.T) {
 			continue
 		}
 		if matches := extRe.FindAll(data, -1); len(matches) > 0 {
-			t.Errorf("theme %s.css contains external URL(s) — violates spec 12:", name)
+			t.Errorf("theme %s.css contains external URL(s) — violates spec principles-and-invariants:", name)
 			for _, m := range matches {
 				t.Errorf("  %s", m)
 			}

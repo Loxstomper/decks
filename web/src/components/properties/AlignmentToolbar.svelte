@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
-   * AlignmentToolbar.svelte — Alignment-as-intent button strip (P3-5 / spec 03).
+   * AlignmentToolbar.svelte — Alignment-as-intent button strip (P3-5 / spec layout-vocabulary).
    *
    * WHY THIS EXISTS:
    * ================
-   * Spec 03 §"Alignment-as-intent" states that alignment controls set CONTAINER
+   * Spec layout-vocabulary §"Alignment-as-intent" states that alignment controls set CONTAINER
    * PROPERTIES (data-align / data-justify), NOT pixel coordinates.  This keeps
-   * layout intent in the model so it survives resolution changes (spec 05).
+   * layout intent in the model so it survives resolution changes (spec scaling-and-resolution).
    *
    * This component is PURELY PRESENTATIONAL — it receives the current container
    * props and fires typed callbacks when the user clicks a button.  All model

@@ -22,7 +22,7 @@
  *   POST /api/shared/{filename}/copy?deck={deckName}
  *     Response: { src: "assets/img/logo.png" }
  *     Status: 200
- *     Note: copies the shared file INTO the deck (spec 08 — never a cross-deck ref).
+ *     Note: copies the shared file INTO the deck (spec assets-and-media — never a cross-deck ref).
  *
  *   GET /api/providers
  *     Response: { name, label }[]   (ENABLED providers only; absent key → omitted)
@@ -37,8 +37,8 @@
  *     Response: { src: "assets/img/photo.jpg" }   (downloaded + localized)
  *     Status: 200
  *
- * SECRETS: provider API keys live in env vars server-side only (spec 12 §5 /
- * spec 13).  The frontend never sees or sends keys.
+ * SECRETS: provider API keys live in env vars server-side only (spec principles-and-invariants §5 /
+ * spec project-structure).  The frontend never sees or sends keys.
  */
 
 // ── Shared types ──────────────────────────────────────────────────────────────
@@ -167,7 +167,7 @@ export async function listShared(): Promise<SharedFile[]> {
 
 /**
  * Copy a shared/ file into the deck's assets/ directory (server-side copy,
- * not a cross-deck reference — spec 08).
+ * not a cross-deck reference — spec assets-and-media).
  *
  * `filename` is the bare shared filename (e.g. "logo.svg", the `name` field of a
  * {@link SharedFile}); the server matches it strictly against shared/<filename>.
@@ -194,7 +194,7 @@ export async function copySharedAsset(
 /**
  * List available image providers and their enabled status.
  * A provider is disabled when its API key is absent from the server env
- * (spec 12 §5 — keys are server-side only, never sent to the frontend).
+ * (spec principles-and-invariants §5 — keys are server-side only, never sent to the frontend).
  */
 export async function listProviders(): Promise<Provider[]> {
   const res = await fetch('/api/providers', { cache: 'no-store' });
@@ -239,7 +239,7 @@ export async function searchProvider(
  * Lane GO downloads `result.full_url` (the external image) into
  * `decks/{deckName}/assets/`, giving the file a stable local name, and returns
  * the relative `src`.  After this call, the deck is self-contained and offline-
- * ready (spec 08, 12).
+ * ready (spec assets-and-media, principles-and-invariants).
  */
 export async function fetchProviderImage(
   deckName: string,

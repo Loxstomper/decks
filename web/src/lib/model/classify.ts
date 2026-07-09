@@ -1,5 +1,5 @@
 /**
- * classify.ts — Per-node element classification (P2-1 / spec 02 / spec 03).
+ * classify.ts — Per-node element classification (P2-1 / spec document-model / spec layout-vocabulary).
  *
  * Every ElementNode in the model falls into exactly one of four classes.
  * The classification drives which editing surface the canvas shows, whether
@@ -7,7 +7,7 @@
  *
  * Rules (first match wins):
  *
- *   FREE        — carries `data-free` (absolute-positioning escape hatch, spec 03).
+ *   FREE        — carries `data-free` (absolute-positioning escape hatch, spec layout-vocabulary).
  *                 Wins over container so that `data-free data-lay` is unambiguous.
  *
  *   CONTAINER   — carries `data-lay` (layout primitive: stack / row / grid / layers)
@@ -30,7 +30,7 @@
  *   PASSTHROUGH — everything else: structural HTML (html/head/body/div without
  *                 data-lay), raw-text elements (script/style/textarea/title),
  *                 metadata (meta/link), unknown custom elements, etc. The editor
- *                 never touches these; they round-trip byte-identically (spec 12 #4).
+ *                 never touches these; they round-trip byte-identically (spec principles-and-invariants #4).
  */
 
 import { hasAttribute, getAttribute } from './edit';
@@ -65,7 +65,7 @@ const LEAF_TAGS = new Set<string>([
 ]);
 
 /**
- * Return the classification of an ElementNode per spec 02 / 03.
+ * Return the classification of an ElementNode per spec document-model / layout-vocabulary.
  *
  * This is a pure function of the node's tag name and attributes — it does not
  * walk children or inspect ancestors. Call it at any point; it never mutates.
@@ -91,7 +91,7 @@ export function classify(el: ElementNode): ElementClass {
 
   // Rule 3b — math block: a KaTeX leaf has no dedicated HTML tag, so the editor
   // marks it with its OWN class token `math-block` (see blocks/builders.ts).
-  // spec 03 lists Math as a leaf block type — recognise the editor's own marker
+  // spec layout-vocabulary lists Math as a leaf block type — recognise the editor's own marker
   // so the math block gets a data-eid and is individually selectable/styleable.
   // This is the editor's emitted marker, not user styling, so reading it here
   // does not violate the "no class-string parsing for layout" principle.
@@ -100,7 +100,7 @@ export function classify(el: ElementNode): ElementClass {
   }
 
   // Rule 3c — chart block (P17-15): a Chart.js chart is a <canvas> carrying the
-  // editor's own marker attribute `data-chart` (see blocks/builders.ts). spec 03
+  // editor's own marker attribute `data-chart` (see blocks/builders.ts). spec layout-vocabulary
   // lists Chart as a leaf block type — recognise the marker so the chart gets a
   // data-eid and is individually selectable (its JSON data is edited in the
   // inspector). A bare <canvas> WITHOUT data-chart is left passthrough — the
@@ -112,7 +112,7 @@ export function classify(el: ElementNode): ElementClass {
 
   // Rule 3d — QR block (P19): a QR code is a <div> carrying the editor's own
   // marker attribute `data-qr` (the encoded payload; see blocks/builders.ts).
-  // spec 03 lists QR code as a leaf block type — recognise the marker so the QR
+  // spec layout-vocabulary lists QR code as a leaf block type — recognise the marker so the QR
   // gets a data-eid and is individually selectable (its payload/options are
   // edited in the inspector). A bare <div> WITHOUT data-qr stays passthrough —
   // the editor only owns QR blocks it emitted. Dual-encoded with the
@@ -133,7 +133,7 @@ export function classify(el: ElementNode): ElementClass {
 
 /**
  * Text-bearing leaf tags the editor's per-element colour control applies to
- * (P9-8 / spec 09 "Text appearance": heading / paragraph / list / text leaf).
+ * (P9-8 / spec theming-and-styles "Text appearance": heading / paragraph / list / text leaf).
  * Media/embed leaves (img, video, svg, iframe, table cells aside) carry no
  * directly-coloured text, so they are intentionally excluded.
  */
@@ -149,7 +149,7 @@ const TEXT_LEAF_TAGS = new Set<string>([
 /**
  * True when `el` is a TEXT leaf — a leaf (per {@link classify}) whose content is
  * directly-coloured text. Drives whether the inspector shows the text-colour
- * control (spec 09). Pure; never mutates.
+ * control (spec theming-and-styles). Pure; never mutates.
  */
 export function isTextLeaf(el: ElementNode): boolean {
   if (classify(el) !== 'leaf') return false;
