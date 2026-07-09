@@ -7,9 +7,9 @@
  *
  * Coverage:
  *  1. screenToLogical / logicalToScreen basic correctness
- *  2. fit-scale computation (present-scale mode, spec 05)
- *  3. custom editor zoom (spec 05 — distinct from present-scale)
- *  4. pan offset (additive, spec 04)
+ *  2. fit-scale computation (present-scale mode, spec scaling-and-resolution)
+ *  3. custom editor zoom (spec scaling-and-resolution — distinct from present-scale)
+ *  4. pan offset (additive, spec canvas-interaction)
  *  5. round-trip identity in both directions (floating-point tolerance)
  *  6. Edge cases: zoom=1 (fit), extreme zoom, non-default logical size
  */
@@ -131,7 +131,7 @@ describe('round-trip identity', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. computeFitTransform — present-scale (spec 05)
+// 3. computeFitTransform — present-scale (spec scaling-and-resolution)
 // ---------------------------------------------------------------------------
 
 describe('computeFitTransform', () => {
@@ -204,7 +204,7 @@ describe('computeFitTransform', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. computeZoomTransform — editor zoom (spec 05)
+// 4. computeZoomTransform — editor zoom (spec scaling-and-resolution)
 // ---------------------------------------------------------------------------
 
 describe('computeZoomTransform', () => {
@@ -259,7 +259,7 @@ describe('computeZoomTransform', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. applyPan — additive pan offset (spec 04)
+// 5. applyPan — additive pan offset (spec canvas-interaction)
 // ---------------------------------------------------------------------------
 
 describe('applyPan', () => {
@@ -337,11 +337,11 @@ describe('composed transforms', () => {
 // ---------------------------------------------------------------------------
 
 describe('constants', () => {
-  it('LOGICAL_WIDTH is 1920 (spec 05)', () => {
+  it('LOGICAL_WIDTH is 1920 (spec scaling-and-resolution)', () => {
     expect(LOGICAL_WIDTH).toBe(1920);
   });
 
-  it('LOGICAL_HEIGHT is 1080 (spec 05)', () => {
+  it('LOGICAL_HEIGHT is 1080 (spec scaling-and-resolution)', () => {
     expect(LOGICAL_HEIGHT).toBe(1080);
   });
 

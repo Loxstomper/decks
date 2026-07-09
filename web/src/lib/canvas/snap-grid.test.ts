@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { snapToGrid, snapPointToGrid, DEFAULT_GRID_SIZE } from './snap-grid.ts';
 
 describe('snapToGrid', () => {
-  it('defaults to an 8 logical-unit grid (spec 04)', () => {
+  it('defaults to an 8 logical-unit grid (spec canvas-interaction)', () => {
     expect(DEFAULT_GRID_SIZE).toBe(8);
     expect(snapToGrid(0)).toBe(0);
     expect(snapToGrid(3)).toBe(0); // nearest multiple of 8 below the halfway

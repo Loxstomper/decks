@@ -275,7 +275,7 @@ func TestValidate_DataBackgroundColorTolerated(t *testing.T) {
 }
 
 func TestValidate_DataBackgroundSetTolerated(t *testing.T) {
-	// The full data-background-* pass-through set (spec 16) must be tolerated
+	// The full data-background-* pass-through set (spec theming-and-styles) must be tolerated
 	// without enum validation: size/position/repeat/opacity/gradient + video flags.
 	html := `<section data-eid="s1"` +
 		` data-background-size="cover"` +

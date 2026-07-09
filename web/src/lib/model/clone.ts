@@ -18,7 +18,7 @@
  *   • Strips every `data-eid` (case-insensitively) so stampEids (model/eid.ts)
  *     re-mints unique ids for the copy on insert.
  *   • PRESERVES `data-id` and all other attributes so reveal auto-animate can
- *     still pair the original and the copy by `data-id` (spec 07).
+ *     still pair the original and the copy by `data-id` (spec motion-and-transitions).
  *
  * Pure over the model (no DOM, no store) → unit-testable.
  */

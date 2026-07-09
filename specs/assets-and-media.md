@@ -1,4 +1,4 @@
-# 08 — Assets & media
+# Assets & media
 
 **Status:** decided (Gemini provider deferred)
 
@@ -45,9 +45,9 @@ Design the asset layer so providers are interchangeable behind one "image provid
 
 ## Fonts
 
-- See [09](09-theming-and-styles.md): fonts are **downloaded and self-hosted** into
+- See [Theming & styles](theming-and-styles.md): fonts are **downloaded and self-hosted** into
   `assets/fonts/` (or a shared font cache) so decks run fully offline.
 
 ## Related
 
-[09](09-theming-and-styles.md) · [12](12-principles-and-invariants.md) · [13](13-project-structure.md)
+[Theming & styles](theming-and-styles.md) · [Principles & invariants](principles-and-invariants.md) · [Project structure](project-structure.md)

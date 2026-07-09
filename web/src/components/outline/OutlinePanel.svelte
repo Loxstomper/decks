@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * OutlinePanel.svelte — Outline / layers tree panel (P3-3 / spec 04).
+   * OutlinePanel.svelte — Outline / layers tree panel (P3-3 / spec canvas-interaction).
    *
    * This is the top-level outline component mounted in PaneLayout's `outline`
    * snippet zone.  It:

@@ -35,15 +35,15 @@ import (
 var revealVendor embed.FS
 
 // layoutVendor holds the slides-builder layout vocabulary files:
-//   - vendor/slides-layout.css     — CSS for enum data-* attributes (spec 03)
+//   - vendor/slides-layout.css     — CSS for enum data-* attributes (spec layout-vocabulary)
 //   - vendor/slides-layout-init.js — applies numeric data-* to inline styles
 //
-// These are shipped alongside reveal so decks render layout offline (spec 12).
+// These are shipped alongside reveal so decks render layout offline (spec principles-and-invariants).
 //
 //go:embed vendor/slides-layout.css vendor/slides-layout-init.js
 var layoutVendor embed.FS
 
-// highlightVendor holds the reveal.js highlight plugin (P5-9, spec 12):
+// highlightVendor holds the reveal.js highlight plugin (P5-9, spec principles-and-invariants):
 //   - vendor/highlight/plugin.js       — UMD bundle (includes highlight.js)
 //   - vendor/highlight/monokai.min.css — Monokai colour theme
 //
@@ -59,7 +59,7 @@ var highlightVendor embed.FS
 //   - vendor/katex/dist/contrib/auto-render.min.js — auto-render extension
 //   - vendor/katex/dist/fonts/*.woff2          — KaTeX maths fonts
 //
-// Bundled so LaTeX math expressions render offline (spec 12 – zero CDN URLs).
+// Bundled so LaTeX math expressions render offline (spec principles-and-invariants – zero CDN URLs).
 //
 //go:embed vendor/math vendor/katex
 var mathVendor embed.FS
@@ -71,7 +71,7 @@ var mathVendor embed.FS
 //
 // Pressing 'S' during a presentation opens the speaker window with notes,
 // next-slide preview, and a timer.  All assets are local (zero external URLs,
-// spec 12 offline-first).
+// spec principles-and-invariants offline-first).
 //
 //go:embed vendor/notes
 var notesVendor embed.FS
@@ -81,7 +81,7 @@ var notesVendor embed.FS
 //   - vendor/chart/plugin.js    — thin reveal plugin reading data-chart-data JSON
 //
 // Loaded in the scaffold so <canvas data-chart> blocks render in the editor,
-// the present route, and PDF export — all offline (spec 12, zero CDN URLs).
+// the present route, and PDF export — all offline (spec principles-and-invariants, zero CDN URLs).
 //
 //go:embed vendor/chart
 var chartVendor embed.FS
@@ -93,7 +93,7 @@ var chartVendor embed.FS
 //                           building the SVG from the module matrix.
 //
 // Loaded in the scaffold so <div data-qr> blocks render in the editor, the
-// present route, and PDF export — all offline (spec 12, zero CDN URLs).
+// present route, and PDF export — all offline (spec principles-and-invariants, zero CDN URLs).
 //
 //go:embed vendor/qr
 var qrVendor embed.FS
@@ -105,7 +105,7 @@ var qrVendor embed.FS
 //
 // Vendored into each deck but enabled ONLY on the present route (server injects
 // the script + plugin registration so the editor stays clean and deck.html is
-// never mutated — present-mode annotations are ephemeral, spec 10).
+// never mutated — present-mode annotations are ephemeral, spec presenting-and-export).
 //
 //go:embed vendor/chalkboard
 var chalkboardVendor embed.FS
@@ -124,7 +124,7 @@ const revealVersion = "5.1.0"
 
 // deckHTML is the minimal valid reveal.js template used by New.
 // All resource paths are RELATIVE so the deck renders without any network
-// access (spec 12 – offline-first).  The path structure mirrors the deck
+// access (spec principles-and-invariants – offline-first).  The path structure mirrors the deck
 // folder layout: assets/vendor/reveal/ next to deck.html.
 //
 // Plugins enabled (all served from assets/vendor/ — zero CDN):
@@ -136,11 +136,11 @@ const deckHTML = `<!doctype html>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>{{DECK_NAME}}</title>
-  <!-- reveal.js vendored locally – no network required (spec 12 offline-first) -->
+  <!-- reveal.js vendored locally – no network required (spec principles-and-invariants offline-first) -->
   <link rel="stylesheet" href="assets/vendor/reveal/reset.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/reveal.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/theme/black.css" />
-  <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec 03) -->
+  <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec layout-vocabulary) -->
   <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
   <!-- Per-slide themes – section[data-theme] re-binds reveal --r-* vars (P10-1) -->
   <link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />
@@ -182,12 +182,12 @@ const deckHTML = `<!doctype html>
   <script src="assets/vendor/qr/plugin.js"></script>
   <script>
     Reveal.initialize({
-      // Logical canvas matches the editor (spec 05): reveal scales this 1920x1080
+      // Logical canvas matches the editor (spec scaling-and-resolution): reveal scales this 1920x1080
       // space to any screen at present time, so editor overlays and the rendered
       // deck share one coordinate system (WYSIWYG). Aspect changes rewrite these.
       width: 1920,
       height: 1080,
-      // Full logical canvas at origin: free coords are identity (spec 05, Phase 15).
+      // Full logical canvas at origin: free coords are identity (spec scaling-and-resolution, Phase 15).
       // center:false + margin:0 stop reveal from inset-offsetting the slide, so a
       // [data-free] element at data-x=0,data-y=0 lands at the true canvas top-left.
       // Structured 'stack' slides still center via data-justify in slides-layout.css.
@@ -198,7 +198,7 @@ const deckHTML = `<!doctype html>
       progress: true,
       slideNumber: false,
       transition: 'slide',
-      // KaTeX: point at local assets so math renders offline (spec 12, P5-10).
+      // KaTeX: point at local assets so math renders offline (spec principles-and-invariants, P5-10).
       // The math plugin constructs URLs as: local + '/dist/katex.min.{css,js}'
       // and local + '/dist/contrib/auto-render.min.js'.
       katex: { local: 'assets/vendor/katex' },
@@ -330,7 +330,7 @@ func New(root, name string) error {
 		return fmt.Errorf("deck new: write custom.css: %w", err)
 	}
 
-	// Vendor reveal into the deck so it is self-contained (spec 12).
+	// Vendor reveal into the deck so it is self-contained (spec principles-and-invariants).
 	if err := Vendor(root, name); err != nil {
 		return fmt.Errorf("deck new: vendor reveal: %w", err)
 	}
@@ -371,7 +371,7 @@ func Vendor(root, name string) error {
 	}
 	log.Printf("deck: vendored slides-slide-themes.css → %s", vendorDir)
 
-	// Highlight plugin → assets/vendor/highlight/ (P5-9, spec 12 offline-first)
+	// Highlight plugin → assets/vendor/highlight/ (P5-9, spec principles-and-invariants offline-first)
 	if err := copyEmbeddedFS(highlightVendor, "vendor/highlight", filepath.Join(vendorDir, "highlight")); err != nil {
 		return fmt.Errorf("vendor: copy highlight plugin: %w", err)
 	}
@@ -388,7 +388,7 @@ func Vendor(root, name string) error {
 
 	// Notes plugin → assets/vendor/notes/ (P7-2, speaker view via 'S' key)
 	// Includes plugin.js (RevealNotes UMD), notes.js (core), speaker-view.html
-	// (popup window). All local so speaker view works offline (spec 12).
+	// (popup window). All local so speaker view works offline (spec principles-and-invariants).
 	if err := copyEmbeddedFS(notesVendor, "vendor/notes", filepath.Join(vendorDir, "notes")); err != nil {
 		return fmt.Errorf("vendor: copy notes plugin: %w", err)
 	}
@@ -435,7 +435,7 @@ func initKeyRE(key string) *regexp.Regexp {
 
 // upgradeInitialize inserts `center: false,` and `margin: 0,` into the first
 // Reveal.initialize({…}) call if those keys are absent (Phase 15: full logical
-// canvas at origin so free coords are identity, spec 05). It is a pure function
+// canvas at origin so free coords are identity, spec scaling-and-resolution). It is a pure function
 // for testability. Returns the (possibly rewritten) HTML and whether it changed.
 //
 // Guarantees:
@@ -478,7 +478,7 @@ func upgradeInitialize(html string) (string, bool) {
 
 	var b strings.Builder
 	b.WriteString(html[:insertAt])
-	b.WriteString(indent + "// Full logical canvas at origin: free coords are identity (spec 05, Phase 15).\n")
+	b.WriteString(indent + "// Full logical canvas at origin: free coords are identity (spec scaling-and-resolution, Phase 15).\n")
 	if needCenter {
 		b.WriteString(indent + "center: false,\n")
 	}

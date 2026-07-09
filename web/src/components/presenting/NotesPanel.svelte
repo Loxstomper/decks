@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * NotesPanel.svelte — Per-slide speaker notes editor (P7-2 / spec 10).
+   * NotesPanel.svelte — Per-slide speaker notes editor (P7-2 / spec presenting-and-export).
    *
    * WHY A DEDICATED COMPONENT:
    * Speaker notes live as `<aside class="notes">` inside each `<section>` (spec

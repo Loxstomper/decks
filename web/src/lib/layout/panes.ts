@@ -1,7 +1,7 @@
 /**
  * panes.ts — Workspace-level pane layout persistence (P9-3/4/5).
  *
- * WHY THIS EXISTS (spec 04 "Collapsible & resizable chrome"):
+ * WHY THIS EXISTS (spec canvas-interaction "Collapsible & resizable chrome"):
  * ==========================================================
  * The editor shell is the user's workspace, so its pane sizes and collapse
  * state must survive a reload. One open workspace ⇒ a single localStorage key

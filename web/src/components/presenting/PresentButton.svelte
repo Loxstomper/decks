@@ -1,10 +1,10 @@
 <script lang="ts">
   /**
-   * PresentButton.svelte — "Present" action button (P7-1 / spec 10).
+   * PresentButton.svelte — "Present" action button (P7-1 / spec presenting-and-export).
    *
    * Opens the current deck in full presentation mode in a new browser tab.
    *
-   * URL opened: `/present/{name}` (spec 10 canonical present route).
+   * URL opened: `/present/{name}` (spec presenting-and-export canonical present route).
    * The Go backend serves the deck's raw `deck.html` byte-for-byte at this route
    * (handlePresent → os.DirFS, identical bytes to /decks/{name}/deck.html) and
    * resolves sibling assets under /present/{name}/{path...}. Reveal.js initialises
@@ -12,7 +12,7 @@
    * opens from there — with no editor chrome attached.
    *
    * WHY /present/{name} (not /decks/{name}/deck.html):
-   * Spec 10 makes /present/<deck> the dedicated, bookmarkable present entry point,
+   * Spec presenting-and-export makes /present/<deck> the dedicated, bookmarkable present entry point,
    * clearly distinct from the editing iframe src (/decks/{name}/deck.html). Both
    * serve identical bytes, but converging on the canonical route keeps a single
    * contract between the FE and the Go server (integrator convergence, Phase 7).

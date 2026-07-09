@@ -7,7 +7,7 @@
  * without DOM or fetch mocks.
  *
  * All returned nodes are dirty=true so serializeDeck emits canonical markup for
- * them (spec 12 §4 — byte-stable passthrough only applies to untouched nodes).
+ * them (spec principles-and-invariants §4 — byte-stable passthrough only applies to untouched nodes).
  */
 
 import { createElement, createText, appendChild } from '$lib/model';
@@ -20,7 +20,7 @@ import type { ElementNode } from '$lib/model';
  *
  * `src` MUST be a relative deck-asset path ("assets/photo.jpg") — never an
  * external URL.  This is enforced by callers (upload/localize pipeline) so the
- * deck stays self-contained and offline-first (spec 08, 12).
+ * deck stays self-contained and offline-first (spec assets-and-media, principles-and-invariants).
  *
  * The optional `alt` text defaults to empty; screen-reader quality is the
  * integrator's concern, not the format's.
@@ -148,7 +148,7 @@ export const CHART_HEIGHT = 400;
  * canvas must carry intrinsic width/height. <canvas> is NOT a void element; we
  * leave it childless (a fallback text child is allowed but unnecessary).
  *
- * OFFLINE-FIRST (spec 12): emits zero external URLs — Chart.js + the plugin are
+ * OFFLINE-FIRST (spec principles-and-invariants): emits zero external URLs — Chart.js + the plugin are
  * vendored into the deck by the scaffold (Lane GO / P17-14).
  */
 export function buildChartBlock(type: string, dataJson: string): ElementNode {
@@ -172,7 +172,7 @@ export const QR_DEFAULTS = { ec: 'M', fg: '#000000', bg: '#ffffff', quiet: 4 } a
 
 /**
  * Build the `aria-label` for a QR block from its payload. The encoded value is
- * otherwise opaque to assistive tech, so we surface it (spec 03 "QR code").
+ * otherwise opaque to assistive tech, so we surface it (spec layout-vocabulary "QR code").
  * Shared with the store's edit command so insert + edit stay consistent.
  */
 export function qrAriaLabel(payload: string): string {
@@ -201,9 +201,9 @@ export function qrAriaLabel(payload: string): string {
  *
  * `fg`/`bg`/`quiet` are functional inputs to QR generation stored as data-qr-*
  * attributes (not CSS) — the renderer must read them to draw scannable modules
- * (spec 03 "QR code").
+ * (spec layout-vocabulary "QR code").
  *
- * OFFLINE-FIRST (spec 12): emits zero external URLs — the QR generator + plugin
+ * OFFLINE-FIRST (spec principles-and-invariants): emits zero external URLs — the QR generator + plugin
  * are vendored into the deck by the scaffold (P19-1). The block is inert (empty
  * div) without them but never breaks the deck.
  */

@@ -24,7 +24,7 @@
  *     property inheritance requires no JS — verified here via computed style).
  *
  *  4. Offline guard: the present route must not make any external network
- *     requests (spec 12 / P9-2 invariant).
+ *     requests (spec principles-and-invariants / P9-2 invariant).
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================

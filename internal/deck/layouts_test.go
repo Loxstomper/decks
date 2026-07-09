@@ -41,7 +41,7 @@ func TestBundledLayouts_NonEmpty(t *testing.T) {
 // TestBundledLayouts_WellFormed parses each preset and asserts the Phase-14
 // contract: well-formed HTML, a single <section> carrying data-layout matching
 // the preset name, exactly one data-slot="content" container, and zero external
-// (http/https) URLs (offline-first, spec 12).
+// (http/https) URLs (offline-first, spec principles-and-invariants).
 func TestBundledLayouts_WellFormed(t *testing.T) {
 	for _, p := range deck.BundledLayouts() {
 		p := p

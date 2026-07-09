@@ -1,7 +1,7 @@
 /**
  * overlay-geometry.ts — Map an in-iframe element rect to an overlay box (P2-4).
  *
- * WHY THIS EXISTS (spec 04 "Coordinate/scale system", P0-14 transform):
+ * WHY THIS EXISTS (spec canvas-interaction "Coordinate/scale system", P0-14 transform):
  * =====================================================================
  * The selection box is drawn in the PARENT document, over the iframe, but the
  * element it tracks lives INSIDE the iframe. Two facts make the math clean:

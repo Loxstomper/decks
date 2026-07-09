@@ -1,5 +1,5 @@
 /**
- * types.ts — DOM-as-model node types (P1-4 / spec 02).
+ * types.ts — DOM-as-model node types (P1-4 / spec document-model).
  *
  * WHY A SOURCE-PRESERVING TREE (and not a re-serialized DOMParser document):
  * ==========================================================================
@@ -13,7 +13,7 @@
  * vs. kept self-closing slashes, void-element handling, whitespace collapsing,
  * boolean-attribute rewriting, `<` in text, comment/CDATA edge cases, etc.
  * For odd / AI-authored / hand-written markup that is exactly the content we
- * must "never destroy" (spec 12), so a full re-serialize is the wrong tool.
+ * must "never destroy" (spec principles-and-invariants), so a full re-serialize is the wrong tool.
  *
  * Instead we parse into a real, mutable element tree where **every node keeps
  * its exact original source slice** (`raw`). Serialization is then:
@@ -30,7 +30,7 @@
  *   parse(serialize(parse(html))) === serialize(parse(html))   (idempotent)
  * and keeps reformatting scoped to the exact element the user/Claude edited.
  *
- * The tree is still a faithful DOM-as-model (spec 02): elements, attributes,
+ * The tree is still a faithful DOM-as-model (spec document-model): elements, attributes,
  * children, comments, CDATA, doctype, raw-text (script/style) — all addressable
  * and mutable. It just additionally remembers where it came from.
  */

@@ -1,7 +1,7 @@
 <script lang="ts">
   /**
    * DragController.svelte — Reorder / reparent / free-move drag controller
-   * (P3-6, P3-7, P3-8 for free drags / spec 04 "Two drag semantics").
+   * (P3-6, P3-7, P3-8 for free drags / spec canvas-interaction "Two drag semantics").
    *
    * WHY THIS EXISTS:
    * ================
@@ -13,7 +13,7 @@
    * attaches pointer listeners to the same-origin iframe document, and renders a
    * drop indicator / drag ghost in an overlay layer over (but outside) the iframe.
    *
-   * COORDINATE MODEL (spec 04 "all hit-testing in logical space"):
+   * COORDINATE MODEL (spec canvas-interaction "all hit-testing in logical space"):
    *   • Pointer events that fire INSIDE the iframe report clientX/clientY in the
    *     iframe's own viewport, which is the LOGICAL 1920×1080 space (the iframe is
    *     sized at logical dimensions and reveal renders at scale 1 — the parent's

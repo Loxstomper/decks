@@ -1,14 +1,14 @@
 /**
  * aspect.svelte.ts — Reactive aspect-ratio + reposition-offer store (P4-7).
  *
- * WHY THIS EXISTS (spec 05 "Aspect-ratio change behavior"):
+ * WHY THIS EXISTS (spec scaling-and-resolution "Aspect-ratio change behavior"):
  * =========================================================
  * The chosen aspect drives the LOGICAL canvas size, which the canvas (RevealFrame
  * width/height + coords.ts) must render at. That size is editor-wide shared state,
  * so it lives in one module-level `$state` store rather than being threaded as
  * props — the same pattern as gridStore/selectionStore.
  *
- * It ALSO owns the transient state of an in-progress aspect change: spec 05 says
+ * It ALSO owns the transient state of an in-progress aspect change: spec scaling-and-resolution says
  * structured content reflows automatically but FREE elements must be FLAGGED with
  * an offer to reposition (never silently moved). So `begin()` updates the aspect
  * IMMEDIATELY — the canvas iframe element and the overlay/coords adopt the new
@@ -114,7 +114,7 @@ class AspectStore {
     this.#freeRectsAtStart = freeRects;
     this.offers = computeRepositionOffers(freeRects, old, next, this.mode);
     // Default every offer to ACCEPT (the suggested reposition keeps free elements
-    // on-canvas). The user can decline individually — spec 05 forbids SILENT moves,
+    // on-canvas). The user can decline individually — spec scaling-and-resolution forbids SILENT moves,
     // and showing the dialog with a clear accept/decline IS the explicit consent.
     this.decisions = {};
   }

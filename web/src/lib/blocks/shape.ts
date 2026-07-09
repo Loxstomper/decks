@@ -1,5 +1,5 @@
 /**
- * blocks/shape.ts — Shape / line / arrow builder (P5-12 / spec 03 "Shape / line / arrow").
+ * blocks/shape.ts — Shape / line / arrow builder (P5-12 / spec layout-vocabulary "Shape / line / arrow").
  *
  * Shapes are inline `<svg>` elements. They are inserted as FREE elements
  * (data-free + data-x/y/w/h in logical coords) so the Phase-4 resize/drag
@@ -7,7 +7,7 @@
  * scales to fill its box (preserveAspectRatio="none").
  *
  * WHY currentColor + no fill for outlines:
- *   The deck owns styling (spec 03 ownership split). Using `currentColor`/stroke
+ *   The deck owns styling (spec layout-vocabulary ownership split). Using `currentColor`/stroke
  *   means the shape adopts the slide's text colour and is themeable via CSS the
  *   user/Claude Code add, without the editor baking in a palette.
  *
@@ -16,7 +16,7 @@
  *   mint one without breaking byte-stable round-trips. Drawing the head as an
  *   explicit polygon keeps the builder pure and id-free.
  *
- * All coordinates are LOGICAL (1920×1080 canvas, spec 05). Defaults centre the
+ * All coordinates are LOGICAL (1920×1080 canvas, spec scaling-and-resolution). Defaults centre the
  * shape so it lands visibly on the slide.
  */
 
@@ -25,7 +25,7 @@ import type { ElementNode } from '$lib/model/types';
 
 export type ShapeKind = 'rect' | 'ellipse' | 'line' | 'arrow';
 
-/** Logical canvas size (spec 05) used to centre the default shape rect. */
+/** Logical canvas size (spec scaling-and-resolution) used to centre the default shape rect. */
 const CANVAS_W = 1920;
 const CANVAS_H = 1080;
 
@@ -82,7 +82,7 @@ export function buildShape(kind: ShapeKind): ElementNode {
     viewBox: '0 0 100 100',
     // Non-uniform scale: the shape fills whatever box the user resizes it to.
     preserveAspectRatio: 'none',
-    // Free escape-hatch (boolean attr) + logical geometry (spec 03 / spec 04).
+    // Free escape-hatch (boolean attr) + logical geometry (spec layout-vocabulary / spec canvas-interaction).
     'data-free': null,
     'data-x': String(rect.x),
     'data-y': String(rect.y),

@@ -2,7 +2,7 @@
   /**
    * SelectionOverlay.svelte — The selection bounding box (P2-4).
    *
-   * WHY THIS EXISTS (spec 04 "An overlay layer in the parent document sits over
+   * WHY THIS EXISTS (spec canvas-interaction "An overlay layer in the parent document sits over
    * the iframe, drawing selection boxes"):
    * ====================================================================
    * Purely presentational: given a screen-space rect (already computed by the

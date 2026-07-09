@@ -48,7 +48,7 @@ describe('serializeInlineHtml — canonical round-trip (byte-stable fixed point)
   });
 });
 
-describe('serializeInlineHtml — sanitization (security invariant, spec 12)', () => {
+describe('serializeInlineHtml — sanitization (security invariant, spec principles-and-invariants)', () => {
   it('drops <script> entirely, including its content', () => {
     expect(serializeInlineHtml('a<script>alert(1)</script>b')).toBe('ab');
   });

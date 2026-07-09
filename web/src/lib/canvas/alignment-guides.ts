@@ -1,7 +1,7 @@
 /**
  * alignment-guides.ts — Smart alignment guides for free-element drag (P4-4).
  *
- * WHY THIS EXISTS (spec 04 "Smart guides"):
+ * WHY THIS EXISTS (spec canvas-interaction "Smart guides"):
  * ==========================================
  * While dragging a `data-free` element, snap lines appear when the element's
  * edges or center align with sibling edges/centers OR the slide center/edges.
@@ -9,7 +9,7 @@
  * logical units, giving effortless pixel-perfect placement.
  *
  * Pure function: no DOM, no side effects → unit-testable headlessly.
- * All coordinates and thresholds are in LOGICAL space (spec 04, spec 05).
+ * All coordinates and thresholds are in LOGICAL space (spec canvas-interaction, spec scaling-and-resolution).
  *
  * Guide anatomy:
  *   axis='x' → a VERTICAL line rendered at x=position (shows horizontal alignment)
@@ -107,7 +107,7 @@ export function computeGuides(
     }
   }
 
-  // Slide edges and center (spec 04: "slide center and optionally slide edges").
+  // Slide edges and center (spec canvas-interaction: "slide center and optionally slide edges").
   addXTargets([0, canvasSize.width / 2, canvasSize.width]);
   addYTargets([0, canvasSize.height / 2, canvasSize.height]);
 

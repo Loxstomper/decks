@@ -25,7 +25,7 @@ describe('logicalSizeToAspect — reverse map for load-time seeding', () => {
   });
 });
 
-describe('aspectToLogicalSize — preset table (spec 05)', () => {
+describe('aspectToLogicalSize — preset table (spec scaling-and-resolution)', () => {
   it('16:9 → 1920×1080', () => {
     expect(aspectToLogicalSize('16:9')).toEqual({ width: 1920, height: 1080 });
   });

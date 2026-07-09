@@ -19,7 +19,7 @@
    *   the `data-chart` attribute and the JSON `type` stay consistent — the
    *   contract the vendored plugin and `slides validate` both rely on.
    *
-   * OFFLINE-FIRST (spec 12): the emitted markup carries zero external URLs;
+   * OFFLINE-FIRST (spec principles-and-invariants): the emitted markup carries zero external URLs;
    *   Chart.js + the plugin are vendored into the deck by the scaffold (P17-14).
    *   The block is inert (blank canvas) without them but never breaks the deck.
    */

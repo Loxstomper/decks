@@ -7,7 +7,7 @@
  * (vitest) already cover the pure model/serializer/command logic; this spec is
  * the END-TO-END proof that the features actually render in a real browser
  * against the real Go server, and — critically — that the offline-first and
- * byte-stability invariants still hold (spec 12).
+ * byte-stability invariants still hold (spec principles-and-invariants).
  *
  *  1. Rich-text inline marks (Lane A/B): a leaf containing <strong>/<em>/<a>
  *     round-trips through the deck API and renders in the present route — the
@@ -21,9 +21,9 @@
  *     slides and is suppressed on a data-footer-hidden slide (P17-18).
  *  5. Present-mode plugins (Lane H): the present route injects the chalkboard +
  *     laser plugin scripts and registers them, while the ON-DISK deck.html stays
- *     byte-identical (annotations are ephemeral — spec 10) (P17-19).
+ *     byte-identical (annotations are ephemeral — spec presenting-and-export) (P17-19).
  *  6. Offline guard: the present route makes zero external http(s) requests with
- *     all of the above present (spec 12 / P9-2).
+ *     all of the above present (spec principles-and-invariants / P9-2).
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY (Playwright, not vitest):
  *   npm run test:e2e        (or npm run test:e2e:docker)

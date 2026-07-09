@@ -1,5 +1,5 @@
 /**
- * eid.ts — Stable `data-eid` stamping for managed elements (P2-2 / spec 02).
+ * eid.ts — Stable `data-eid` stamping for managed elements (P2-2 / spec document-model).
  *
  * INVARIANTS (all tested in classify.test.ts):
  *
@@ -21,7 +21,7 @@
  *   SCOPED DIRTY — Each stamp call goes through setAttribute which sets ONLY
  *                  that element's `dirty = true`. Neighbouring elements that
  *                  already had eids remain clean and serialize via verbatim
- *                  byte passthrough (spec 12 #4).
+ *                  byte passthrough (spec principles-and-invariants #4).
  *
  *   NO PASSTHROUGH — classify(el) === 'passthrough' elements never receive an
  *                    eid; the editor does not manage them.

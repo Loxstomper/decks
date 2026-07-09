@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * PropertiesPanel.svelte — Container layout properties panel (P3-4 / spec 03).
+   * PropertiesPanel.svelte — Container layout properties panel (P3-4 / spec layout-vocabulary).
    *
    * WHY THIS EXISTS:
    * ================
@@ -14,7 +14,7 @@
    * panel never stores a local copy — every control is a derived view of the model
    * that re-reads on each render cycle triggered by the reactive `deckStore.model`.
    *
-   * STORE COMMAND PATTERN (spec 02 byte-stability):
+   * STORE COMMAND PATTERN (spec document-model byte-stability):
    * The panel fires `onApplyLayoutChange(eid, partialProps)`.  The integrator
    * wires this to `deckStore.applyLayoutChange(eid, delta)` (a new method the
    * integrator adds to DeckStore — see integration_notes):
@@ -176,7 +176,7 @@
     void deckStore.setSlideFooterHidden(containerEid, hidden);
   }
 
-  // ── P9-8: per-element text colour (spec 09 "Text appearance") ──────────────
+  // ── P9-8: per-element text colour (spec theming-and-styles "Text appearance") ──────────────
   //
   // Shown only when the SELECTED element itself is a text leaf (heading /
   // paragraph / list / leaf) — independent of the resolved layout container. The
@@ -210,7 +210,7 @@
     void deckStore.indentList(selectedEid, dir);
   }
 
-  // ── P17-15: chart-data editor (spec 03 "Chart" leaf) ───────────────────────
+  // ── P17-15: chart-data editor (spec layout-vocabulary "Chart" leaf) ───────────────────────
   //
   // Shown only when the SELECTED element itself is a <canvas data-chart> chart
   // leaf. Its type + JSON config are edited in ChartDataControl, which commits
@@ -228,7 +228,7 @@
   const chartLeaf: ElementNode | null = $derived(deriveChartLeaf(selectedEid));
   const chartProps: ChartProps | null = $derived(chartLeaf ? getChartProps(chartLeaf) : null);
 
-  // ── P19: QR code editor (spec 03 "QR code" leaf) ───────────────────────────
+  // ── P19: QR code editor (spec layout-vocabulary "QR code" leaf) ───────────────────────────
   //
   // Shown only when the SELECTED element itself is a <div data-qr> QR leaf. Its
   // payload + encoding options are edited in QrControl, which commits via
@@ -253,7 +253,7 @@
     void deckStore.applyTextColor(selectedEid, value);
   }
 
-  // ── P17-11: per-image alt text (spec 08 "Assets and media") ────────────────
+  // ── P17-11: per-image alt text (spec assets-and-media "Assets and media") ────────────────
   //
   // Shown only when the SELECTED element itself is an img leaf.
 
@@ -393,7 +393,7 @@
       />
 
       <!-- Equal columns/rows: sets data-grow=1 on all element children so
-           flex distributes space evenly (spec 03 "equal columns" intent).
+           flex distributes space evenly (spec layout-vocabulary "equal columns" intent).
            Not shown for grid (use data-cols template instead) or layers. -->
       {#if layoutProps.lay === 'row' || layoutProps.lay === 'stack'}
         <button class="action-btn" onclick={onEqualColumns}>

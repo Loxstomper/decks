@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * ExportPanel.svelte — Export controls (P7-4 / spec 10).
+   * ExportPanel.svelte — Export controls (P7-4 / spec presenting-and-export).
    *
    * Two export formats, both served by the Go backend on demand:
    *

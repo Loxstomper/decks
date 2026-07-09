@@ -1,4 +1,4 @@
-# 02 — Document model
+# Document model
 
 **Status:** decided
 
@@ -20,7 +20,7 @@ manipulates and preserves everything else verbatim.
   `DOMParser` → `outerHTML`: that normalizes whitespace/attribute order/entities and would
   churn every file on save — the opposite of the byte-stable invariant below.)
 - **Well-formed input.** The parser targets well-formed reveal HTML — explicit close tags, no
-  HTML5 tag-omission. `slides validate` ([11](11-claude-code-integration.md)) gates malformed
+  HTML5 tag-omission. `slides validate` ([Claude Code integration](claude-code-integration.md)) gates malformed
   input rather than the parser guessing.
 - **Passthrough.** Nodes the editor doesn't understand stay in the tree untouched (their `raw`
   bytes pass straight through on save). The editor recognizes elements by their classes /
@@ -46,7 +46,7 @@ When parsing, each node is one of:
 
 | Class | Meaning | Editor behavior |
 |---|---|---|
-| **Container** | Has a `data-lay` layout primitive (see [03](03-layout-vocabulary.md)) | Full layout editing |
+| **Container** | Has a `data-lay` layout primitive (see [Layout vocabulary](layout-vocabulary.md)) | Full layout editing |
 | **Leaf** | A known content block (text, image, code, math, table, shape, embed) | Full content + style editing |
 | **Free** | Any element with `data-free` | Absolute positioning editing |
 | **Passthrough** | Anything else | Preserved verbatim; flagged "source only" in UI |
@@ -56,14 +56,14 @@ When parsing, each node is one of:
 - Stable, unique per deck (e.g., short slug + counter: `t1`, `p1`, `img1`).
 - Assigned on first edit / insert; preserved across save/load.
 - Used by: canvas selection, Claude Code targeting, auto-animate `data-id` derivation
-  (see [07](07-motion-and-transitions.md)), and "highlight what Claude changed".
+  (see [Motion & transitions](motion-and-transitions.md)), and "highlight what Claude changed".
 
 ## Inline content model (rich text)
 
 A **text leaf** (heading / paragraph / list item) may hold more than a single text node — a
 small set of **inline marks**: `strong`, `em`, `u`, `s`, `a[href]`, and `span[style]`. So a
 *word or phrase* can be bold / italic / coloured / linked, not just the whole element (the
-whole-element text-color escape hatch in [09](09-theming-and-styles.md) is the degenerate case;
+whole-element text-color escape hatch in [Theming & styles](theming-and-styles.md) is the degenerate case;
 this is the Google-Slides "select a word, bold it" expectation).
 
 - **Constrained allowlist.** Only those tags, each with a fixed attribute allowlist
@@ -77,18 +77,18 @@ this is the Google-Slides "select a word, bold it" expectation).
   subtree goes `dirty`; its open/close tag bytes and every sibling pass through untouched.
 - **Sub-leaf nodes carry no `data-eid`.** Marks are content *within* a leaf, addressed by the
   leaf's eid plus a selection range — not independently selectable elements. (A link is the one
-  mark that may instead wrap a *whole element*; see [03](03-layout-vocabulary.md),
-  [04](04-canvas-interaction.md).)
+  mark that may instead wrap a *whole element*; see [Layout vocabulary](layout-vocabulary.md),
+  [Canvas & interaction](canvas-interaction.md).)
 - **Sanitization is mandatory.** `contenteditable` — and especially **paste** — can introduce
   arbitrary HTML; the serializer strips everything off-allowlist (scripts, event handlers,
   external resource URLs, `javascript:` hrefs) before it reaches the model. This is a security +
-  offline invariant, not a nicety ([12](12-principles-and-invariants.md)).
+  offline invariant, not a nicety ([Principles & invariants](principles-and-invariants.md)).
 
 ## Serialization rules
 
 - Deterministic output: same model → same bytes, every time.
 - **Idempotent round-trip** is a tested invariant: load→save with no edits = no diff. See
-  [12](12-principles-and-invariants.md).
+  [Principles & invariants](principles-and-invariants.md).
 - Output targets *machine legibility* (predictable, semantic) — not human formatting fidelity,
   since no human hand-edits the HTML (Claude Code does). Consistent indentation, attribute
   ordering, and `data-*` grouping.
@@ -98,8 +98,8 @@ this is the Google-Slides "select a word, bold it" expectation).
 Human (canvas, in memory) and Claude Code (file on disk) both write. v1 uses **turn-taking +
 reload**: editor autosaves per command; external change triggers SSE reload when not mid-
 gesture; a dirty guard prompts on conflict. True concurrent merge is out of scope for v1. See
-[11](11-claude-code-integration.md).
+[Claude Code integration](claude-code-integration.md).
 
 ## Related
 
-[03](03-layout-vocabulary.md) · [11](11-claude-code-integration.md) · [12](12-principles-and-invariants.md)
+[Layout vocabulary](layout-vocabulary.md) · [Claude Code integration](claude-code-integration.md) · [Principles & invariants](principles-and-invariants.md)

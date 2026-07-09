@@ -1,7 +1,7 @@
 /**
  * selection.svelte.ts — Canvas selection store (P2-3, extended P4-5/6).
  *
- * WHY THIS EXISTS (spec 04 "Selection"):
+ * WHY THIS EXISTS (spec canvas-interaction "Selection"):
  * ======================================
  * Selection is shared state: the canvas overlay draws the box, the outline /
  * properties panels reflect and drive it, and editor hotkeys act on it.

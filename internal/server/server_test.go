@@ -295,7 +295,7 @@ func TestDeckCreate_BadName(t *testing.T) {
 }
 
 // TestDeckCreate_NoExternalURLs verifies the offline-first invariant: a freshly
-// created deck's deck.html must not contain any http/https URLs (spec 12).
+// created deck's deck.html must not contain any http/https URLs (spec principles-and-invariants).
 func TestDeckCreate_NoExternalURLs(t *testing.T) {
 	srv, root := newTestServer(t)
 
@@ -968,14 +968,14 @@ func TestFontLocalize_OK(t *testing.T) {
 		t.Errorf("cssPath should start with assets/fonts/, got %q", result.CSSPath)
 	}
 
-	// Verify the generated CSS is free of external URLs (spec 12).
+	// Verify the generated CSS is free of external URLs (spec principles-and-invariants).
 	cssFull := filepath.Join(root, "decks", "fontdeck", result.CSSPath)
 	cssData, err := os.ReadFile(cssFull)
 	if err != nil {
 		t.Fatalf("read font-face.css: %v", err)
 	}
 	if bytes.Contains(cssData, []byte("http")) {
-		t.Errorf("font-face.css contains external URL after localization — violates spec 12:\n%s", cssData)
+		t.Errorf("font-face.css contains external URL after localization — violates spec principles-and-invariants:\n%s", cssData)
 	}
 }
 
@@ -1024,7 +1024,7 @@ func TestFontLocalize_Offline503(t *testing.T) {
 // on-disk deck.html verbatim plus the ephemeral present-only annotation/laser
 // plugins injected before </body> (P17-19). The deck's own bytes appear
 // unchanged in the response (everything up to </body> is preserved); only the
-// plugin block is appended. The on-disk file itself is NEVER modified (spec 10).
+// plugin block is appended. The on-disk file itself is NEVER modified (spec presenting-and-export).
 func TestPresent_ServesExactDeckHTML(t *testing.T) {
 	srv, root := newTestServer(t)
 	if err := deck.New(root, "pres-deck"); err != nil {
@@ -1225,7 +1225,7 @@ func TestNotesPlugin_VendoredAndEnabled(t *testing.T) {
 		t.Error("deck.html does not include RevealNotes in plugins array")
 	}
 
-	// 4. Zero external URLs: the deck must be fully offline-capable (spec 12).
+	// 4. Zero external URLs: the deck must be fully offline-capable (spec principles-and-invariants).
 	//    Scan both the HTML and the speaker-view.html for any http(s):// links.
 	for _, p := range []struct{ label, path string }{
 		{"deck.html", htmlPath},
@@ -1239,7 +1239,7 @@ func TestNotesPlugin_VendoredAndEnabled(t *testing.T) {
 		// URLs are a violation.  We specifically check for CDN/absolute URLs.
 		for _, forbidden := range []string{"https://cdn", "https://fonts.googleapis", "https://unpkg"} {
 			if strings.Contains(string(data), forbidden) {
-				t.Errorf("%s contains external URL %q — violates spec 12", p.label, forbidden)
+				t.Errorf("%s contains external URL %q — violates spec principles-and-invariants", p.label, forbidden)
 			}
 		}
 	}
@@ -1503,7 +1503,7 @@ func TestValidate_DeckNotFound(t *testing.T) {
 
 // TestPresentRoute_InjectsPluginsByteStable verifies the present route serves a
 // deck.html augmented with the chalkboard + laser plugins (P17-19) while the
-// on-disk deck.html stays byte-identical (annotations are ephemeral, spec 10).
+// on-disk deck.html stays byte-identical (annotations are ephemeral, spec presenting-and-export).
 func TestPresentRoute_InjectsPluginsByteStable(t *testing.T) {
 	srv, root := newTestServer(t)
 	if err := deck.New(root, "talk"); err != nil {

@@ -1,7 +1,7 @@
 /**
  * marquee.ts — Pure hit-math for marquee (rubber-band) multi-select (P4-5).
  *
- * WHY THIS EXISTS (spec 04 "Marquee (drag-select) for multi-select"):
+ * WHY THIS EXISTS (spec canvas-interaction "Marquee (drag-select) for multi-select"):
  * ===================================================================
  * Dragging on EMPTY canvas space draws a selection rectangle; on release every
  * element whose LOGICAL rect is touched by (or contained in) that rectangle is
@@ -13,9 +13,9 @@
  * COORDINATE SPACE (load-bearing): every rect here is in LOGICAL canvas units
  * (1920×1080-style). The marquee rectangle the user drew is converted from screen
  * to logical by the controller via coords.ts BEFORE calling in, so the hit test is
- * scale/zoom/pan independent — identical behaviour at any zoom (spec 04).
+ * scale/zoom/pan independent — identical behaviour at any zoom (spec canvas-interaction).
  *
- * Two modes (spec 04 leaves the exact rule to us; both are standard editor idioms):
+ * Two modes (spec canvas-interaction leaves the exact rule to us; both are standard editor idioms):
  *   • 'intersect' — select anything the band TOUCHES (Photoshop/Figma default;
  *                   forgiving, the common case).
  *   • 'contain'   — select only elements FULLY enclosed by the band (PowerPoint

@@ -4,7 +4,7 @@
 // uploaded format may not play in all browsers (e.g. .mov, .avi), ffmpeg can
 // re-encode it to H.264/MP4 for maximum compatibility.
 //
-// ffmpeg is an OPTIONAL dependency (spec 14 / spec 08 – graceful degradation):
+// ffmpeg is an OPTIONAL dependency (spec assets-and-media / spec assets-and-media – graceful degradation):
 //   - If ffmpeg is on PATH and the input is a non-web-native format, Transcode
 //     re-encodes to .mp4.
 //   - If ffmpeg is absent, or the input is already web-native (mp4/webm), the
@@ -29,7 +29,7 @@ var webNativeVideoExt = map[string]bool{
 }
 
 // HasFFmpeg reports whether the ffmpeg binary is on the system PATH.
-// Used to surface the transcode capability to the frontend (spec 14).
+// Used to surface the transcode capability to the frontend (spec assets-and-media).
 func HasFFmpeg() bool {
 	_, err := exec.LookPath("ffmpeg")
 	return err == nil
@@ -102,7 +102,7 @@ func LocalizeVideo(root, deckName string, data []byte, originalName string) (rel
 
 	if err := TranscodeToMP4(srcPath, mp4Path); err != nil {
 		// Transcode failed: log and fall back to the original file.
-		// We do NOT return an error here — graceful degradation (spec 14).
+		// We do NOT return an error here — graceful degradation (spec assets-and-media).
 		_ = err // caller gets relSrc of original, transcoded=false
 		return relSrc, false, nil
 	}

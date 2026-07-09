@@ -1,5 +1,5 @@
 /**
- * layout.test.ts — Unit tests for the layout-props model (P3-4 / spec 03).
+ * layout.test.ts — Unit tests for the layout-props model (P3-4 / spec layout-vocabulary).
  *
  * Test goals:
  *   1. getLayoutProps() returns typed props from data-* attrs — correct values,

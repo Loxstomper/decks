@@ -8,7 +8,7 @@
  *   • INLINE MARKS now SURVIVE the edit — they are no longer flattened to text
  *     (this is the P17 behaviour change: a committed `<strong>` is preserved,
  *     and `<b>` is canonicalised to `<strong>`), and hostile markup is stripped;
- *   • sibling / unrelated subtrees are byte-IDENTICAL (spec 12 #4 passthrough);
+ *   • sibling / unrelated subtrees are byte-IDENTICAL (spec principles-and-invariants #4 passthrough);
  *   • an unknown eid is a no-op returning false.
  */
 

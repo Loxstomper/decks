@@ -281,7 +281,7 @@ func TestInjectQrPlugin_ScaffoldUnchanged(t *testing.T) {
 }
 
 // TestGenerateSlideThemesCSS_NoExternalURLs guards the offline-first contract:
-// the generated stylesheet must contain zero http(s) URLs (spec 12).
+// the generated stylesheet must contain zero http(s) URLs (spec principles-and-invariants).
 func TestGenerateSlideThemesCSS_NoExternalURLs(t *testing.T) {
 	css := string(GenerateSlideThemesCSS())
 	for _, bad := range []string{"http://", "https://", "//fonts", "url(http"} {

@@ -16,16 +16,16 @@ feature investigation this project grew out of.)
 ## Core principles (the non-negotiables)
 
 1. **Source of truth is plain reveal.js HTML on disk.** The editor and Claude Code both read
-   and write the same `deck.html`. See [02](02-document-model.md).
+   and write the same `deck.html`. See [Document model](document-model.md).
 2. **Offline-first.** All core editing and presenting works with zero network. Only image
    *acquisition* helpers need the internet, and they always localize what they fetch. See
-   [12](12-principles-and-invariants.md).
+   [Principles & invariants](principles-and-invariants.md).
 3. **Hybrid layout: structured by default, absolute when needed.** Alignment is expressed as
-   declared layout *intent*, not coordinates. See [03](03-layout-vocabulary.md).
+   declared layout *intent*, not coordinates. See [Layout vocabulary](layout-vocabulary.md).
 4. **Idempotent round-trip & never destroy the unknown.** Load→save is byte-stable; content
-   the canvas can't represent is preserved verbatim. See [12](12-principles-and-invariants.md).
+   the canvas can't represent is preserved verbatim. See [Principles & invariants](principles-and-invariants.md).
 5. **Single binary.** Go backend with the Svelte frontend embedded via `go:embed`. See
-   [01](01-architecture.md).
+   [Architecture](architecture.md).
 
 ## Locked decisions (at a glance)
 
@@ -42,25 +42,28 @@ feature investigation this project grew out of.)
 | Logical canvas | 1920×1080, configurable aspect ratio |
 | Layout contract | `data-*` attributes; editor owns layout, you own styling |
 | Project layout | `decks/<name>/{deck.html, custom.css, assets/}` |
+| Workspace root | `--dir` › `$SLIDES_DIR` › nearest ancestor with `decks/` › error |
 | AI interface | Claude Code **skill** + CLI first; MCP later |
 
 ## Spec index
 
-| # | Spec | Concern |
-|---|---|---|
-| 01 | [Architecture](01-architecture.md) | Tech stack, runtime, components, data flow |
-| 02 | [Document model](02-document-model.md) | Source of truth, DOM-as-model, passthrough, element IDs |
-| 03 | [Layout vocabulary](03-layout-vocabulary.md) | The 5 primitives, `data-*` contract, alignment-as-intent, leaf blocks |
-| 04 | [Canvas & interaction](04-canvas-interaction.md) | Coordinate/scale, selection, guides, snapping, resize, layers panel |
-| 05 | [Scaling & resolution](05-scaling-and-resolution.md) | Logical canvas, aspect ratio, present-scale vs editor-zoom |
-| 06 | [Slide management](06-slide-management.md) | Navigator, vertical slides, CRUD/reorder/hide |
-| 07 | [Motion & transitions](07-motion-and-transitions.md) | Fragments, transitions, auto-animate authoring |
-| 08 | [Assets & media](08-assets-and-media.md) | Asset folders, image providers, video, font localization |
-| 09 | [Theming & styles](09-theming-and-styles.md) | Themes, `custom.css`, CSS variables, fonts |
-| 10 | [Presenting & export](10-presenting-and-export.md) | Edit/present modes, speaker view, PDF, HTML bundle |
-| 11 | [Claude Code integration](11-claude-code-integration.md) | Skill, CLI, turn-taking handshake, future MCP |
-| 12 | [Principles & invariants](12-principles-and-invariants.md) | Offline-first, round-trip, never-destroy, validation, secrets |
-| 13 | [Project structure](13-project-structure.md) | Directory tree, config, git |
+Read roughly in this order — the foundations come first — but each spec stands alone.
+
+| Spec | Concern |
+|---|---|
+| [Architecture](architecture.md) | Tech stack, runtime, components, data flow |
+| [Document model](document-model.md) | Source of truth, DOM-as-model, passthrough, element IDs |
+| [Layout vocabulary](layout-vocabulary.md) | The 5 primitives, `data-*` contract, alignment-as-intent, leaf blocks |
+| [Canvas & interaction](canvas-interaction.md) | Coordinate/scale, selection, guides, snapping, resize, layers panel |
+| [Scaling & resolution](scaling-and-resolution.md) | Logical canvas, aspect ratio, present-scale vs editor-zoom |
+| [Slide management](slide-management.md) | Navigator, vertical slides, CRUD/reorder/hide |
+| [Motion & transitions](motion-and-transitions.md) | Fragments, transitions, auto-animate authoring |
+| [Assets & media](assets-and-media.md) | Asset folders, image providers, video, font localization |
+| [Theming & styles](theming-and-styles.md) | Themes, `custom.css`, CSS variables, fonts |
+| [Presenting & export](presenting-and-export.md) | Edit/present modes, speaker view, PDF, HTML bundle |
+| [Claude Code integration](claude-code-integration.md) | Skill, CLI, turn-taking handshake, future MCP |
+| [Principles & invariants](principles-and-invariants.md) | Offline-first, round-trip, never-destroy, validation, secrets |
+| [Project structure](project-structure.md) | Directory tree, config, git |
 
 > **Build sequencing** lives in [`../IMPLEMENTATION_PLAN.md`](../IMPLEMENTATION_PLAN.md), not in
 > `specs/`. Specs describe *what & why* (design concerns); the implementation plan describes
@@ -76,9 +79,12 @@ feature investigation this project grew out of.)
   coordinates. The escape hatch.
 - **Inline mark** — allowlisted inline formatting (`strong` / `em` / `u` / `s` / `a` /
   `span[style]`) inside a text leaf; rich text *within* content, addressed by the leaf's
-  `data-eid` plus a selection range, not its own element. See [02](02-document-model.md).
+  `data-eid` plus a selection range, not its own element. See [Document model](document-model.md).
 - **Passthrough** — HTML the editor doesn't manage but preserves verbatim in the model.
 - **`data-eid`** — stable per-element ID stamped by the editor; lets the canvas and Claude
   Code reference the same element.
 - **Turn-taking** — concurrency model: human edits, then hands off to Claude Code (or vice
   versa); the editor reloads on external file change.
+- **Workspace root** — the directory holding `decks/` (plus `config.toml`, `templates/`,
+  `shared/`, `themes/`). Every command resolves one before doing anything; `decks/` is the
+  marker that identifies it. See [Project structure](project-structure.md).

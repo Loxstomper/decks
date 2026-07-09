@@ -94,7 +94,7 @@ stylesheet (`assets/vendor/slides-layout.css`).
 | `data-h`   | logical px integer   | Height                     |
 | `data-rot` | degrees (integer)    | Clockwise rotation         |
 
-Logical coordinates map to the 1920×1080 canvas (spec 05). reveal.js scales
+Logical coordinates map to the 1920×1080 canvas (spec scaling-and-resolution). reveal.js scales
 the canvas to any screen at present time; the editor overlays share the same
 coordinate system, so WYSIWYG is preserved.
 

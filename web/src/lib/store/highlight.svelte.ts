@@ -1,5 +1,5 @@
 /**
- * highlight.svelte.ts — External-change highlight store (P8-7 / spec 11).
+ * highlight.svelte.ts — External-change highlight store (P8-7 / spec claude-code-integration).
  *
  * WHY THIS EXISTS:
  * ================
@@ -7,7 +7,7 @@
  * model against the reloaded one (model/diff.ts) and asks this store to FLASH the
  * changed elements. Both the canvas (ChangeHighlightOverlay, which outlines the
  * eids inside the iframe) and the outline panel read this store so the human can
- * instantly see "what Claude changed" (spec 11 "highlight what Claude changed").
+ * instantly see "what Claude changed" (spec claude-code-integration "highlight what Claude changed").
  *
  * The store holds the set of currently-highlighted eids plus, per eid, WHICH
  * kind of change it was ('added' | 'changed') so consumers can colour them

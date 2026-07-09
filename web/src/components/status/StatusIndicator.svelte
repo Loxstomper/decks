@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * StatusIndicator.svelte — Turn-taking status badge (P8-5 / spec 11 §5).
+   * StatusIndicator.svelte — Turn-taking status badge (P8-5 / spec claude-code-integration §5).
    *
-   * Spec 11 requires a legible indicator of the human↔Claude handoff state:
+   * Spec claude-code-integration requires a legible indicator of the human↔Claude handoff state:
    * "synced / external change / unsaved". This is the proper, accessible version
    * of the basic badge the deck store already drove: a coloured dot + label, with
    * a `role="status"` live region so screen readers announce transitions.

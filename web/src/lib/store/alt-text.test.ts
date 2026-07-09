@@ -1,5 +1,5 @@
 /**
- * alt-text.test.ts — Alt text command tests (P17-11, spec 08).
+ * alt-text.test.ts — Alt text command tests (P17-11, spec assets-and-media).
  *
  * Covers deckStore.applyAltText(eid, alt):
  *   • sets alt on an img element;

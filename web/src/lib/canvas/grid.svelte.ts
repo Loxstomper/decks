@@ -1,7 +1,7 @@
 /**
- * grid.svelte.ts — Snap-to-grid toggle + spacing store (P3-8 / spec 04).
+ * grid.svelte.ts — Snap-to-grid toggle + spacing store (P3-8 / spec canvas-interaction).
  *
- * WHY THIS EXISTS (spec 04 "Snap-to-grid: optional grid … with toggle"):
+ * WHY THIS EXISTS (spec canvas-interaction "Snap-to-grid: optional grid … with toggle"):
  * ======================================================================
  * The grid is a single piece of editor-wide UI state: a toggle (on/off) and a
  * spacing in LOGICAL units (default 8). Both the grid OVERLAY renderer
@@ -18,7 +18,7 @@ import { DEFAULT_GRID_SIZE } from './snap-grid.ts';
 class GridStore {
   /** Whether snapping + the grid overlay are active. Off by default (opt-in). */
   enabled = $state(false);
-  /** Grid spacing in LOGICAL units (spec 04 default 8). */
+  /** Grid spacing in LOGICAL units (spec canvas-interaction default 8). */
   size = $state(DEFAULT_GRID_SIZE);
   /** Whether to draw the visual grid overlay when enabled. */
   showOverlay = $state(true);

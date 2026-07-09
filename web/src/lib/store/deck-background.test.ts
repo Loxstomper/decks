@@ -1,5 +1,5 @@
 /**
- * deck-background.test.ts — Unified slide background command (P16-1/2, spec 16).
+ * deck-background.test.ts — Unified slide background command (P16-1/2, spec theming-and-styles).
  *
  * Covers deckStore.applySlideBackground(eid, delta), the single command that
  * writes the reveal.js `data-background-*` set on a slide <section>:

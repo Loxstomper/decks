@@ -8,7 +8,7 @@
    * The reveal.js math plugin (RevealMath.KaTeX, vendored offline by Lane GO)
    * processes `\[...\]` display-math delimiters anywhere in a slide and renders
    * them with KaTeX.  Without the plugin, the raw LaTeX is visible as text —
-   * valid graceful degradation (spec 12).
+   * valid graceful degradation (spec principles-and-invariants).
    *
    * UI DESIGN:
    *   A LaTeX text area with a live-rendered preview using an inline <script>

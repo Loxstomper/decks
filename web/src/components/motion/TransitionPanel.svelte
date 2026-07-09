@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * TransitionPanel.svelte — Slide transition control panel (P6-8 / spec 07).
+   * TransitionPanel.svelte — Slide transition control panel (P6-8 / spec motion-and-transitions).
    *
    * WHY TWO LEVELS:
    * Reveal supports two scopes of transition control:

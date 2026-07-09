@@ -1,6 +1,6 @@
 /**
  * thumbnail.ts — Build an offline, static thumbnail document for one slide
- * (P6-2 / spec 06 "Thumbnails: rendered from the live model").
+ * (P6-2 / spec slide-management "Thumbnails: rendered from the live model").
  *
  * APPROACH (chosen for robustness + offline correctness):
  * =======================================================
@@ -24,7 +24,7 @@
  * backgrounds) and the slides-layout flex/grid vocabulary, so it visually
  * approximates the slide.
  *
- * OFFLINE (spec 12): every stylesheet / background-image URL this builder emits is
+ * OFFLINE (spec principles-and-invariants): every stylesheet / background-image URL this builder emits is
  * written ABSOLUTE (`/decks/<name>/assets/…`), which the Go backend serves from the
  * deck's own `assets/` (vendored, zero external URLs).
  *

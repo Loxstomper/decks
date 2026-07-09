@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 /*
- * Workspace chrome themes (spec 09 — editor chrome themes).
+ * Workspace chrome themes (spec theming-and-styles — editor chrome themes).
  *
  * The four chrome colour tokens (surface, surface-raised, surface-overlay,
  * accent, accent-muted) are CSS custom properties; tailwind.config.js maps

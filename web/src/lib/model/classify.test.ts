@@ -1,5 +1,5 @@
 /**
- * classify.test.ts — P2-1 classification + P2-2 eid stamping (spec 02/03).
+ * classify.test.ts — P2-1 classification + P2-2 eid stamping (spec document-model/layout-vocabulary).
  *
  * Test goals:
  *  1. classify() returns the correct class for each node type across the corpus.
@@ -9,7 +9,7 @@
  *  4. Eids survive parse → serialize → re-parse cycles unchanged.
  *  5. Passthrough nodes never receive a data-eid.
  *  6. Stamping an element does NOT mark its already-stamped siblings dirty
- *     (byte-stable passthrough for untouched subtrees, spec 12 #4).
+ *     (byte-stable passthrough for untouched subtrees, spec principles-and-invariants #4).
  *  7. nextEid() produces incrementing unique ids that respect existing ones.
  */
 
@@ -150,7 +150,7 @@ describe('classify() — leaf', () => {
     }
   });
 
-  it('svg is a leaf (shape / icon block type, spec 03)', () => {
+  it('svg is a leaf (shape / icon block type, spec layout-vocabulary)', () => {
     const model = parseDeck(loadFixture('kitchen-sink.html'));
     const svgs = getElementsByTagName(model, 'svg');
     expect(svgs.length).toBeGreaterThan(0);
@@ -165,14 +165,14 @@ describe('classify() — leaf', () => {
     }
   });
 
-  it('iframe is a leaf (embed block type, spec 03)', () => {
+  it('iframe is a leaf (embed block type, spec layout-vocabulary)', () => {
     const model = parseDeck(loadFixture('layout.html'));
     const iframes = getElementsByTagName(model, 'iframe');
     expect(iframes.length).toBeGreaterThan(0);
     for (const e of iframes) expect(classify(e)).toBe('leaf');
   });
 
-  it('a div carrying the math-block class is a leaf (KaTeX block, spec 03)', () => {
+  it('a div carrying the math-block class is a leaf (KaTeX block, spec layout-vocabulary)', () => {
     // The math block has no dedicated tag; the editor marks it with class
     // "math-block" (blocks/builders.ts buildMathBlock) so it is a selectable leaf.
     const model = parseDeck(

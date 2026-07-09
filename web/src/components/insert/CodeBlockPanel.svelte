@@ -16,7 +16,7 @@
    * REVEAL DEPENDENCY:
    *   Line numbering requires the reveal `highlight` plugin and highlight.js to be
    *   vendored + enabled in the deck.  Lane GO is responsible for vendoring these
-   *   (offline-first, spec 12).  The generated block is inert (unstyled) without
+   *   (offline-first, spec principles-and-invariants).  The generated block is inert (unstyled) without
    *   them, but the deck remains valid HTML — safe graceful degradation.
    *
    * LINE-NUMBER STEPPING (reveal feature):

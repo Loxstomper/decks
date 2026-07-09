@@ -16,7 +16,7 @@
    * does NOT import deckStore directly — it stays pure of store coupling so
    * the integrator can test it in isolation.
    *
-   * OFFLINE-FIRST (spec 08, 12): the upload sends the file to the Go backend,
+   * OFFLINE-FIRST (spec assets-and-media, principles-and-invariants): the upload sends the file to the Go backend,
    * which copies it into decks/{name}/assets/.  The returned src is always a
    * relative "assets/..." path — never an external URL.
    */

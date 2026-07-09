@@ -15,7 +15,7 @@
  * on slide 1. When `viewedSlideEid` is null (reveal not ready) we fall back to
  * the selection's slide, else the first slide.
  *
- * Rules (spec 03 / P5-1 "insert into the current container or after the selection"):
+ * Rules (spec layout-vocabulary / P5-1 "insert into the current container or after the selection"):
  *
  *   FLOW blocks (text/table/…), selection is ON the viewed slide:
  *     • selection is a CONTAINER → insert INTO it (appended last).

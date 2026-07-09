@@ -1,5 +1,5 @@
 /**
- * motion.test.ts — Pure model operation tests for Lane B (P6-7, P6-8, P6-9 / spec 07).
+ * motion.test.ts — Pure model operation tests for Lane B (P6-7, P6-8, P6-9 / spec motion-and-transitions).
  *
  * All tests use the source-preserving parser + serializer; NO DOM / jsdom required.
  *
@@ -495,7 +495,7 @@ describe('auto-animate — disableAutoAnimate', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// BYTE STABILITY TESTS (spec 12 #4)
+// BYTE STABILITY TESTS (spec principles-and-invariants #4)
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('byte stability — only modified elements are re-serialized', () => {

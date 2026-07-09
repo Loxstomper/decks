@@ -1,10 +1,10 @@
-// Package unsplash implements the Unsplash image provider (spec 08 / P5-7).
+// Package unsplash implements the Unsplash image provider (spec assets-and-media / P5-7).
 //
 // The Unsplash API key is read from the UNSPLASH_ACCESS_KEY environment
 // variable.  If the variable is absent, Enabled() returns false and the
 // provider is omitted from the /api/providers listing.  All fetched images
 // are localized into the deck's assets/img/ directory so they are available
-// offline after the initial download (spec 08 / spec 12).
+// offline after the initial download (spec assets-and-media / spec principles-and-invariants).
 //
 // API reference: https://unsplash.com/documentation
 package unsplash
@@ -212,7 +212,7 @@ func (p *Provider) Fetch(id, root, deckName string) (string, error) {
 	}
 	filename := safeSlug(slug) + "_" + strconv.Itoa(photo.Width) + ".jpg"
 
-	// 4. Localize: copy into deck assets (spec 08 – decks self-contained).
+	// 4. Localize: copy into deck assets (spec assets-and-media – decks self-contained).
 	return assets.LocalizeReader(root, deckName, imgResp.Body, filename, "image/jpeg")
 }
 

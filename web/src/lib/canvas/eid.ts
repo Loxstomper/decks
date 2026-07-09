@@ -1,7 +1,7 @@
 /**
  * eid.ts — Map a clicked DOM element back to a selectable model node (P2-3).
  *
- * WHY THIS EXISTS (spec 04 "Selection"):
+ * WHY THIS EXISTS (spec canvas-interaction "Selection"):
  * ======================================
  * Selection/editing run in the PARENT window but operate on elements that live
  * inside the reveal.js iframe. The only stable bridge between a rendered DOM
@@ -9,7 +9,7 @@
  * the model (and that is written into deck.html on save). So when the user clicks
  * a node inside the iframe we must resolve that DOM `Element` to a single eid.
  *
- * Two rules, both from spec 04:
+ * Two rules, both from spec canvas-interaction:
  *   1. "Click to select a leaf" — we select the NEAREST classifiable *leaf*, not
  *      whatever exact text-run / inline span happened to receive the click. A
  *      click anywhere inside `<h1 data-eid="t1">Hello</h1>` selects `t1`.

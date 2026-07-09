@@ -1,5 +1,5 @@
 /**
- * edit.ts — Mutation + query helpers over the model (spec 02).
+ * edit.ts — Mutation + query helpers over the model (spec document-model).
  *
  * These are the operations a deck store (P1-7+) builds on. Every mutation marks
  * the affected node `dirty`, which switches that node from byte-stable
@@ -72,7 +72,7 @@ export function walk(
   for (const node of model.nodes) recurse(node, null);
 }
 
-/** Find the element carrying the given `data-eid` (stable per-deck id, spec 02).
+/** Find the element carrying the given `data-eid` (stable per-deck id, spec document-model).
  *  Returns the first match in document order, or `null`. */
 export function findByEid(model: DeckModel, eid: string): ElementNode | null {
   let found: ElementNode | null = null;

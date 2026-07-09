@@ -13,7 +13,7 @@
  * The attribute is a JSON Chart.js config: { "type": "bar", "data": {...},
  * "options": {...} }.  Chart.js itself (chart.umd.js) is vendored alongside and
  * loaded before this plugin, exposing the global `Chart`.  Everything is local —
- * zero external URLs (spec 12 offline-first).
+ * zero external URLs (spec principles-and-invariants offline-first).
  */
 (function () {
   'use strict';

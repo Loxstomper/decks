@@ -1,5 +1,5 @@
 /**
- * parse.ts — Source-preserving HTML parser (P1-4 / spec 02).
+ * parse.ts — Source-preserving HTML parser (P1-4 / spec document-model).
  *
  * Produces a {@link DeckModel}: a real, mutable element tree in which every node
  * additionally records its exact original source slice (`raw`). See types.ts for
@@ -7,7 +7,7 @@
  *
  * Scope: this is a pragmatic parser for the well-formed HTML that reveal decks
  * use (explicit closing tags; the editor and `slides validate` gate malformed
- * input — spec 11/12). It handles the edge cases that actually occur in
+ * input — spec claude-code-integration/principles-and-invariants). It handles the edge cases that actually occur in
  * AI-authored decks and that the golden corpus exercises:
  *   - elements, attributes (quoted / unquoted / boolean), case preserved
  *   - void elements and XML-style `/>` self-closing

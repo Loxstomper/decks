@@ -1,7 +1,7 @@
 /**
- * style.ts — Per-element inline `style` color helper (P9-8 / spec 09).
+ * style.ts — Per-element inline `style` color helper (P9-8 / spec theming-and-styles).
  *
- * WHY THIS EXISTS (spec 09 "Text appearance"):
+ * WHY THIS EXISTS (spec theming-and-styles "Text appearance"):
  * ============================================
  * The editor owns LAYOUT, not styling — with ONE deliberate exception: a
  * whole-element text colour control. It writes an inline `style="color: …"` on
@@ -11,7 +11,7 @@
  * Scope is whole-element (no sub-string runs). We read/write the `color`
  * declaration WITHIN the existing `style` attribute, preserving any other
  * declarations the user (or Claude Code) authored, and keeping the colour's
- * position stable so repeated edits round-trip byte-for-byte (spec 12 #4).
+ * position stable so repeated edits round-trip byte-for-byte (spec principles-and-invariants #4).
  *
  * Mutations go through edit.ts (setAttribute/removeAttribute) so the element is
  * marked dirty and the value is entity-encoded like any other attribute.
@@ -62,7 +62,7 @@ export function getInlineStyleProp(el: ElementNode, prop: string): string | null
  * Removing the last declaration drops the now-empty `style` attribute entirely
  * so the element returns to its un-styled form (clean round-trip). Mutates via
  * setAttribute/removeAttribute so the element is marked dirty and re-serializes
- * canonically while every untouched element round-trips byte-for-byte (spec 12).
+ * canonically while every untouched element round-trips byte-for-byte (spec principles-and-invariants).
  */
 export function setInlineStyleProp(el: ElementNode, prop: string, value: string | null): void {
   const lprop = prop.toLowerCase();

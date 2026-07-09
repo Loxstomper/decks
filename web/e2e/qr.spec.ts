@@ -9,7 +9,7 @@
  *  2. The on-disk deck.html keeps the div EMPTY (byte-stable data-bound model):
  *     the SVG is a runtime artefact, never persisted.
  *  3. Offline guard: the present route makes zero external http(s) requests with
- *     the QR present (spec 12 / P9-2).
+ *     the QR present (spec principles-and-invariants / P9-2).
  *
  * The script-free navigator thumbnail painting a placeholder is a unit-tested
  * concern (thumbnail.ts substituteQrPlaceholders) — not exercised here.

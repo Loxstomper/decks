@@ -1,5 +1,5 @@
 /**
- * theme.ts — Theme-props model for per-slide theming (P10 / spec 16).
+ * theme.ts — Theme-props model for per-slide theming (P10 / spec theming-and-styles).
  *
  * WHY THIS MODULE EXISTS:
  * =======================

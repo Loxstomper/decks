@@ -1,4 +1,4 @@
-# 01 — Architecture
+# Architecture
 
 **Status:** decided
 
@@ -13,9 +13,9 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
 | Layer | Choice | Why |
 |---|---|---|
 | Backend | **Go** | File I/O, `fsnotify` watching, SSE, asset handling; plays to owner's expertise; compiles to a single binary. |
-| Distribution | **Single binary** via `go:embed` | Drop the binary into a workspace and run; no Node runtime in production. |
+| Distribution | **Single binary** via `go:embed` | Put it on `$PATH` and run it against any workspace ([Project structure](project-structure.md)); no Node runtime in production. The binary carries everything a workspace needs: the frontend, the vendored reveal.js + plugins, the bundled themes/layouts, and the Claude Code authoring skill ([Claude Code integration](claude-code-integration.md)). |
 | Frontend | **Svelte 5 + TypeScript** | Lightweight, HTML-centric (suits the owner's htmx/Alpine taste); runes give fine-grained reactivity ideal for canvas state. |
-| Styling | **Tailwind** | Already familiar; used for editor chrome and for *appearance* styling of slide content (not layout — see [03](03-layout-vocabulary.md)). |
+| Styling | **Tailwind** | Already familiar; used for editor chrome and for *appearance* styling of slide content (not layout — see [Layout vocabulary](layout-vocabulary.md)). |
 | Build | **Vite** | Dev server + HMR for the editor app; bundles the embedded frontend. |
 | Renderer | **reveal.js** in sandboxed `<iframe>` | Isolates reveal's global CSS/keyboard from editor chrome; clean coordinate space; present mode = load the iframe with no overlay. |
 | Code pane | **CodeMirror 6** | Lighter than Monaco; ample for HTML/CSS viewing/editing. |
@@ -55,7 +55,7 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
   overlay. Editing the source pane re-parses (debounced).
 - **Canvas → source:** canvas mutates DOM model → serialize → autosave to disk (each command).
 - **External (Claude Code) → canvas:** fsnotify detects write → SSE event → client re-parses
-  (guarded by turn-taking, see [11](11-claude-code-integration.md)).
+  (guarded by turn-taking, see [Claude Code integration](claude-code-integration.md)).
 
 ## Dev vs prod
 
@@ -64,8 +64,8 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
   everything.
 - **Testing:** Go (`go test`) and frontend unit tests (vitest) plus an **end-to-end suite
   (Playwright)** that drives a real browser against the **built binary**, covering the editing
-  flows units can't (see [12](12-principles-and-invariants.md#testing)).
+  flows units can't (see [Principles & invariants](principles-and-invariants.md#testing)).
 
 ## Related
 
-[02](02-document-model.md) · [04](04-canvas-interaction.md) · [11](11-claude-code-integration.md) · [13](13-project-structure.md)
+[Document model](document-model.md) · [Canvas & interaction](canvas-interaction.md) · [Claude Code integration](claude-code-integration.md) · [Project structure](project-structure.md)

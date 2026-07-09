@@ -1,6 +1,6 @@
 <script lang="ts">
   /**
-   * OutlineTreeNode.svelte — Recursive outline tree row (P3-3 / spec 04).
+   * OutlineTreeNode.svelte — Recursive outline tree row (P3-3 / spec canvas-interaction).
    *
    * WHY RECURSIVE:
    * The document hierarchy has unbounded depth (containers nesting containers).
@@ -268,7 +268,7 @@
     {#if isPassthrough}
       <span
         class="flex-shrink-0 ml-1 px-1 py-px text-[9px] font-semibold uppercase tracking-wide rounded bg-white/10 text-fg/30"
-        title="Source-only — the editor never modifies this element; it round-trips byte-identically (spec 12 #4)"
+        title="Source-only — the editor never modifies this element; it round-trips byte-identically (spec principles-and-invariants #4)"
         aria-label="source only"
       >
         src

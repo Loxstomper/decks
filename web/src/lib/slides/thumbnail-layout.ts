@@ -1,6 +1,6 @@
 /**
  * thumbnail-layout.ts — PURE static port of the numeric layout vocabulary
- * (P12-4 / spec 03, spec 12).
+ * (P12-4 / spec layout-vocabulary, spec principles-and-invariants).
  *
  * WHY THIS EXISTS:
  * ================

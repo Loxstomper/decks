@@ -1,4 +1,4 @@
-// Package provider defines the image/media acquisition interface (spec 08 / P5-6).
+// Package provider defines the image/media acquisition interface (spec assets-and-media / P5-6).
 //
 // Every provider follows the same contract:
 //  1. Search returns paginated results (thumbnail URL, ID, metadata).

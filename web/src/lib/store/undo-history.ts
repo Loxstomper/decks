@@ -24,7 +24,7 @@
  * The stack is bounded to MAX_HISTORY entries.  When the limit is hit we drop
  * the OLDEST snapshot (index 0) and adjust the cursor — the user loses the
  * ability to undo all the way back to the very first state, which is acceptable
- * since git keeps durable history (spec 13).
+ * since git keeps durable history (spec project-structure).
  */
 
 /** Maximum number of snapshots retained in the undo stack (session-only). */

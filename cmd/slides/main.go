@@ -100,8 +100,8 @@ func runServe() {
 		log.Fatalf("embed: %v", err)
 	}
 
-	// Image-acquisition providers (spec 08). Each reads its API key from the
-	// environment at construction (secrets-from-env-only, spec 12/13); a provider
+	// Image-acquisition providers (spec assets-and-media). Each reads its API key from the
+	// environment at construction (secrets-from-env-only, spec principles-and-invariants/project-structure); a provider
 	// with no key reports Enabled()==false and is omitted from GET /api/providers,
 	// so the picker degrades gracefully when keys are absent.
 	reg := &provider.Registry{}
@@ -176,7 +176,7 @@ func runUpgrade(name string) {
 	fmt.Printf("Upgraded deck %q at %s\n", name, filepath.Join(deckDir, "deck.html"))
 }
 
-// runAddSlide appends a starter <section> to an existing deck (P8-1, spec 11).
+// runAddSlide appends a starter <section> to an existing deck (P8-1, spec claude-code-integration).
 func runAddSlide(name string) {
 	root := workspaceRoot()
 
@@ -191,7 +191,7 @@ func runAddSlide(name string) {
 	fmt.Printf("Added a slide to deck %q (%s)\n", name, filepath.Join(deckDir, "deck.html"))
 }
 
-// runValidate validates a deck against the spec rules (P8-2, spec 11/12) and
+// runValidate validates a deck against the spec rules (P8-2, spec claude-code-integration/principles-and-invariants) and
 // prints readable diagnostics.  It exits NON-ZERO when the deck is malformed so
 // CI / Claude Code can gate on the result; zero when the deck is clean.
 func runValidate(name string) {

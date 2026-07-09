@@ -4,7 +4,7 @@
  * Load-bearing assertions:
  *   • linkLeaf wraps the leaf's content in one <a href>; unlinkLeaf removes it;
  *   • the edited leaf's NEW shape appears in serialized output;
- *   • untouched siblings round-trip byte-for-byte (spec 12 #4);
+ *   • untouched siblings round-trip byte-for-byte (spec principles-and-invariants #4);
  *   • indent/outdent is reversible and byte-stable (re-parse is a fixed point).
  */
 

@@ -2,7 +2,7 @@
   /**
    * BlockTextControl.svelte — Whole-leaf text alignment + list indent (P17-8).
    *
-   * WHY THIS EXISTS (spec 04 rich text):
+   * WHY THIS EXISTS (spec canvas-interaction rich text):
    * ====================================
    * Block-level text controls for the selected text leaf: a text-align strip
    * (left / center / right / justify, written as an inline `style="text-align"`

@@ -287,7 +287,7 @@ function cssEscapeUrl(s: string): string {
 
 /**
  * True when `src` is a LOCAL (offline-safe) asset reference — not an absolute
- * http(s)/protocol-relative URL or a data: URI. Offline-first (spec 12): a logo
+ * http(s)/protocol-relative URL or a data: URI. Offline-first (spec principles-and-invariants): a logo
  * must live in the deck (e.g. `assets/logo.png`), never a remote URL.
  */
 function isLocalAsset(src: string): boolean {

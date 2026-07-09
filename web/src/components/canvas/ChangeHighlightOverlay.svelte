@@ -7,7 +7,7 @@
    * eids into `highlightStore`. This component paints those eids INSIDE the
    * reveal iframe: it injects a one-off stylesheet and toggles a `data-sb-flash`
    * attribute on each changed/added element so the user can instantly see what
-   * Claude changed (spec 11 "highlight what Claude changed").
+   * Claude changed (spec claude-code-integration "highlight what Claude changed").
    *
    * WHY PAINT INSIDE THE IFRAME (vs an absolute overlay box like SelectionOverlay):
    * the changed set can be many elements scattered across the slide; a CSS

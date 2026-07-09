@@ -1,5 +1,5 @@
 /**
- * slides/index.ts — Public surface of the slide-management lane (P6, spec 06).
+ * slides/index.ts — Public surface of the slide-management lane (P6, spec slide-management).
  *
  * Pure model operations (slides.ts), the canvas reveal driver (reveal-control.ts)
  * and the offline thumbnail builder (thumbnail.ts). The deckStore wraps the model

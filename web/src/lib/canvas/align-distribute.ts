@@ -1,14 +1,14 @@
 /**
  * align-distribute.ts — Align and distribute operations for free multi-selection (P4-6).
  *
- * WHY THIS EXISTS (spec 04 "Align / distribute"):
+ * WHY THIS EXISTS (spec canvas-interaction "Align / distribute"):
  * ================================================
  * When the user selects 2+ `data-free` elements and clicks an alignment button,
  * we compute new logical positions for every element and apply them as ONE undo
  * entry (via `deckStore.applyFreeGeometryBatch`).
  *
  * All functions here are PURE (no DOM, no store) → unit-testable headlessly.
- * All coordinates are in LOGICAL space (spec 04, spec 05).
+ * All coordinates are in LOGICAL space (spec canvas-interaction, spec scaling-and-resolution).
  *
  * Alignment strategy (matches Figma / Adobe XD convention):
  *   • Align ops use the BOUNDING BOX of the entire selection as the reference frame.

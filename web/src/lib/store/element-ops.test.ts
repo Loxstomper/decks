@@ -143,7 +143,7 @@ describe('deckStore — duplicate / z-order / clipboard (P13-5/6/7)', () => {
     expect(eids.indexOf(newEid!)).toBe(eids.indexOf('p1') + 1);
     // Selection moved to the clone.
     expect(selectionStore.eid).toBe(newEid);
-    // Untouched slide round-trips verbatim (spec 12 #4).
+    // Untouched slide round-trips verbatim (spec principles-and-invariants #4).
     expect(disk.html).toContain(S2);
   });
 

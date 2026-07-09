@@ -1,7 +1,7 @@
 /**
  * free.ts — Model-layer toggle for the free-positioning escape hatch (P4-1).
  *
- * WHY THIS EXISTS (spec 03 / spec 04 "Two drag semantics"):
+ * WHY THIS EXISTS (spec layout-vocabulary / spec canvas-interaction "Two drag semantics"):
  * =========================================================
  * A `data-free` element is absolutely positioned in LOGICAL coordinates via
  * `data-x`/`data-y`/`data-w`/`data-h`. This module provides the model
@@ -17,7 +17,7 @@
  * WHY USE edit.ts HELPERS (setAttribute/removeAttribute):
  *   These are the canonical mutation path: each call marks the element dirty
  *   (triggering canonical re-render on next serializeDeck) while untouched
- *   siblings stay clean (byte-stable passthrough, spec 12 #4).
+ *   siblings stay clean (byte-stable passthrough, spec principles-and-invariants #4).
  *
  * classify(el) then returns 'free' for elements with data-free — no extra
  * coordination needed; classify() already has that rule at highest priority.
@@ -28,7 +28,7 @@ import type { ElementNode, DeckModel } from './types';
 
 /**
  * A logical-coordinate rectangle, matching the coordinate space used by
- * data-x / data-y / data-w / data-h (spec 03).
+ * data-x / data-y / data-w / data-h (spec layout-vocabulary).
  */
 export interface LogicalRect {
   x: number;
@@ -53,7 +53,7 @@ export interface LogicalRect {
  *   styling are untouched.
  *
  * After this call: setAttribute/removeAttribute have marked only this element
- * dirty — siblings round-trip byte-identically (spec 12 #4).
+ * dirty — siblings round-trip byte-identically (spec principles-and-invariants #4).
  */
 export function setFree(el: ElementNode, on: boolean, rect?: LogicalRect): void {
   if (on) {

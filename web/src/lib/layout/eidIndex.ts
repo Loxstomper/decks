@@ -1,7 +1,7 @@
 /**
  * eidIndex.ts — Locate a `data-eid` occurrence inside an HTML source string (P9-6).
  *
- * WHY THIS EXISTS (spec 04 "Source ↔ selection sync"):
+ * WHY THIS EXISTS (spec canvas-interaction "Source ↔ selection sync"):
  * ===================================================
  * Jump-to-source is a *coarse, attribute-anchored* scroll — not a full source
  * map. When an element is selected on the canvas/outline and the source pane is

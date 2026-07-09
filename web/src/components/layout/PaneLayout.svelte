@@ -3,7 +3,7 @@
    * PaneLayout.svelte — Three-zone resizable/collapsible editor layout
    * (P1-1, extended in P9-3/4/5).
    *
-   * Layout (spec 04):
+   * Layout (spec canvas-interaction):
    *   ┌──────────────┬──────────────────────────┬─────────────────────────┐
    *   │  Navigator   │        Canvas            │  Outline+Props / Source │
    *   │  (filmstrip) │  (iframe + overlay)      │  (tabbed right panel)   │

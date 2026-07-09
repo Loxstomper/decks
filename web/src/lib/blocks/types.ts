@@ -1,5 +1,5 @@
 /**
- * blocks/types.ts — Insert-palette registry contract (P5-1, spec 03 "Leaf block types").
+ * blocks/types.ts — Insert-palette registry contract (P5-1, spec layout-vocabulary "Leaf block types").
  *
  * WHY A REGISTRY (and not a hard-coded palette):
  * ==============================================

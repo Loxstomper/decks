@@ -194,7 +194,7 @@
 
   // Aspect picker → begin an aspect change. begin() updates the live canvas size
   // immediately (structured content reflows via flex/grid) and computes a
-  // reposition OFFER for every free element (spec 05 forbids silently moving them).
+  // reposition OFFER for every free element (spec scaling-and-resolution forbids silently moving them).
   // When there are no free elements the change is purely structural — there is no
   // dialog to show, so we persist the new size directly as one undo entry.
   function onAspectPick(value: string): void {
@@ -500,7 +500,7 @@
       slide is reflected back.
     -->
     <div class="flex flex-col h-full min-h-0 gap-2">
-      <!-- Sync status indicator (spec 11 §5 / P8-5): turn-taking handoff state. -->
+      <!-- Sync status indicator (spec claude-code-integration §5 / P8-5): turn-taking handoff state. -->
       <div class="px-1 flex-shrink-0">
         <StatusIndicator />
         <!-- Workspace chrome theme switcher (P9-10): persists in localStorage. -->
@@ -646,7 +646,7 @@
       <!--
         Aspect reposition offer (P4-7): renders nothing unless an aspect change is
         pending. Lists each free element with old→suggested coords for accept/decline
-        (spec 05: free elements must never be silently moved). Apply persists the new
+        (spec scaling-and-resolution: free elements must never be silently moved). Apply persists the new
         reveal size + accepted offers as one undo entry; Cancel reverts the canvas.
       -->
       <AspectRepositionOffer />

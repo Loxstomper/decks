@@ -1,18 +1,18 @@
 /**
  * web/src/lib/sse/index.ts — SSE client for the /events endpoint.
  *
- * WHY THIS EXISTS (spec 11, spec 01):
+ * WHY THIS EXISTS (spec claude-code-integration, spec architecture):
  * =====================================
  * The Go backend uses fsnotify to watch deck folders and broadcasts
  * `{"deck":"<name>","type":"changed"}` events over Server-Sent Events when an
  * external write occurs (e.g. Claude Code edits a deck.html). The Svelte editor
  * must re-parse the deck after such an external change — but only when it is not
- * mid-gesture or dirty (turn-taking, spec 11 §4).
+ * mid-gesture or dirty (turn-taking, spec claude-code-integration §4).
  *
  * This module provides:
  *   • A plain-TS SSE client that opens an EventSource on /events.
  *   • A reactive connection-state store (connecting | open | closed) — so the
- *     status indicator (spec 11 §5) can show "synced / external change / unsaved".
+ *     status indicator (spec claude-code-integration §5) can show "synced / external change / unsaved".
  *   • A reactive lastEvent store — holds the most recent DeckChangedEvent.
  *   • onDeckChanged(deckName, handler) — targeted subscription for a single deck
  *     (pass null to receive all deck change events).

@@ -2,7 +2,7 @@
   /**
    * GuidesOverlay.svelte — Renders smart alignment guide lines (P4-4).
    *
-   * WHY THIS EXISTS (spec 04 "Smart guides"):
+   * WHY THIS EXISTS (spec canvas-interaction "Smart guides"):
    * ==========================================
    * Purely presentational. The `DragController` computes which guides are active
    * (see `computeGuides` in alignment-guides.ts) and passes them here as props.

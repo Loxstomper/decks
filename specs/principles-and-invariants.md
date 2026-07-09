@@ -1,4 +1,4 @@
-# 12 — Principles & invariants
+# Principles & invariants
 
 **Status:** decided
 
@@ -10,10 +10,10 @@ Cross-cutting rules every other spec depends on.
 - reveal.js, highlight.js, KaTeX, themes, and **fonts** are bundled/self-hosted
   (`go:embed` into the binary or copied into the deck) — never CDN-linked.
 - Fonts are downloaded once (online) and localized into `assets/fonts/`
-  (see [09](09-theming-and-styles.md)).
+  (see [Theming & styles](theming-and-styles.md)).
 - The **only** network-dependent features are image-acquisition helpers (Unsplash, Giphy,
   Gemini), and they **always localize** what they fetch and degrade gracefully offline
-  (see [08](08-assets-and-media.md)).
+  (see [Assets & media](assets-and-media.md)).
 
 ## Idempotent round-trip
 
@@ -26,23 +26,23 @@ Cross-cutting rules every other spec depends on.
 ## Never destroy the unknown
 
 - HTML the canvas can't fully represent (custom widgets, unknown structure, plugins) is
-  **preserved verbatim** via passthrough ([02](02-document-model.md)).
+  **preserved verbatim** via passthrough ([Document model](document-model.md)).
 - Such elements/slides get a small **"source only / partially editable"** badge rather than
   being dropped or mangled. Trust over cleverness.
 
 ## Input sanitization
 
 - Content entered through `contenteditable` or **paste** is sanitized before it reaches the
-  model: only the inline-mark allowlist survives ([02](02-document-model.md)), and **scripts,
+  model: only the inline-mark allowlist survives ([Document model](document-model.md)), and **scripts,
   event handlers, external resource URLs, and `javascript:` link hrefs are stripped**. This
   protects both the offline invariant (no smuggled remote resources) and the document model (no
   arbitrary HTML soup).
-- Pasted images are localized through the asset pipeline ([08](08-assets-and-media.md)), never
+- Pasted images are localized through the asset pipeline ([Assets & media](assets-and-media.md)), never
   left as a remote `src`.
 
 ## Validation
 
-- `slides validate` ([11](11-claude-code-integration.md)) gates both Claude Code edits and the
+- `slides validate` ([Claude Code integration](claude-code-integration.md)) gates both Claude Code edits and the
   editor's save path. Malformed decks are surfaced, not silently broken.
 
 ## Testing
@@ -65,12 +65,12 @@ Three tiers, each catching what the one below can't:
 ## Secrets
 
 - API keys (Unsplash / Giphy / Gemini) come from **env vars or a gitignored local config** —
-  never committed in `config.toml` (see [13](13-project-structure.md)).
+  never committed in `config.toml` (see [Project structure](project-structure.md)).
 
 ## Versioning
 
 - **Git is the durable revision history** (each deck folder is git-friendly: HTML + assets +
-  CSS). The snapshot undo stack ([04](04-canvas-interaction.md)) is session-only.
+  CSS). The snapshot undo stack ([Canvas & interaction](canvas-interaction.md)) is session-only.
 
 ## Related
 

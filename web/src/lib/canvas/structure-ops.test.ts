@@ -39,7 +39,7 @@ describe('moveChild (P3-6 reorder)', () => {
     expect(eidOrder(out, ['a', 'b', 'c'])).toEqual(['b', 'a', 'c']);
   });
 
-  it('keeps untouched siblings byte-identical (spec 12 #4)', () => {
+  it('keeps untouched siblings byte-identical (spec principles-and-invariants #4)', () => {
     const model = parseDeck(REORDER_DECK);
     moveChildByEid(model, 'c', 0);
     const out = serializeDeck(model);
@@ -168,7 +168,7 @@ describe('deleteElement (P9-7)', () => {
     expect(deleteElement(model, 'nope')).toBe(false);
   });
 
-  it('leaves the rest of the deck byte-stable (spec 12 #4)', () => {
+  it('leaves the rest of the deck byte-stable (spec principles-and-invariants #4)', () => {
     const model = parseDeck(NESTED_DECK);
     deleteElement(model, 'li1');
     const out = serializeDeck(model);

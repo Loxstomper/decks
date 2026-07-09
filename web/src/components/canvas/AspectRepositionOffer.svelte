@@ -1,12 +1,12 @@
 <script lang="ts">
   /**
    * AspectRepositionOffer.svelte — Reposition offer dialog for an aspect change
-   * (P4-7, spec 05 "Free elements are flagged, with an offer to reposition/rescale").
+   * (P4-7, spec scaling-and-resolution "Free elements are flagged, with an offer to reposition/rescale").
    *
    * WHY THIS EXISTS:
    * ================
    * Changing the aspect ratio reflows structured content automatically, but FREE
-   * elements are pinned to coordinates that assumed the OLD canvas. Spec 05 forbids
+   * elements are pinned to coordinates that assumed the OLD canvas. Spec scaling-and-resolution forbids
    * SILENTLY moving them — we must FLAG them and OFFER a reposition. This panel is
    * that affordance: it lists every affected free element, shows old → suggested
    * coordinates, lets the user accept/decline per element or all at once, choose the

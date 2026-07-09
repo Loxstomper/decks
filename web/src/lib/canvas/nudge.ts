@@ -1,13 +1,13 @@
 /**
- * nudge.ts — Keyboard-nudge delta + guard logic (P3-9 / spec 04 "Keyboard nudge").
+ * nudge.ts — Keyboard-nudge delta + guard logic (P3-9 / spec canvas-interaction "Keyboard nudge").
  *
- * WHY THIS EXISTS (spec 04: "arrows = 1 logical unit; Shift+arrows = 10"):
+ * WHY THIS EXISTS (spec canvas-interaction: "arrows = 1 logical unit; Shift+arrows = 10"):
  * ========================================================================
- * Arrow keys move the current selection in LOGICAL units (spec 05) so the nudge
+ * Arrow keys move the current selection in LOGICAL units (spec scaling-and-resolution) so the nudge
  * amount is independent of editor zoom — pressing → always moves the element 1
  * logical unit regardless of how the canvas is scaled on screen.
  *
- * Two element kinds get different nudge semantics (spec 04 "Two drag semantics"):
+ * Two element kinds get different nudge semantics (spec canvas-interaction "Two drag semantics"):
  *   • FREE element (`data-free`)  → arrows adjust its logical data-x/data-y.
  *   • STRUCTURED element          → up/left and down/right reorder it ±1 among
  *                                    its siblings (geometric position is owned by
@@ -18,7 +18,7 @@
  * DOM-free so they are unit-testable headless.
  */
 
-/** Nudge step sizes in LOGICAL units (spec 04). */
+/** Nudge step sizes in LOGICAL units (spec canvas-interaction). */
 export const NUDGE_STEP = 1;
 export const NUDGE_STEP_LARGE = 10;
 
@@ -39,7 +39,7 @@ export interface NudgeDelta {
 /**
  * Compute the logical translation for a FREE element from an arrow press.
  *
- * Shift selects the large step (10) vs the fine step (1), matching spec 04.
+ * Shift selects the large step (10) vs the fine step (1), matching spec canvas-interaction.
  * Returns `null` for non-arrow keys so the caller can ignore the event (and let
  * it bubble to other handlers).
  */
@@ -99,7 +99,7 @@ const TEXT_ENTRY_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 
 /**
  * True when the keyboard focus is in a text-editing context where arrow keys
- * mean "move the caret", not "nudge the selection" (spec 04 guard).
+ * mean "move the caret", not "nudge the selection" (spec canvas-interaction guard).
  *
  * Covers:
  *   • a P2-5 in-place contenteditable session (passed via `editing`),

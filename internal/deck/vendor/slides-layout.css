@@ -1,9 +1,9 @@
-/* slides-layout.css — Layout vocabulary for slides-builder (spec 03).
+/* slides-layout.css — Layout vocabulary for slides-builder (spec layout-vocabulary).
  *
  * Maps data-* attributes on layout containers to the corresponding flex/grid CSS.
- * Shipped offline alongside reveal.js (spec 12 — zero external URLs).
+ * Shipped offline alongside reveal.js (spec principles-and-invariants — zero external URLs).
  *
- * ATTRIBUTE CONTRACT (spec 03 §"The data-* contract"):
+ * ATTRIBUTE CONTRACT (spec layout-vocabulary §"The data-* contract"):
  *
  *   Container attributes on elements with data-lay:
  *     data-lay      stack | row | grid | layers
@@ -31,7 +31,7 @@
  *   handled here via attribute selectors — no script needed.
  */
 
-/* ── Slide canvas: full 1920x1080 containing block at origin (spec 05) ─────── */
+/* ── Slide canvas: full 1920x1080 containing block at origin (spec scaling-and-resolution) ─────── */
 /* With reveal configured center:false + margin:0 (Phase 15), each slide section
  * is the full logical canvas anchored at the top-left. Reveal already gives
  * `.reveal .slides > section` position:absolute + width:100%; we pin it to the
@@ -92,7 +92,7 @@
 }
 
 /* ── Cross-axis alignment (data-align, stack + row) ──────────────────────── */
-/* "center horizontally" → data-align="center" (alignment-as-intent, spec 03). */
+/* "center horizontally" → data-align="center" (alignment-as-intent, spec layout-vocabulary). */
 
 [data-lay][data-align="start"]   { align-items: flex-start; }
 [data-lay][data-align="center"]  { align-items: center; }
@@ -100,7 +100,7 @@
 [data-lay][data-align="stretch"] { align-items: stretch; }
 
 /* ── Main-axis justification (data-justify, stack + row) ─────────────────── */
-/* "space between" → data-justify="between" (alignment-as-intent, spec 03). */
+/* "space between" → data-justify="between" (alignment-as-intent, spec layout-vocabulary). */
 
 [data-lay][data-justify="start"]   { justify-content: flex-start; }
 [data-lay][data-justify="center"]  { justify-content: center; }

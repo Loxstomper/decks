@@ -16,7 +16,7 @@
    * CONTRAST GUARD: foreground/background contrast directly affects whether the
    * code scans, so we surface a warning (not a hard block) when it is too low.
    *
-   * OFFLINE-FIRST (spec 12): the emitted markup carries zero external URLs; the
+   * OFFLINE-FIRST (spec principles-and-invariants): the emitted markup carries zero external URLs; the
    * QR generator + plugin are vendored into the deck by the scaffold (P19-1).
    * The block is inert (empty div) without them but never breaks the deck.
    */

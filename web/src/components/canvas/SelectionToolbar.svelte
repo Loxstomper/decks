@@ -3,7 +3,7 @@
    * SelectionToolbar.svelte — Floating format toolbar over a text selection
    * (P17-7).
    *
-   * WHY THIS EXISTS (spec 04 rich text):
+   * WHY THIS EXISTS (spec canvas-interaction rich text):
    * ====================================
    * When the user selects text inside an active in-place edit, a small toolbar
    * appears at the selection with Bold / Italic / Underline / Strike, a font-size

@@ -1,4 +1,4 @@
-# 06 — Slide management
+# Slide management
 
 **Status:** decided
 
@@ -13,7 +13,7 @@ structure. All operations are DOM operations on `<section>` elements.
   deck**" affordance in the navigator prompts for a name and creates the deck.
 - It is the **same scaffold** as the CLI: a `POST /api/decks/{name}` runs the identical
   `slides new` logic server-side (`decks/<name>/{deck.html, custom.css, assets/}` with
-  reveal vendored offline, see [13](13-project-structure.md)), then the editor opens it.
+  reveal vendored offline, see [Project structure](project-structure.md)), then the editor opens it.
 - Name validation reuses `deck.ValidName`; creating an existing name is rejected (no clobber).
   Creation is offline and writes no external URLs.
 
@@ -29,17 +29,17 @@ structure. All operations are DOM operations on `<section>` elements.
 | Action | DOM effect |
 |---|---|
 | Add slide | Insert a `<section>` (with a starter `data-lay="stack"`) |
-| Duplicate | Clone a `<section>`, regenerate `data-eid`s (preserve for auto-animate pairing — see [07](07-motion-and-transitions.md)) |
+| Duplicate | Clone a `<section>`, regenerate `data-eid`s (preserve for auto-animate pairing — see [Motion & transitions](motion-and-transitions.md)) |
 | Delete | Remove the `<section>` |
 | Reorder | Move the `<section>` in document order |
 | Add vertical | Nest a `<section>` under a top-level `<section>` |
 | Hide | `data-visibility="hidden"` (kept in source, skipped when presenting) |
-| Theme override | `data-theme` (+ managed `data-background-color`) on the `<section>`; inherits the deck theme when absent (see [09](09-theming-and-styles.md)) |
+| Theme override | `data-theme` (+ managed `data-background-color`) on the `<section>`; inherits the deck theme when absent (see [Theming & styles](theming-and-styles.md)) |
 
 Slides that override the deck theme show a small **theme badge** in the navigator/thumbnail.
 
 These same operations are reachable from a **slide-level context menu** (right-click on empty
-slide background; see [04](04-canvas-interaction.md) "Context menu") — one dispatch path, no
+slide background; see [Canvas & interaction](canvas-interaction.md) "Context menu") — one dispatch path, no
 duplicated logic.
 
 ## Slide layouts
@@ -47,18 +47,18 @@ duplicated logic.
 Google-Slides-style **layout presets**: named, pre-arranged slide structures (Title, Title +
 Body, Section Header, Two Content, Comparison, Title Only, Big Number, Caption, Blank). A layout
 is **structure, not theme** — it composes the existing `data-lay` primitives
-([03](03-layout-vocabulary.md)), decoupled from the reveal CSS theme
-([09](09-theming-and-styles.md)). It generalizes what `addSlide` already does (a starter
+([Layout vocabulary](layout-vocabulary.md)), decoupled from the reveal CSS theme
+([Theming & styles](theming-and-styles.md)). It generalizes what `addSlide` already does (a starter
 `data-lay="stack"` section).
 
 - **Source = template snippets.** Each layout is a `<section>` snippet with **starter content**
   (real heading/body leaves carrying prompt text you overwrite — not ghost placeholders).
   Built-in presets ship bundled (embedded, offline); user/Claude-authored layouts live in the
-  `templates/` directory ([13](13-project-structure.md)). Both are listed together via
+  `templates/` directory ([Project structure](project-structure.md)). Both are listed together via
   `GET /api/templates`.
 - **Pick a layout** when adding a slide, or **change a slide's layout** from the slide context
-  menu ([04](04-canvas-interaction.md)).
-- **Apply preserves content (never-destroy, [12](12-principles-and-invariants.md)).** Changing
+  menu ([Canvas & interaction](canvas-interaction.md)).
+- **Apply preserves content (never-destroy, [Principles & invariants](principles-and-invariants.md)).** Changing
   the layout of a slide that already has content **moves its existing leaves into the new
   layout's primary content slot** rather than discarding them. A layout snippet marks its
   target container (e.g. `data-slot="content"`; the first slot when several exist). Applying is
@@ -77,7 +77,7 @@ instance per slide). Because it runs no JS, it must close the gaps where reveal'
 otherwise do the work, so the thumbnail is **faithful to the actual slide**:
 
 - **Actual theme, not a fixed one.** The thumbnail links the deck's *current* theme (and, once
-  per-slide overrides exist, the slide's `data-theme` — see [09](09-theming-and-styles.md)),
+  per-slide overrides exist, the slide's `data-theme` — see [Theming & styles](theming-and-styles.md)),
   never a hardcoded default. Switching the deck theme restyles the thumbnails.
 - **Numeric layout applied.** The numeric layout vocabulary (`data-gap`/`data-pad`/`data-cols`/
   `data-rows`/`data-grow`/`data-basis`/`data-span`, and free `data-x/y/w/h/rot`) is normally
@@ -86,11 +86,12 @@ otherwise do the work, so the thumbnail is **faithful to the actual slide**:
 - **Fragments show their final state** (forced visible), rather than vanishing under reveal's
   `opacity:0` default.
 - **Backgrounds honored** — a section's `data-background-color` is rendered as its background.
-- **Accepted approximation:** code highlighting, KaTeX math, and **Chart.js charts** (reveal
-  plugins, JS-driven) are not run, so they render plain or as a placeholder
-  ([03](03-layout-vocabulary.md)). These are the acknowledged thumbnail-only fidelity gaps, not
-  bugs — they render correctly everywhere JS runs (editor, present, PDF).
+- **Accepted approximation:** code highlighting, KaTeX math, **Chart.js charts**, and **QR codes**
+  (reveal plugins, JS-driven) are not run, so they render plain or as a placeholder
+  ([Layout vocabulary](layout-vocabulary.md)). These are the acknowledged thumbnail-only fidelity gaps, not
+  bugs — they render correctly everywhere JS runs (editor, present, PDF). Any future JS-rendered
+  leaf joins this list and must paint a script-free placeholder.
 
 ## Related
 
-[02](02-document-model.md) · [04](04-canvas-interaction.md) · [07](07-motion-and-transitions.md) · [09](09-theming-and-styles.md)
+[Document model](document-model.md) · [Canvas & interaction](canvas-interaction.md) · [Motion & transitions](motion-and-transitions.md) · [Theming & styles](theming-and-styles.md)
