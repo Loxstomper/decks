@@ -146,6 +146,22 @@ export function buildSlideTree(model: DeckModel | null): SlideTreeNode[] {
   }));
 }
 
+/**
+ * Map reveal's (h, v) indices to the eid of the slide they present, or null when
+ * unknown (negative/out-of-range indices, or a slide with no eid). Mirrors the
+ * navigator's highlight logic: `h` picks the top-level slide; if it is a stack,
+ * `v` picks the nested vertical slide (clamping to the first when `v` overshoots).
+ */
+export function indicesToEid(model: DeckModel | null, h: number, v: number): string | null {
+  if (!model || h < 0) return null;
+  const top = buildSlideTree(model)[h];
+  if (!top) return null;
+  if (top.verticals.length > 0) {
+    return top.verticals[v]?.eid ?? top.verticals[0]?.eid ?? null;
+  }
+  return top.eid;
+}
+
 // ── Internal whitespace + splice helpers ─────────────────────────────────────
 
 /** The whitespace text node immediately preceding `el` in `parent.children`. */

@@ -7,17 +7,27 @@
  *   { mode: 'into',  parentEid }  → deckStore.insertBlock(parentEid, node)
  *   { mode: 'after', eid }        → deckStore.insertAfter(eid, node)
  *
+ * WHICH SLIDE: the block ALWAYS lands on the slide the canvas is currently
+ * presenting (`viewedSlideEid`, passed by the caller from reveal's indices). The
+ * selection only refines WHERE WITHIN that slide — and only when the selection
+ * actually lives on the viewed slide. This stops an insert made while viewing
+ * slide 25 (with nothing, or something on another slide, selected) from landing
+ * on slide 1. When `viewedSlideEid` is null (reveal not ready) we fall back to
+ * the selection's slide, else the first slide.
+ *
  * Rules (spec 03 / P5-1 "insert into the current container or after the selection"):
  *
- *   FLOW blocks (text/table/…):
+ *   FLOW blocks (text/table/…), selection is ON the viewed slide:
  *     • selection is a CONTAINER → insert INTO it (appended last).
  *     • selection is a LEAF/FREE → insert AFTER it (as a sibling).
- *     • nothing / passthrough     → insert INTO the current slide <section>.
+ *     • passthrough              → insert INTO the viewed slide <section>.
+ *   FLOW blocks, no selection or selection on a DIFFERENT slide:
+ *     • insert INTO the viewed slide <section>.
  *
  *   FREE blocks (shape/embed):
  *     Free elements are absolutely positioned relative to their slide, so they
- *     always go INTO the slide <section> (the section ancestor of the selection,
- *     else the first slide). This keeps their logical data-x/y meaningful.
+ *     always go INTO the viewed slide <section>. This keeps their logical
+ *     data-x/y meaningful.
  *
  * Returns null only when the model has no slide section at all to fall back to.
  */
@@ -76,30 +86,37 @@ export function resolveInsertTarget(
   model: DeckModel,
   selectedEid: string | null,
   placement: Placement = 'flow',
+  viewedSlideEid: string | null = null,
 ): InsertTarget | null {
   const selected = selectedEid ? findByEid(model, selectedEid) : null;
 
-  // FREE blocks always land in the slide section.
-  if (placement === 'free') {
-    const section = currentSection(model, selected);
-    const eid = section ? eidOf(section) : null;
-    return eid ? { mode: 'into', parentEid: eid } : null;
-  }
+  // The slide the block MUST land on: the viewed (presented) slide, else the
+  // selection's slide, else the first slide.
+  const viewedSection = viewedSlideEid ? findByEid(model, viewedSlideEid) : null;
+  const targetSection = viewedSection ?? currentSection(model, selected);
+  const targetEid = targetSection ? eidOf(targetSection) : null;
+  if (!targetEid) return null;
 
-  // FLOW blocks: relative to the selection.
+  // FREE blocks always land in the slide section itself.
+  if (placement === 'free') return { mode: 'into', parentEid: targetEid };
+
+  // FLOW blocks place relative to the selection — but ONLY when the selection
+  // lives on the target slide. Otherwise (nothing selected, or a selection on a
+  // different slide) the block goes into the target slide section.
   if (selected) {
-    const cls = classify(selected);
-    if (cls === 'container') {
-      const eid = eidOf(selected);
-      if (eid) return { mode: 'into', parentEid: eid };
-    } else if (cls === 'leaf' || cls === 'free') {
-      const eid = eidOf(selected);
-      if (eid) return { mode: 'after', eid };
+    const selSection = sectionAncestor(selected, parentMap(model));
+    if (selSection && eidOf(selSection) === targetEid) {
+      const cls = classify(selected);
+      if (cls === 'container') {
+        const eid = eidOf(selected);
+        if (eid) return { mode: 'into', parentEid: eid };
+      } else if (cls === 'leaf' || cls === 'free') {
+        const eid = eidOf(selected);
+        if (eid) return { mode: 'after', eid };
+      }
+      // passthrough → fall through to the target slide section.
     }
-    // passthrough → fall through to the slide section.
   }
 
-  const section = currentSection(model, selected);
-  const eid = section ? eidOf(section) : null;
-  return eid ? { mode: 'into', parentEid: eid } : null;
+  return { mode: 'into', parentEid: targetEid };
 }

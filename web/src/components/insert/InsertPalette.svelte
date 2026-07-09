@@ -32,6 +32,8 @@
   import type { Component } from 'svelte';
   import { deckStore } from '$lib/store/deck.svelte';
   import { selectionStore } from '$lib/canvas/selection.svelte';
+  import { viewedSlide } from '$lib/canvas/viewed-slide.svelte';
+  import { indicesToEid } from '$lib/slides';
   import type { ElementNode } from '$lib/model';
   import {
     getInsertRegistryByGroup,
@@ -180,7 +182,10 @@
   async function placeNode(node: ElementNode, placement: 'flow' | 'free'): Promise<void> {
     const model = deckStore.model;
     if (!model) return;
-    const target = resolveInsertTarget(model, selectionStore.eid, placement);
+    // The block lands on the slide the canvas is presenting (spec 06 "current
+    // slide"), not slide 1, when nothing on the viewed slide is selected.
+    const viewedEid = indicesToEid(model, viewedSlide.h, viewedSlide.v);
+    const target = resolveInsertTarget(model, selectionStore.eid, placement, viewedEid);
     if (!target) return;
     if (target.mode === 'into') {
       await deckStore.insertBlock(target.parentEid, node);
