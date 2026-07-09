@@ -31,10 +31,23 @@ When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`
   `mcr.microsoft.com/playwright` image via `npm run test:e2e:docker`. Specs live in `web/e2e/*.spec.ts`.
 
 ## Gotchas
-- **The layout contract is encoded twice** — `web/src/lib/model/layout.ts` (TS, editor) and
-  `internal/validate/validate.go` (Go, CLI/save-path `validate`). They are independent
-  re-implementations of the same `data-*` enums/numeric rules; **keep their allowed-sets in
-  sync** when changing the layout vocabulary, or `validate` and the editor will disagree.
+- **The layout contract is encoded four times.** Independent re-implementations of the same
+  `data-*` vocabulary; changing it means changing all of them, or they silently disagree:
+  - `web/src/lib/model/layout.ts` — TS, the editor's enums/getters/setters.
+  - `internal/validate/validate.go` — Go, the CLI + save-path `validate` (allowed-sets must
+    match `layout.ts`, else `validate` and the editor disagree).
+  - `internal/deck/vendor/slides-layout-init.js` — applies the **numeric** attrs
+    (`data-gap/pad/cols/rows/grow/basis/span`, free `data-x/y/w/h/rot`) at runtime in the deck.
+  - `web/src/lib/slides/thumbnail-layout.ts` — a static port of that same numeric vocabulary to
+    inline styles, because navigator thumbnails are **script-free** and never run the init JS.
+- **Adding a vendored plugin or a `<head>` link only fixes *new* decks.** The scaffold template
+  and `Vendor()` copy files; existing decks keep their old `deck.html`. Anything the editor can
+  insert into *any* deck (chart, QR, per-slide themes) must also be injected into existing decks
+  by `deck.Upgrade` (`slides upgrade <name>`) — idempotent, byte-stable, matching the scaffold's
+  bytes — or the inserted block silently renders nowhere. See `injectQrPlugin` /
+  `injectSlideThemesLink` for the pattern.
+- **JS-rendered leaves must paint a thumbnail placeholder** (code, KaTeX, Chart, QR). The
+  thumbnail iframe runs no scripts; this is a documented fidelity gap, not a bug (spec slide-management).
 - **Optional external tools degrade gracefully** (offline-first): image providers need
   `UNSPLASH_ACCESS_KEY` / `GIPHY_API_KEY` (absent → provider disabled); PDF export needs Chrome
   via `$CHROME_BIN` or a common name (absent → 503); video transcode needs `ffmpeg` (absent →
