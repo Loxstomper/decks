@@ -4,11 +4,14 @@
 //
 //	slides [serve]           start the HTTP server (default action)
 //	slides new <name>        scaffold a new deck
-//	slides vendor <name>     (re)vendor reveal.js into an existing deck
-//	slides upgrade <name>    re-vendor + migrate reveal config (Phase 15)
+//	slides vendor <deck>     (re)vendor reveal.js into an existing deck
+//	slides upgrade <deck>    re-vendor + migrate reveal config (Phase 15)
 //	slides add-slide <deck>  append a starter <section> to a deck (P8-1)
 //	slides validate <deck>   check a deck against the spec rules (P8-2)
 //	slides install-skill     (re)install the Claude Code authoring skill (P21-2)
+//
+// <deck> is a bare name, a path (decks/my-talk), or "." from inside a deck folder
+// (P21-1, see deckarg.go). <name> for `new` is always a bare name.
 //
 // A global --dir <path> (before the subcommand) or $SLIDES_DIR selects the workspace;
 // otherwise it is found by walking up from the cwd.  See root.go and spec
@@ -60,12 +63,12 @@ func main() {
 		runNew(dir, args[1])
 	case args[0] == "vendor":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides vendor <name>")
+			fatalf("usage: slides vendor <deck>")
 		}
 		runVendor(dir, args[1])
 	case args[0] == "upgrade":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides upgrade <name>")
+			fatalf("usage: slides upgrade <deck>")
 		}
 		runUpgrade(dir, args[1])
 	case args[0] == "add-slide":
@@ -91,7 +94,13 @@ func resolve(flagDir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("getwd: %w", err)
 	}
-	return findRoot(cwd, flagDir, os.Getenv(EnvDir))
+	return resolveFrom(flagDir, cwd)
+}
+
+// resolveFrom is resolve with an explicit starting directory for the upward search.
+// Deck commands start from the deck the user named, when they named it by path.
+func resolveFrom(flagDir, startDir string) (string, error) {
+	return findRoot(startDir, flagDir, os.Getenv(EnvDir))
 }
 
 // mustWorkspace resolves an *existing* workspace or exits non-zero.  Used by every
@@ -102,19 +111,34 @@ func resolve(flagDir string) (string, error) {
 // a stray ~/decks/ makes all of $HOME a workspace — and a visible root makes that
 // diagnosable instead of silent (spec project-structure).
 func mustWorkspace(flagDir string) string {
-	root, err := resolve(flagDir)
+	cwd, err := os.Getwd()
 	if err != nil {
-		var nw *noWorkspaceError
-		if errors.As(err, &nw) {
-			fatalf("error: %s is not a slides workspace (no %s/).\n"+
-				"  slides new <name>     initialize one here\n"+
-				"  slides --dir <path>   use an existing one",
-				nw.Dir, deck.DecksDir)
-		}
-		fatalf("error: %v", err)
+		fatalf("error: getwd: %v", err)
+	}
+	return mustWorkspaceFrom(flagDir, cwd)
+}
+
+// mustWorkspaceFrom is mustWorkspace with an explicit start directory for the upward search.
+func mustWorkspaceFrom(flagDir, startDir string) string {
+	root, err := resolveFrom(flagDir, startDir)
+	if err != nil {
+		workspaceFatal(err)
 	}
 	log.Printf("workspace: %s", root)
 	return root
+}
+
+// workspaceFatal prints a workspace-resolution failure and exits non-zero, naming both
+// escape hatches when the directory simply isn't a workspace.
+func workspaceFatal(err error) {
+	var nw *noWorkspaceError
+	if errors.As(err, &nw) {
+		fatalf("error: %s is not a slides workspace (no %s/).\n"+
+			"  slides new <name>     initialize one here\n"+
+			"  slides --dir <path>   use an existing one",
+			nw.Dir, deck.DecksDir)
+	}
+	fatalf("error: %v", err)
 }
 
 // runServe starts the HTTP server.
@@ -208,17 +232,12 @@ func runNew(flagDir, name string) {
 // runVendor (re)vendors the embedded reveal.js distribution into an existing
 // deck's assets/vendor/reveal/ directory.  Use this if vendor files were
 // deleted or to upgrade after a binary update.
-func runVendor(flagDir, name string) {
-	root := mustWorkspace(flagDir)
+func runVendor(flagDir, arg string) {
+	root, name := mustWorkspaceAndDeck(flagDir, arg)
+	deckDir := deck.DeckPath(root, name)
 
 	if err := ensureAuxDirs(root); err != nil {
 		log.Fatalf("workspace: %v", err)
-	}
-
-	// Verify the deck exists before attempting to vendor.
-	deckDir := deck.DeckPath(root, name)
-	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
-		fatalf("deck %q not found at %s", name, deckDir)
 	}
 
 	if err := deck.Vendor(root, name); err != nil {
@@ -232,16 +251,12 @@ func runVendor(flagDir, name string) {
 // Phase 15 coordinate-identity reveal config: it re-vendors (updated CSS/JS) and
 // rewrites deck.html's Reveal.initialize to add center:false + margin:0 if
 // absent.  The rewrite is byte-stable / idempotent when the keys already exist.
-func runUpgrade(flagDir, name string) {
-	root := mustWorkspace(flagDir)
+func runUpgrade(flagDir, arg string) {
+	root, name := mustWorkspaceAndDeck(flagDir, arg)
+	deckDir := deck.DeckPath(root, name)
 
 	if err := ensureAuxDirs(root); err != nil {
 		log.Fatalf("workspace: %v", err)
-	}
-
-	deckDir := deck.DeckPath(root, name)
-	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
-		fatalf("deck %q not found at %s", name, deckDir)
 	}
 
 	if err := deck.Upgrade(root, name); err != nil {
@@ -251,13 +266,9 @@ func runUpgrade(flagDir, name string) {
 }
 
 // runAddSlide appends a starter <section> to an existing deck (P8-1, spec claude-code-integration).
-func runAddSlide(flagDir, name string) {
-	root := mustWorkspace(flagDir)
-
+func runAddSlide(flagDir, arg string) {
+	root, name := mustWorkspaceAndDeck(flagDir, arg)
 	deckDir := deck.DeckPath(root, name)
-	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
-		fatalf("deck %q not found at %s", name, deckDir)
-	}
 
 	if err := deck.AddSlide(root, name); err != nil {
 		log.Fatalf("add-slide: %v", err)
@@ -268,13 +279,9 @@ func runAddSlide(flagDir, name string) {
 // runValidate validates a deck against the spec rules (P8-2, spec claude-code-integration/principles-and-invariants) and
 // prints readable diagnostics.  It exits NON-ZERO when the deck is malformed so
 // CI / Claude Code can gate on the result; zero when the deck is clean.
-func runValidate(flagDir, name string) {
-	root := mustWorkspace(flagDir)
-
+func runValidate(flagDir, arg string) {
+	root, name := mustWorkspaceAndDeck(flagDir, arg)
 	deckDir := deck.DeckPath(root, name)
-	if _, err := os.Stat(deckDir); os.IsNotExist(err) {
-		fatalf("deck %q not found at %s", name, deckDir)
-	}
 
 	res, err := validate.Deck(deckDir)
 	if err != nil {

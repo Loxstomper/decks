@@ -25,6 +25,11 @@ A skill is low-build and leans on the clean `data-*` contract. It contains:
     up from the cwd ([Project structure](project-structure.md) "Workspace resolution"). Claude Code can
     therefore run the CLI from anywhere inside a deck, and `$SLIDES_DIR` lets a hook pin the
     workspace without passing a flag.
+  - `<deck>` is a name, a path to one (`decks/my-talk`, or any path inside it), or `.`. A bare
+    word is always a *name*, never a relative path: from inside `decks/my-talk/`, `validate
+    assets` must ask for a deck called `assets` rather than silently resolving the deck you
+    happen to be standing in. Anything outside the workspace's `decks/` is refused — the CLI
+    narrows to the same single-segment guard the HTTP layer uses, never loosens it.
 - Claude Code edits HTML directly for content; calls the CLI for structural ops + validation.
 
 ## Skill distribution: the binary ships its own skill

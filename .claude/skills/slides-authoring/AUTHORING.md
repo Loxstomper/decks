@@ -296,9 +296,16 @@ slides vendor <name>  # (re)vendor reveal.js into an existing deck after binary 
 ```
 
 ```bash
-slides add-slide <name>   # append a starter <section> to the deck (byte-stable)
-slides validate <name>    # check well-formedness: valid data-*, unique eids, assets exist
+slides add-slide <deck>   # append a starter <section> to the deck (byte-stable)
+slides validate <deck>    # check well-formedness: valid data-*, unique eids, assets exist
+slides install-skill      # (re)install this skill + AUTHORING.md into .claude/skills/
 ```
+
+`<deck>` is a deck name, a path to one (`decks/my-talk`), or `.` from inside the
+deck folder. The binary finds the workspace by walking up from the cwd (or from
+`--dir` / `$SLIDES_DIR`), so it runs from anywhere. A bare word is always a
+name, never a relative path — that ambiguity would otherwise resolve silently to
+the wrong deck.
 
 Run `slides validate` after every Claude Code edit. It exits non-zero with
 readable diagnostics on the offending line/eid, catching invalid enum values,

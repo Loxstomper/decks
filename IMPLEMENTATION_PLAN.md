@@ -19,7 +19,7 @@ independently completable, and verifiable.
 
 ## Where we are
 
-**Phases 0–20 are complete, plus P21-2** (tags `0.0.1`–`0.0.20`; Phase 19, the QR block, landed on
+**Phases 0–21 are complete** (tags `0.0.1`–`0.0.21`; Phase 19, the QR block, landed on
 `main` untagged). That covers: the Go+Svelte skeleton and
 single-binary embed; the live editor shell and source-preserving document model; text editing with
 per-command undo/autosave; the five layout primitives and alignment-as-intent; free positioning
@@ -29,23 +29,11 @@ turn-taking; per-slide theme overrides and backgrounds; thumbnail fidelity; the 
 slide-layout presets; inline rich text, links, charts, command palette, footers, present-mode
 polish; the QR block; workspace resolution (the `slides` binary now runs from anywhere on
 `$PATH`), and skill distribution (the binary embeds the `slides-authoring` skill and installs it
-into each workspace).
+into each workspace), and a deck can be named by name, by path, or as `.` from inside its folder.
 
 **Everything below is what remains.**
 
 ---
-
-## Phase 21 — CLI follow-ups
-> Independent of workspace resolution (Phase 20) and skill distribution (P21-2), both now done.
-> This is what makes the upward search fully pay off: naming a deck the way you'd name a file.
-
-- [ ] **P21-1 — Deck argument accepts a path.** Let the deck arg be a path rather than
-  only a bare name — `slides validate decks/my-talk`, or `.` from inside the deck folder.
-  Independent of root resolution, but it's what makes the upward search fully pay off. Note
-  `deck.validateName` currently rejects anything but a bare segment (the traversal guard the HTTP
-  layer also relies on), so a path form must resolve to a name *before* that guard, not loosen it.
-  _Done when:_ a deck can be named by path, by `.`, or by bare name, and traversal outside the
-  workspace is refused. (Spec project-structure, claude-code-integration)
 
 ## Deferred
 
@@ -93,6 +81,12 @@ Loose ends surfaced while building, none load-bearing.
   committed `.claude/skills/` copy to the embedded bytes, but nothing checks the *prose* against
   the *validator's* allowed-sets — a vocabulary change can still update the code and leave the
   skill teaching the old rules. A generated allowed-values table in `AUTHORING.md` would close it.
+- [ ] **`slides new` still takes only a bare name**, unlike the other deck commands — the deck
+  doesn't exist yet, so a path can't be resolved against it. This is *safe*, not broken:
+  `deck.validateName` rejects `new decks/foo` and `new ../escape` with `deck name "…" is invalid
+  (must be a simple folder name)`, so no traversal is possible. Open only as sugar: should
+  `new decks/foo` mean `new foo`? Also note the message arrives via `log.Fatalf`, so it carries a
+  `main.go:NNN:` prefix that the other commands' `fatalf` errors don't.
 
 ## Cross-cutting (maintain throughout)
 
@@ -115,3 +109,4 @@ Loose ends surfaced while building, none load-bearing.
 | M8 | Everyday-authoring parity — inline text, links, charts, palette | ✅ Phase 17 (`0.0.18`) |
 | M9 | **Installable CLI** — `slides` on `$PATH`, run from anywhere | ✅ Phase 20 (core) |
 | M10 | **AI-native distribution** — the binary ships the skill that teaches its own contract | ✅ P21-2 |
+| M11 | **Run from anywhere** — workspace found by walking up; deck named by name, path, or `.` | ✅ Phase 21 |

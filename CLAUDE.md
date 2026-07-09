@@ -25,6 +25,11 @@ the cwd containing `decks/`. So the binary runs from `$PATH`, from anywhere, inc
 deck folder. The resolved root is always logged.
 - **`new` is the only command that creates a workspace.** Everything else exits non-zero outside
   one rather than scaffolding an unproven root. `--dir`/`$SLIDES_DIR` paths must already exist.
+- **`<deck>` may be a name, a path (`decks/my-talk`, or any path inside it), or `.`** for
+  `vendor`/`upgrade`/`add-slide`/`validate`. A bare word is always a *name*, never a relative path
+  — otherwise `validate assets` inside `decks/my-talk/` would silently mean `my-talk`. An absolute
+  deck path also locates its workspace, so it works from anywhere (unless `--dir` pins one).
+  `new` still takes a bare name.
 - Testing against a throwaway root: `slides --dir /tmp/ws new intro` then `slides --dir /tmp/ws`.
 
 ## Deck authoring (for Claude Code)

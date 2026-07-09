@@ -16,13 +16,16 @@ import (
 const EnvDir = "SLIDES_DIR"
 
 const usage = `Usage:
-  slides [--dir <path>] [serve]        start the editor (default action)
-  slides [--dir <path>] new <name>     create a deck; initializes a workspace if there is none
-  slides [--dir <path>] vendor <name>  (re)vendor reveal.js into an existing deck
-  slides [--dir <path>] upgrade <name> re-vendor + migrate an existing deck's reveal config
+  slides [--dir <path>] [serve]           start the editor (default action)
+  slides [--dir <path>] new <name>        create a deck; initializes a workspace if there is none
+  slides [--dir <path>] vendor <deck>     (re)vendor reveal.js into an existing deck
+  slides [--dir <path>] upgrade <deck>    re-vendor + migrate an existing deck's reveal config
   slides [--dir <path>] add-slide <deck>  append a starter <section>
   slides [--dir <path>] validate <deck>   check a deck against the spec rules
-  slides [--dir <path>] install-skill  (re)install the Claude Code authoring skill
+  slides [--dir <path>] install-skill     (re)install the Claude Code authoring skill
+
+<deck> is a deck name, a path to one (decks/my-talk), or "." from inside a deck folder.
+A bare word is always a name, never a relative path.
 
 Workspace resolution (in precedence order):
   --dir <path>   an existing directory; never created

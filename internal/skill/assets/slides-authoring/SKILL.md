@@ -596,6 +596,13 @@ slides add-slide my-talk
 slides validate my-talk
 ```
 
+A deck can be named three ways, so you never have to `cd` first: by name
+(`my-talk`), by path (`decks/my-talk`, or a path to any file inside it), or as
+`.` when you are already inside the deck folder. Anything resolving outside the
+workspace's `decks/` is refused. A bare word is always a deck *name* — from
+inside `decks/my-talk/`, `slides validate assets` looks for a deck called
+`assets`, not the deck you are standing in; write `slides validate .` for that.
+
 ALWAYS run `slides validate` after editing a deck — it exits non-zero with
 readable diagnostics when the deck is malformed, so you can fix it before the
 canvas or presenter silently breaks:
