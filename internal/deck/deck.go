@@ -88,9 +88,9 @@ var chartVendor embed.FS
 
 // qrVendor holds the QR generator + the slides-builder QR plugin (P19):
 //   - vendor/qr/qrcode.js — qrcode-generator (Kazuhiko Arase, MIT; exposes the
-//                           global `qrcode`), the matrix/error-correction core.
+//     global `qrcode`), the matrix/error-correction core.
 //   - vendor/qr/plugin.js  — thin reveal plugin reading data-qr + data-qr-*,
-//                           building the SVG from the module matrix.
+//     building the SVG from the module matrix.
 //
 // Loaded in the scaffold so <div data-qr> blocks render in the editor, the
 // present route, and PDF export — all offline (spec principles-and-invariants, zero CDN URLs).

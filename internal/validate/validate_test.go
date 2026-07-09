@@ -161,8 +161,8 @@ func TestValidate_QrValid(t *testing.T) {
 // flagged invalid-attr.
 func TestValidate_QrInvalid(t *testing.T) {
 	for _, c := range []string{
-		`<div data-qr="">x</div>`,          // empty payload
-		`<div data-qr="   ">x</div>`,       // whitespace-only payload
+		`<div data-qr="">x</div>`,                 // empty payload
+		`<div data-qr="   ">x</div>`,              // whitespace-only payload
 		`<div data-qr="x" data-qr-ec="Z">x</div>`, // bad EC level
 	} {
 		res := Bytes([]byte(c), "")

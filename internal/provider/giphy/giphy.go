@@ -89,8 +89,8 @@ func (p *Provider) Search(query string, page int) ([]provider.Result, int, error
 
 	var apiResp struct {
 		Data []struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
+			ID     string `json:"id"`
+			Title  string `json:"title"`
 			Images struct {
 				FixedHeight struct {
 					URL    string `json:"url"`
@@ -154,8 +154,8 @@ func (p *Provider) Fetch(id, root, deckName string) (string, error) {
 
 	var gifMeta struct {
 		Data struct {
-			ID    string `json:"id"`
-			Title string `json:"title"`
+			ID     string `json:"id"`
+			Title  string `json:"title"`
 			Images struct {
 				Original struct {
 					URL string `json:"url"`

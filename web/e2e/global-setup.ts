@@ -5,9 +5,8 @@
  *  1. Locate the pre-built `slides` binary (must already be compiled).
  *  2. Create a temp workspace directory.
  *  3. Write a config.toml to that workspace so the server uses TEST_PORT.
- *  4. Scaffold a test deck: `./slides new smoke-deck`.
- *  5. Start `./slides` (serving from the temp workspace) and wait until
- *     GET /health returns 200.
+ *  4. Scaffold a test deck: `slides --dir <tmp> new smoke-deck`.
+ *  5. Start `slides --dir <tmp> serve` and wait until GET /health returns 200.
  *  6. Write the temp-dir path and PID to a shared-state file so
  *     global-teardown.ts can clean up.
  *
@@ -89,9 +88,13 @@ export default async function globalSetup(): Promise<void> {
 
   // Scaffold the test deck.
   // `slides new <name>` creates decks/<name>/{deck.html,custom.css,assets/}.
-  // The binary uses CWD as workspace root, so we pass cwd: tmpDir.
+  //
+  // We pass `--dir tmpDir` rather than relying on cwd: the binary resolves its
+  // workspace by walking up from the cwd looking for decks/, so a cwd-only setup
+  // would silently adopt an ancestor workspace if one ever existed above the OS
+  // temp dir. `--dir` pins it, and `new` initializes tmpDir since it has no decks/.
   await new Promise<void>((resolve, reject) => {
-    const proc = spawn(binaryPath, ['new', SMOKE_DECK], {
+    const proc = spawn(binaryPath, ['--dir', tmpDir, 'new', SMOKE_DECK], {
       cwd: tmpDir,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
@@ -103,9 +106,9 @@ export default async function globalSetup(): Promise<void> {
     });
   });
 
-  // Start the server (non-blocking). cwd=tmpDir means the workspace is the
-  // temp directory we prepared.
-  const server = spawn(binaryPath, ['serve'], {
+  // Start the server (non-blocking), pinned to the temp workspace we just
+  // initialized. It now has decks/, so `serve` resolves it as a real workspace.
+  const server = spawn(binaryPath, ['--dir', tmpDir, 'serve'], {
     cwd: tmpDir,
     stdio: ['ignore', 'pipe', 'pipe'],
     // Detach is intentionally NOT set — teardown kills by PID within the

@@ -11,20 +11,31 @@ operational only (commands, gotchas).
 - Frontend build **must run before** `go build` (the binary embeds `web/dist/`):
   - `cd web && npm install && npm run build`   # outputs to web/dist/
   - `go build -o slides ./cmd/slides`          # single binary
-- Run server: `./slides` (or `go run ./cmd/slides`). Default port **3000** (override in `config.toml`: `port = 8080`).
-- Scaffold a deck: `./slides new <name>` → `decks/<name>/{deck.html,custom.css,assets/}` (created **workspace-relative to CWD**, with reveal.js vendored offline into `assets/vendor/reveal/`).
-- Re-vendor reveal into an existing deck: `./slides vendor <name>`.
-- Append a starter slide: `./slides add-slide <name>`.
-- Validate a deck (layout contract, unique eids, asset existence, well-formedness, offline guard): `./slides validate <name>` (exit 0 = clean, non-zero + diagnostics = invalid). **Run after editing a deck by hand or with Claude Code.**
+- Run server: `slides` (or `go run ./cmd/slides`). Default port **3000** (override in `config.toml`: `port = 8080`).
+- Scaffold a deck: `slides new <name>` → `decks/<name>/{deck.html,custom.css,assets/}` (with reveal.js vendored offline into `assets/vendor/reveal/`).
+- Re-vendor reveal into an existing deck: `slides vendor <name>`.
+- Append a starter slide: `slides add-slide <name>`.
+- Validate a deck (layout contract, unique eids, asset existence, well-formedness, offline guard): `slides validate <name>` (exit 0 = clean, non-zero + diagnostics = invalid). **Run after editing a deck by hand or with Claude Code.**
+
+## Workspace resolution
+Every command resolves a **workspace root** — the directory holding `decks/` — before doing
+anything: `--dir <path>` (global, *before* the subcommand) › `$SLIDES_DIR` › nearest ancestor of
+the cwd containing `decks/`. So the binary runs from `$PATH`, from anywhere, including inside a
+deck folder. The resolved root is always logged.
+- **`new` is the only command that creates a workspace.** Everything else exits non-zero outside
+  one rather than scaffolding an unproven root. `--dir`/`$SLIDES_DIR` paths must already exist.
+- Testing against a throwaway root: `slides --dir /tmp/ws new intro` then `slides --dir /tmp/ws`.
 
 ## Deck authoring (for Claude Code)
-When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`.claude/skills/slides-authoring/SKILL.md`) and the full contract reference (`docs/AUTHORING.md`): the `data-*` layout vocabulary, `data-eid` rules, offline-first (no external URLs), and turn-taking. Always finish with `./slides validate <name>`.
+When authoring/editing decks in `decks/`, follow the `slides-authoring` skill (`.claude/skills/slides-authoring/SKILL.md`) and the full contract reference (`docs/AUTHORING.md`): the `data-*` layout vocabulary, `data-eid` rules, offline-first (no external URLs), and turn-taking. Always finish with `slides validate <name>`.
 
 ## Dev
 - `cd web && npm run dev` (Vite on :5173). Vite proxies `/api` and `/events` to the Go backend on **:3000** (override with `GO_PORT`). Run the Go server separately.
 
 ## Test
-- Go: `go test ./...`
+- Go: `go test ./...` (+ `gofmt -l cmd/ internal/` — must print nothing; `go vet ./...`).
+- Frontend types: `cd web && npm run check` (svelte-check). **Not** bare `npx tsc` — it can't
+  resolve types exported from `<script module>` in `.svelte` files and reports phantom errors.
 - Frontend: `cd web && npx vitest run`
 - E2e (Playwright vs the built binary): `cd web && npm run test:e2e` (builds FE+binary, spins a temp
   workspace on port 19999, runs Chromium). In CI/without local browsers, run inside the host

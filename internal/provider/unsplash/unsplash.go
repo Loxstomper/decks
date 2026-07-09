@@ -25,8 +25,8 @@ import (
 )
 
 const (
-	apiBase    = "https://api.unsplash.com"
-	perPage    = 20 // results per search page
+	apiBase     = "https://api.unsplash.com"
+	perPage     = 20 // results per search page
 	httpTimeout = 15 * time.Second
 )
 

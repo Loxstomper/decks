@@ -77,9 +77,16 @@ mistyped `cd` followed by `slides` litters empty `decks/`, `templates/`, `shared
     slides --dir <path>   use an existing one
   ```
 
+- **The `decks/` marker is required of every resolution source alike.** An explicit `--dir` /
+  `$SLIDES_DIR` must *exist*, but existing is not the same as being a workspace: pointing either
+  at a directory without `decks/` is the same "not a workspace" condition as an upward search that
+  found nothing. `slides new` initializes it; everything else refuses. One rule, so the safety
+  property doesn't depend on how the root was named — and `slides --dir ~/Downloads` can no more
+  litter a workspace than `cd ~/Downloads && slides` can.
 - Missing *non-deck* directories (`templates/`, `shared/`, `themes/`) inside an already-resolved
   root are created on demand; their absence is not an error, and readers already treat an absent
-  `shared/` as empty.
+  `shared/` as empty. They are never the marker, so creating them can never manufacture a
+  workspace.
 
 Commands **always report the resolved root** (`serve` logs it at startup; errors name it). The
 upward search can legitimately surprise — a stray `~/decks/` turns all of `$HOME` into a

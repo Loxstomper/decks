@@ -23,8 +23,7 @@ practical how-to guide with annotated snippets.
 ## 1. Project layout
 
 ```
-<workspace>/
-  slides           # the Go binary (run from this directory)
+<workspace>/          # any directory containing decks/ — the `slides` binary lives on $PATH
   config.toml      # editor prefs — no secrets
   decks/
     <name>/
@@ -565,8 +564,21 @@ The editor and Claude Code both write `deck.html`. v1 uses **turn-taking**:
 
 ## 14. CLI workflow
 
+`slides` lives on `$PATH` and finds the workspace itself, so you can run it from
+anywhere — including from inside `decks/<name>/`. It resolves the root as
+`--dir <path>` (before the subcommand) › `$SLIDES_DIR` › the nearest ancestor
+containing `decks/`, and prints the root it chose. If a command reports
+
+```
+error: /some/dir is not a slides workspace (no decks/).
+```
+
+you are outside a workspace: pass `slides --dir <path> …`, don't `cd` and retry
+blindly. **`slides new` is the only command that creates a workspace** — every
+other command refuses rather than scaffolding one where you didn't mean it.
+
 ```bash
-# Scaffold a new deck
+# Scaffold a new deck (initializes a workspace if there is none)
 slides new my-talk
 
 # (Re)vendor reveal.js into an existing deck after a binary upgrade
