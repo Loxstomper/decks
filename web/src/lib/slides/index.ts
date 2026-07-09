@@ -13,6 +13,7 @@ export {
   isVerticalStack,
   isSlideHidden,
   buildSlideTree,
+  indicesToEid,
   addSlide,
   duplicateSlide,
   deleteSlide,

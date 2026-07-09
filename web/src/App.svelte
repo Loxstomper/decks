@@ -75,7 +75,8 @@
   } from '$lib/canvas/aspect-commands.ts';
   import { domRectToLogical } from '$lib/canvas/overlay-geometry.ts';
   import { menuItemsFor, type MenuSelection } from '$lib/canvas/context-menu.ts';
-  import { isSlideHidden } from '$lib/slides';
+  import { isSlideHidden, onSlideChanged, indicesToEid } from '$lib/slides';
+  import { viewedSlide } from '$lib/canvas/viewed-slide.svelte.ts';
   import { ensurePresets, layoutPresets } from '$lib/store/layout-presets.svelte';
   import {
     classify,
@@ -311,8 +312,9 @@
   // The motion panels (fragments / transition / auto-animate) operate on "the
   // current slide". We resolve that as the nearest enclosing <section> of the
   // current selection (so editing an element inside a slide targets that slide),
-  // falling back to the first top-level slide when nothing is selected. reveal is
-  // 2D, so the innermost enclosing <section> is exactly the presented slide.
+  // falling back to the slide the canvas is actually PRESENTING (viewedSlide),
+  // and only then to the first slide. reveal is 2D, so the innermost enclosing
+  // <section> is exactly the presented slide.
   const currentSlideEid = $derived.by<string | null>(() => {
     const model = deckStore.model;
     if (!model) return null;
@@ -327,8 +329,23 @@
         cursor = eid ? findParentOf(model, eid) : null;
       }
     }
+    const viewed = indicesToEid(model, viewedSlide.h, viewedSlide.v);
+    if (viewed) return viewed;
     const slides = getSlides(model);
     return slides.length ? getAttribute(slides[0], 'data-eid') : null;
+  });
+
+  // Track the slide reveal is presenting into the app-global viewedSlide store,
+  // so the insert seam and the motion panels target the slide on screen rather
+  // than slide 1. ONE authoritative subscription (App owns the canvas iframe);
+  // re-subscribe when the iframe is recreated or the deck reloads (reloadNonce
+  // bump → reveal re-inits with a fresh event bus).
+  $effect(() => {
+    void deckStore.reloadNonce;
+    const iframe = canvasIframe;
+    if (!iframe) return;
+    const unsub = onSlideChanged(iframe, ({ h, v }) => viewedSlide.set(h, v));
+    return unsub;
   });
 
   // Right-panel lower zone: tabbed between element Properties, Motion authoring,

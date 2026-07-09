@@ -19,7 +19,8 @@
 
   import { deckStore } from '$lib/store/deck.svelte';
   import { selectionStore } from '$lib/canvas/selection.svelte';
-  import { buildSlideTree, navigateToSlide, onSlideChanged } from '$lib/slides';
+  import { viewedSlide } from '$lib/canvas/viewed-slide.svelte';
+  import { buildSlideTree, navigateToSlide } from '$lib/slides';
   import { hasThemeOverride } from '$lib/model/theme-badge';
   import SlideThumbnail from './SlideThumbnail.svelte';
   import { ensurePresets, layoutPresets } from '$lib/store/layout-presets.svelte';
@@ -57,32 +58,16 @@
 
   // ── Current slide reflection (P6-1) ─────────────────────────────────────────
 
-  // reveal's (h, v) indices, updated by its slidechanged events. We map these
-  // back to a slide eid for highlighting. Reset implicitly when the iframe or the
-  // on-disk copy (reloadNonce) changes — the effect below re-subscribes.
-  let currentH = $state(-1);
-  let currentV = $state(-1);
-
-  $effect(() => {
-    // Re-subscribe when the iframe is recreated OR the deck reloads (reloadNonce
-    // bump → reveal re-inits with a fresh event bus).
-    void deckStore.reloadNonce;
-    const iframe = iframeEl;
-    if (!iframe) return;
-    const unsub = onSlideChanged(iframe, ({ h, v }) => {
-      currentH = h;
-      currentV = v;
-    });
-    return unsub;
-  });
-
+  // reveal's (h, v) indices live in the app-global viewedSlide store, written by
+  // the shell's single onSlideChanged subscription (App.svelte). We map them back
+  // to a slide eid for highlighting.
   /** eid of the slide reveal is currently presenting (null when unknown). */
   const currentEid = $derived.by(() => {
-    const top = tree[currentH];
+    const top = tree[viewedSlide.h];
     if (!top) return null;
     if (top.verticals.length > 0) {
       // In a stack, v selects the nested slide; v=0 is the first vertical slide.
-      return top.verticals[currentV]?.eid ?? top.verticals[0]?.eid ?? null;
+      return top.verticals[viewedSlide.v]?.eid ?? top.verticals[0]?.eid ?? null;
     }
     return top.eid;
   });
