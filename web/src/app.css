@@ -1,6 +1,10 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+
+/* Tailwind v4 is CSS-first, but the chrome tokens below still live in
+   tailwind.config.js (colours built from `rgb(var(--token) / <alpha-value>)`).
+   `@config` keeps that JS config authoritative instead of porting it to `@theme`
+   and duplicating the token list. */
+@config '../tailwind.config.js';
 
 /*
  * Workspace chrome themes (spec theming-and-styles — editor chrome themes).
