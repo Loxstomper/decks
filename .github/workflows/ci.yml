@@ -88,8 +88,32 @@ jobs:
           cache: true
 
       # `go run <module>@<version>` rather than a marketplace action: one less
-      # third-party action to trust, and the module is version-pinned and verified
-      # against the Go checksum database.
+      # third-party action to trust.
+      #
+      # A Go version tag is NOT a mutable pointer the way an Action tag is.
+      # v8.30.1 resolves to an immutable content hash, proxy.golang.org caches the
+      # original zip, and sum.golang.org is an append-only transparency log; a
+      # repointed upstream tag fails with "SECURITY ERROR: checksum mismatch".
+      # Pinning @<commit-sha> would yield a pseudo-version through the same check
+      # -- more opaque, no stronger.
+      #
+      # The gap `go run pkg@version` leaves is that gitleaks is not a dependency of
+      # this module, so nothing in this repo records the hash we expect: CI would be
+      # trusting sum.golang.org at fetch time with no local anchor. Assert it here.
+      # To bump: change the version, run the command, paste the new Sum.
+      - name: Verify the gitleaks module hash
+        run: |
+          expected='h1:PmEvCfVI7ti9dV3s5aMZUY7sS2GxRvG3yzih7E+cS3w='
+          actual=$(go mod download -json github.com/zricethezav/gitleaks/v8@v8.30.1 \
+                   | grep '"Sum":' | head -1 | cut -d'"' -f4)
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::gitleaks module hash mismatch"
+            echo "  expected: $expected"
+            echo "  actual:   $actual"
+            exit 1
+          fi
+          echo "gitleaks v8.30.1 content hash verified: $actual"
+
       - name: gitleaks
         run: |
           go run github.com/zricethezav/gitleaks/v8@v8.30.1 git \
