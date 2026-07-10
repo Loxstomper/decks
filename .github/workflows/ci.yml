@@ -84,14 +84,11 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
-          # NOT go-version-file: go.mod. gitleaks is a *tool*, not a dependency of
-          # this module, and v8.30.1 declares `go 1.24.11` -- newer than the 1.23.0
-          # this project builds against. setup-go exports GOTOOLCHAIN=local, so
-          # `go run` may not fetch a newer toolchain on demand and fails with
-          # "requires go >= 1.24.11 (running go 1.23.0)". Give this job its own Go
-          # instead of dragging the whole project's floor up for one linter.
-          # Bump in step with the gitleaks version pinned below.
-          go-version: '1.24.11'
+          # setup-go exports GOTOOLCHAIN=local, so `go run` cannot fetch a newer
+          # toolchain on demand: go.mod's floor must stay >= the `go` directive of
+          # the gitleaks version pinned below (v8.30.1 wants 1.24.11), or this job
+          # dies with "requires go >= X (running go Y)".
+          go-version-file: go.mod
           cache: true
 
       # `go run <module>@<version>` rather than a marketplace action: one less
