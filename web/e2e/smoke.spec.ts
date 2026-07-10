@@ -1,7 +1,8 @@
 /**
  * e2e/smoke.spec.ts — Smoke test for the decks editor.
  *
- * Opens the editor in a real browser and asserts:
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never
+ * share a deck), opens the editor in a real browser, and asserts:
  *  1. The deck name appears in the navigator (deck-list sidebar).
  *  2. The canvas iframe is visible on the page.
  *  3. The iframe has loaded reveal.js (the .reveal root element is present
@@ -24,18 +25,25 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import { createDeck, openDeckInEditor } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-smoke';
+
+test.beforeAll(async () => {
+  await createDeck(DECK);
+});
 
 test.describe('Editor smoke test', () => {
   test('loads the editor and renders the canvas iframe', async ({ page }) => {
-    // Navigate to the root (the Svelte SPA).
-    await page.goto('/');
+    // Navigate to the root and open this spec's deck (the SPA otherwise opens
+    // the alphabetically-first deck, which need not be this one).
+    await openDeckInEditor(page, DECK);
 
     // ── 1. Deck appears in the navigator sidebar ─────────────────────────────
     // App.svelte renders a <ul> with one <button> per deck whose text content
     // is the deck name. Wait for it to appear (the fetch to /api/decks is async).
-    const deckButton = page.locator('ul button', { hasText: SMOKE_DECK });
+    const deckButton = page.locator('ul button', { hasText: DECK });
     await expect(deckButton).toBeVisible({ timeout: 8_000 });
 
     // ── 2. Canvas iframe is visible ──────────────────────────────────────────

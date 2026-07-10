@@ -20,12 +20,17 @@
  *  we do NOT block legitimate localhost requests; we just collect violations
  *  and assert at the end. iframes are covered because Playwright's request
  *  listener fires for all frames in the page context.
+ *
+ * SETUP: this spec scaffolds and owns its own deck (see fixtures.ts — specs
+ * never share a deck).
  */
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import { createDeck } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-offline-guard';
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -86,6 +91,14 @@ async function assertNoExternalRequests(
 }
 
 // ---------------------------------------------------------------------------
+// Setup
+// ---------------------------------------------------------------------------
+
+test.beforeAll(async () => {
+  await createDeck(DECK);
+});
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -96,7 +109,7 @@ test.describe('Offline guard — no external requests (P9-2 / X-1)', () => {
     await assertNoExternalRequests(
       page,
       '/',
-      `ul button:has-text("${SMOKE_DECK}")`,
+      `ul button:has-text("${DECK}")`,
     );
   });
 
@@ -105,7 +118,7 @@ test.describe('Offline guard — no external requests (P9-2 / X-1)', () => {
     // Wait for the .reveal root to confirm reveal.js finished bootstrapping.
     await assertNoExternalRequests(
       page,
-      `/present/${SMOKE_DECK}/`,
+      `/present/${DECK}/`,
       '.reveal',
     );
   });

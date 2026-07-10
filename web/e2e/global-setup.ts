@@ -5,7 +5,9 @@
  *  1. Locate the pre-built `decks` binary (must already be compiled).
  *  2. Create a temp workspace directory.
  *  3. Write a config.toml to that workspace so the server uses TEST_PORT.
- *  4. Scaffold a test deck: `decks --dir <tmp> new smoke-deck`.
+ *  4. Scaffold the baseline deck: `decks --dir <tmp> new smoke-deck`. It exists so
+ *     a cold `GET /` has a deck to open; specs that mutate a deck create their
+ *     own with `createDeck()` (see fixtures.ts) rather than sharing this one.
  *  5. Start `decks --dir <tmp> serve` and wait until GET /health returns 200.
  *  6. Write the temp-dir path and PID to a shared-state file so
  *     global-teardown.ts can clean up.
@@ -21,23 +23,11 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { SMOKE_DECK, STATE_FILE, TEST_PORT } from './constants.ts';
+
 // ESM: reproduce __dirname
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
-
-// ---------------------------------------------------------------------------
-// Constants shared between setup and teardown via a state file.
-// The state file lives next to this file so it's easy to find.
-// ---------------------------------------------------------------------------
-
-/** Where to write the runtime state (PID + tmpDir) for teardown. */
-export const STATE_FILE = join(__dirname, '.e2e-state.json');
-
-/** The deck name scaffolded during setup (used by specs). */
-export const SMOKE_DECK = 'smoke-deck';
-
-/** The port the test server listens on. */
-export const TEST_PORT = parseInt(process.env.TEST_PORT ?? '19999', 10);
 
 // ---------------------------------------------------------------------------
 // Helpers

@@ -117,4 +117,12 @@
   position: absolute;
   /* Box-sizing so data-w/data-h are inclusive of padding/border. */
   box-sizing: border-box;
+  /* A free element's box IS its declared logical rect: `top`/`left` position the
+     MARGIN edge, so any inherited margin silently shifts the element away from
+     data-x/data-y while the editor's overlay keeps drawing handles at the
+     declared coordinates. reveal's own themes set `.reveal p { margin: <block>
+     0 }` (specificity 0,1,1), which outranks a bare `[data-free]` rule — hence
+     !important. Margin is layout, and the editor owns layout; use padding to
+     inset a free element's content. */
+  margin: 0 !important;
 }

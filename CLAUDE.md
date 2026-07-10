@@ -52,6 +52,16 @@ changing the source, run `decks install-skill` from the repo root and commit bot
 - E2e (Playwright vs the built binary): `cd web && npm run test:e2e` (builds FE+binary, spins a temp
   workspace on port 19999, runs Chromium). In CI/without local browsers, run inside the host
   `mcr.microsoft.com/playwright` image via `npm run test:e2e:docker`. Specs live in `web/e2e/*.spec.ts`.
+  - One spec, against the already-built binary: `cd web && ./node_modules/.bin/playwright test
+    e2e/<file>.spec.ts`. Must be run **from `web/`** and via the local binary — bare `npx playwright`
+    elsewhere fetches a *different* Playwright version, which fails with the misleading
+    "test.beforeAll() did not expect to be called here".
+  - **Every spec scaffolds and owns its own deck** (`POST /api/decks/{name}`) — never share one, or
+    specs trample each other and pass alone while failing in the full run. Use the shared helpers in
+    `web/e2e/fixtures.ts` (`createDeck`, `getDeckHtml`/`putDeckHtml`, `appendSlides`/`prependSlides`/
+    `appendToFirstSlide`, `openDeckInEditor`, `thumbnailSrcdocs`, `menuItem`) rather than re-rolling
+    them. `openDeckInEditor` is mandatory: a bare `page.goto('/')` opens `decks[0]` (alphabetically
+    first), not your deck.
 
 ## Gotchas
 - **The layout contract is encoded five times.** Independent re-implementations of the same
@@ -74,6 +84,9 @@ changing the source, run `decks install-skill` from the repo root and commit bot
   `injectSlideThemesLink` for the pattern.
 - **JS-rendered leaves must paint a thumbnail placeholder** (code, KaTeX, Chart, QR). The
   thumbnail iframe runs no scripts; this is a documented fidelity gap, not a bug (spec slide-management).
+  Thumbnails also carry **no `data-eid`** (`cloneSubtreeStripEids`) and are **IntersectionObserver-gated**
+  — an offscreen row never builds its `srcdoc`. Correlate a thumbnail to its slide by rendered text,
+  and scroll the row in first.
 - **Optional external tools degrade gracefully** (offline-first): image providers need
   `UNSPLASH_ACCESS_KEY` / `GIPHY_API_KEY` (absent → provider disabled); PDF export needs Chrome
   via `$CHROME_BIN` or a common name (absent → 503); video transcode needs `ffmpeg` (absent →

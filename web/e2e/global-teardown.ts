@@ -7,15 +7,8 @@
  */
 
 import { existsSync, readFileSync, rmSync, unlinkSync } from 'node:fs';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 
-// ESM: reproduce __dirname
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-// Inline STATE_FILE to avoid importing global-setup (which re-runs top-level code)
-const STATE_FILE = join(__dirname, '.e2e-state.json');
+import { STATE_FILE } from './constants.ts';
 
 export default async function globalTeardown(): Promise<void> {
   if (!existsSync(STATE_FILE)) {

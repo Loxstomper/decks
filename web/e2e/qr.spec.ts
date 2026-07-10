@@ -14,6 +14,9 @@
  * The script-free navigator thumbnail painting a placeholder is a unit-tested
  * concern (thumbnail.ts substituteQrPlaceholders) — not exercised here.
  *
+ * SETUP: this spec scaffolds and owns its own deck (see fixtures.ts — specs
+ * never share a deck), then injects a QR slide via the PUT API.
+ *
  * CANNOT RUN WITHOUT THE BUILT BINARY (Playwright, not vitest):
  *   npm run test:e2e        (or npm run test:e2e:docker)
  * Type-check without running:
@@ -22,28 +25,13 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import { createDeck, getDeckHtml, prependSlides, putDeckHtml } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-qr';
 
 const QR_EID = 'e2e-qr-p19';
 const QR_PAYLOAD = 'https://example.com/qr-e2e';
-
-// ── Helpers (mirror phase17.spec.ts) ─────────────────────────────────────────
-
-async function getDeckHtml(baseUrl: string, deck: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deck} → ${res.status}`);
-  return res.text();
-}
-
-async function putDeckHtml(baseUrl: string, deck: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deck} → ${res.status}`);
-}
 
 function isExternal(url: string): boolean {
   try {
@@ -55,11 +43,11 @@ function isExternal(url: string): boolean {
   }
 }
 
-// ── Setup: inject a QR slide into the smoke deck once ─────────────────────────
+// ── Setup: scaffold this spec's own deck and inject a QR slide ────────────────
 
-test.beforeAll(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+test.beforeAll(async () => {
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
   if (html.includes(`data-eid="${QR_EID}"`)) return; // idempotent
 
   const qrSlide =
@@ -69,15 +57,15 @@ test.beforeAll(async ({ baseURL }) => {
     `aria-label="QR code: ${QR_PAYLOAD}" style="width: 280px; height: 280px"></div>` +
     `</section>`;
 
-  html = html.replace(/(<div class="slides">)/, `$1\n${qrSlide}\n`);
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  html = prependSlides(html, qrSlide);
+  await putDeckHtml(DECK, html);
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 test.describe('Phase 19 — QR code block', () => {
   test('QR div is rendered to an SVG by the plugin, offline (P19-1/2)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     const result = await page.evaluate(async (eid: string) => {
@@ -107,15 +95,11 @@ test.describe('Phase 19 — QR code block', () => {
     expect(result.viewBox, 'viewBox includes quiet zone (modules + 8)').toMatch(/^0 0 \d+ \d+$/);
   });
 
-  test('on-disk QR div stays empty — the SVG is a runtime artefact (byte-stable)', async ({
-    baseURL,
-  }) => {
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const html = await getDeckHtml(baseUrl, SMOKE_DECK);
+  test('on-disk QR div stays empty — the SVG is a runtime artefact (byte-stable)', async () => {
+    const html = await getDeckHtml(DECK);
     expect(html).toContain(`data-qr="${QR_PAYLOAD}"`);
     // The QR div itself must round-trip EMPTY on disk — the runtime SVG is never
-    // persisted (data-bound, byte-stable). Match just this element's inner HTML
-    // (the shared smoke deck may carry SVGs from other features/specs).
+    // persisted (data-bound, byte-stable). Match just this element's inner HTML.
     const m = html.match(new RegExp(`<div[^>]*data-eid="${QR_EID}-q"[^>]*>([\\s\\S]*?)</div>`));
     expect(m, 'QR div must be present on disk').not.toBeNull();
     expect(m![1].trim(), 'QR div must be empty on disk (SVG is runtime-only)').toBe('');
@@ -126,7 +110,7 @@ test.describe('Phase 19 — QR code block', () => {
     page.on('request', (req) => {
       if (isExternal(req.url())) external.push(req.url());
     });
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1000);
     expect(external, `external requests: ${external.join(', ')}`).toEqual([]);

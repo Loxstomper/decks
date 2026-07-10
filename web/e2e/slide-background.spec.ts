@@ -15,9 +15,10 @@
  *
  *  3. Navigator thumbnail: thumbnail.ts (P16-4) inlines background-image as a CSS
  *     rule on the section in the script-free srcdoc.  Verified by reading the
- *     srcdoc attribute of every iframe.thumb-frame in the editor page and confirming
- *     the one belonging to our slide contains both the slide's data-eid and the
- *     asset file name.  No need to enter the sandboxed frame.
+ *     srcdoc attribute of every iframe.thumb-frame in the editor page, finding the
+ *     one whose heading identifies our slide, and confirming it carries the asset
+ *     file name while the plain slide's thumbnail does not.  No need to enter the
+ *     sandboxed frame.  (Thumbnails carry no data-eid — the clone strips them.)
  *
  *  4. Offline guard: the present route must make zero external http(s) requests even
  *     when a background-image slide is in the deck (the asset is local — spec principles-and-invariants /
@@ -48,9 +49,9 @@
  *
  * SETUP:
  * ======
- * Global setup (e2e/global-setup.ts) scaffolds "smoke-deck" in a fresh temp workspace.
- * This spec's beforeAll:
- *   1. Writes a minimal 1×1 SVG to <tmpDir>/decks/smoke-deck/assets/test-bg.svg
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never share a
+ * deck). Its beforeAll:
+ *   1. Writes a minimal 1×1 SVG to <tmpDir>/decks/<deck>/assets/test-bg.svg
  *      (the image is deck-local — it satisfies the offline guard).
  *   2. Injects three slides into the deck via PUT /api/decks/{name}:
  *      a) A slide with data-background-image="assets/test-bg.svg".
@@ -72,17 +73,26 @@
  *   cd web && npx tsc -p e2e/tsconfig.json
  */
 
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
-import { STATE_FILE } from './global-setup';
+
+import {
+  appendSlides,
+  createDeck,
+  deckAssetsDir,
+  getDeckHtml,
+  openDeckInEditor,
+  putDeckHtml,
+  thumbnailSrcdocs,
+} from './fixtures.ts';
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-slide-background';
 
 // Unique data-eid values — unique across all e2e specs so reruns / parallel
 // spec files don't trample each other.
@@ -107,25 +117,8 @@ const MINIMAL_SVG =
   '</svg>';
 
 // ---------------------------------------------------------------------------
-// API helpers (duplicated across specs — each spec is self-contained)
+// Helpers
 // ---------------------------------------------------------------------------
-
-/** Fetch the current deck.html from the API (returns the raw HTML string). */
-async function getDeckHtml(baseUrl: string, deckName: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deckName} → ${res.status}`);
-  return res.text();
-}
-
-/** PUT new deck.html to the API. */
-async function putDeckHtml(baseUrl: string, deckName: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deckName} → ${res.status}`);
-}
 
 /** Returns true if the URL points to an external (non-local) host. */
 function isExternal(url: string): boolean {
@@ -147,17 +140,15 @@ function isExternal(url: string): boolean {
  * can reference it locally, then inject the three test slides if not present.
  * Idempotent: reruns against a persisted workspace skip re-injection.
  */
-test.beforeAll(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
+test.beforeAll(async () => {
+  await createDeck(DECK);
 
-  // Locate the temp workspace directory written by global-setup.ts.
-  const state = JSON.parse(readFileSync(STATE_FILE, 'utf8')) as { tmpDir: string };
-  const assetsDir = join(state.tmpDir, 'decks', SMOKE_DECK, 'assets');
+  const assetsDir = deckAssetsDir(DECK);
   mkdirSync(assetsDir, { recursive: true });
   // Write idempotently — overwriting the same content on reruns is fine.
   writeFileSync(join(assetsDir, 'test-bg.svg'), MINIMAL_SVG, 'utf8');
 
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+  let html = await getDeckHtml(DECK);
   // Idempotent: if our primary eid is already present the slides are already injected.
   if (html.includes(`data-eid="${BG_IMG_EID}"`)) return;
 
@@ -190,16 +181,13 @@ test.beforeAll(async ({ baseURL }) => {
     `</section>` +
     `</section>`;
 
-  // Splice all three slides before the closing </div></div> of .slides + .reveal
-  // (the two tags appear together in the scaffold's deck.html).  Using the same
-  // replacement pattern as per-slide-theme.spec.ts: the captured group becomes $1
-  // so the new slides land just inside .slides before it closes.
-  html = html.replace(
-    /(<\/div>\s*<\/div>[\s\S]*?<\/body>)/,
-    `${bgSlide}\n${plainSlide}\n${stackSlide}\n$1`,
-  );
+  // Append all three as the last slides inside `.slides`. appendSlides() anchors
+  // on the final `</section>` and throws when it can't find one — unlike the old
+  // `</div></div>` regex, whose first match moved as soon as a fixture slide
+  // contained nested divs, silently splicing these sections *inside* a slide.
+  html = appendSlides(html, `${bgSlide}\n${plainSlide}\n${stackSlide}`);
 
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  await putDeckHtml(DECK, html);
 });
 
 // ---------------------------------------------------------------------------
@@ -218,8 +206,7 @@ test.describe('Slide image background — canvas + present + thumbnail + offline
    * with the matching URL proves the attribute was parsed and rendered.
    */
   test('canvas: reveal creates .slide-background-content with background-image for image slide', async ({ page }) => {
-    await page.goto('/');
-    await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
+    await openDeckInEditor(page, DECK);
 
     const frame = page.frameLocator('iframe.reveal-frame-iframe');
     // Wait for reveal to bootstrap.
@@ -256,7 +243,7 @@ test.describe('Slide image background — canvas + present + thumbnail + offline
    * ?print-pdf, for PDF export — so passing here transitively proves PDF fidelity.
    */
   test('present route: reveal creates .slide-background-content with background-image', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     // Wait until reveal has created its background layer.
     await page.locator('.slide-background-content').first().waitFor({ timeout: 8_000 });
@@ -278,45 +265,49 @@ test.describe('Slide image background — canvas + present + thumbnail + offline
   });
 
   /**
-   * Navigator thumbnail: thumbnail.ts (P16-4) applies the image as an inline
-   * CSS background-image rule on the section element inside the script-free srcdoc.
+   * Navigator thumbnail: thumbnail.ts (P16-4) applies the image as a CSS
+   * background-image rule on the section inside the script-free srcdoc.
    *
-   * The srcdoc is set as a string attribute on each iframe.thumb-frame element in the
-   * editor DOM — it is readable via standard DOM access without entering the sandboxed
-   * frame (sandbox="" gives an opaque origin, but the attribute itself is on the outer
-   * page's iframe element).
+   * The srcdoc is a string attribute on each iframe.thumb-frame in the editor DOM,
+   * readable without entering the sandboxed frame (sandbox="" gives an opaque
+   * origin, but the attribute lives on the outer page's iframe element).
    *
-   * We locate the thumbnail iframe whose srcdoc contains BOTH the slide's data-eid AND
-   * the asset file name, which proves the thumbnail builder correctly emitted the
-   * background-image CSS for the image-background slide.
+   * WE CORRELATE BY HEADING TEXT, NOT BY data-eid: `applyThumbnailLayout()` clones
+   * the section through `cloneSubtreeStripEids()`, so a thumbnail's srcdoc never
+   * carries any data-eid — that is deliberate (eids identify model nodes in the
+   * deck document; duplicating them into a second document would be meaningless)
+   * and is pinned by thumbnail-layout.test.ts. An earlier version of this test
+   * asserted the eid was present and so could never pass.
+   *
+   * The plain-slide check is the control: it proves the background-image rule is
+   * emitted per-slide rather than smeared across every thumbnail.
    */
   test('navigator thumbnail srcdoc contains background-image for image-background slide', async ({ page }) => {
-    await page.goto('/');
-    // Wait until the Navigator has rendered at least one thumbnail iframe.
-    await expect(page.locator('iframe.thumb-frame').first()).toBeAttached({ timeout: 12_000 });
+    await openDeckInEditor(page, DECK);
+    // Thumbnails are IntersectionObserver-gated: scroll every row into view first,
+    // else the rows below the fold report an empty srcdoc.
+    const srcdocs = await thumbnailSrcdocs(page);
 
-    const found = await page.evaluate((eid: string) => {
-      /* eslint-disable @typescript-eslint/no-explicit-any */
-      const doc = (globalThis as any).document as any;
-      const iframes: any[] = Array.from(doc.querySelectorAll('iframe.thumb-frame'));
-      return iframes.some((f: any) => {
-        const srcdoc: string = f.srcdoc ?? '';
-        // The srcdoc must contain the slide's eid (so we know it's the right thumbnail)
-        // AND contain our asset path (proves thumbnail.ts emitted background-image for it).
-        return (
-          srcdoc.includes(`data-eid="${eid}"`) &&
-          srcdoc.includes('test-bg.svg')
-        );
-      });
-    }, BG_IMG_EID);
+    const imageSlideThumb = srcdocs.find((s) => s.includes('Image background slide'));
+    expect(
+      imageSlideThumb,
+      `Expected a thumb-frame whose srcdoc renders the image-background slide ` +
+      `(its <h2> reads "Image background slide"). Got ${srcdocs.length} thumbnails.`,
+    ).toBeDefined();
 
     expect(
-      found,
-      `Navigator thumbnail: expected an iframe.thumb-frame whose srcdoc contains ` +
-      `data-eid="${BG_IMG_EID}" AND 'test-bg.svg'. ` +
-      `thumbnail.ts (P16-4) must inline background-image as CSS on the section ` +
-      `when data-background-image is set and the path is local (not http://).`,
-    ).toBe(true);
+      imageSlideThumb,
+      `thumbnail.ts (P16-4) must inline background-image as CSS on the section when ` +
+      `data-background-image is set and the path is local (not http://).`,
+    ).toContain('test-bg.svg');
+
+    // Control: the no-background slide's thumbnail must NOT carry the image.
+    const plainSlideThumb = srcdocs.find((s) => s.includes('Plain slide (no background)'));
+    expect(plainSlideThumb, 'expected a thumbnail for the plain slide').toBeDefined();
+    expect(
+      plainSlideThumb,
+      'the plain slide has no data-background-image, so its thumbnail must not reference the asset',
+    ).not.toContain('test-bg.svg');
   });
 
   /**
@@ -334,7 +325,7 @@ test.describe('Slide image background — canvas + present + thumbnail + offline
       if (isExternal(req.url())) externalRequests.push(req.url());
     });
 
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     // Let any lazy/deferred loads (lazy plugins, font-face, etc.) settle.
     await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {
@@ -370,7 +361,7 @@ test.describe('Vertical background cascade — propagateVerticalBackground() (P1
    */
 
   test('V1 inherits data-background-image from vertical stack (propagateVerticalBackground)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // V1 carries no background attrs of its own; after propagation it must have
@@ -392,7 +383,7 @@ test.describe('Vertical background cascade — propagateVerticalBackground() (P1
   });
 
   test('V1 inherits data-background-color from vertical stack (propagateVerticalBackground)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     const v1BgColor = await page.evaluate((eid: string) => {
@@ -412,7 +403,7 @@ test.describe('Vertical background cascade — propagateVerticalBackground() (P1
   });
 
   test('V2 inner data-background-color override wins (propagation must not overwrite)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // V2 starts with data-background-color="#ff0000" (its own value).
@@ -437,7 +428,7 @@ test.describe('Vertical background cascade — propagateVerticalBackground() (P1
   });
 
   test('V2 inherits missing data-background-image from stack (per-attribute cascade)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // V2 has its own data-background-color but no data-background-image.

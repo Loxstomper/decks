@@ -44,8 +44,10 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import { appendSlides, createDeck, getDeckHtml, putDeckHtml } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-per-slide-theme';
 
 // Unique data-eid values for the two slides we inject so we can target them
 // precisely (avoids collisions with any prior injection by other specs).
@@ -59,23 +61,6 @@ const THEME_COLOR = '#839496';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-/** Fetch the current deck.html from the API (returns the raw HTML string). */
-async function getDeckHtml(baseUrl: string, deckName: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deckName} → ${res.status}`);
-  return res.text();
-}
-
-/** PUT new deck.html to the API. */
-async function putDeckHtml(baseUrl: string, deckName: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deckName} → ${res.status}`);
-}
-
 /** Returns true if the URL points to an external (non-local) host. */
 function isExternal(url: string): boolean {
   try {
@@ -87,10 +72,11 @@ function isExternal(url: string): boolean {
   }
 }
 
-// ── Setup: inject themed + plain slides into the smoke deck ───────────────────
+// ── Setup: scaffold this spec's own deck, then inject themed + plain slides ───
 
 /**
- * Inject two slides after the first existing slide:
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never
+ * share a deck), then injects two slides after the existing slide(s):
  *   - A themed horizontal slide (data-theme="solarized-dark").
  *   - A plain slide with no theme (inherits deck default).
  * A vertical stack is also added under the themed slide to exercise the
@@ -98,9 +84,9 @@ function isExternal(url: string): boolean {
  *
  * We use stable data-eid values so re-runs idempotently skip re-injection.
  */
-test.beforeAll(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+test.beforeAll(async () => {
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
 
   // Idempotent: skip if already injected.
   if (html.includes(`data-eid="${THEMED_EID}"`)) return;
@@ -125,13 +111,9 @@ test.beforeAll(async ({ baseURL }) => {
     `</section>`;
 
   // Append after the last existing </section> in the .slides block.
-  // We splice before </div> that closes .slides to keep the HTML valid.
-  html = html.replace(
-    /(<\/div>\s*<\/div>[\s\S]*?<\/body>)/,
-    `${themedSlide}\n${plainSlide}\n$1`,
-  );
+  html = appendSlides(html, `${themedSlide}\n${plainSlide}`);
 
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  await putDeckHtml(DECK, html);
 });
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -153,7 +135,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
    */
   test('themed slide has different --r-main-color than plain slide (present route)', async ({ page }) => {
     // Navigate to the present route (not the editor — this proves P10-8 directly).
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
 
     // Wait for reveal.js to bootstrap.
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
@@ -211,7 +193,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
    * paragraph actually restyles.
    */
   test('themed slide paragraph has different computed color than plain (P18-1)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     const readColor = (eid: string) =>
@@ -244,7 +226,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
    * No JS is needed for the var cascade — this test verifies the CSS behavior.
    */
   test('vertical child inherits --r-main-color from themed stack (P10-7 CSS cascade)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // The vertical child has no data-theme of its own — it inherits from the
@@ -282,7 +264,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
       if (isExternal(req.url())) externalRequests.push(req.url());
     });
 
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // Let any lazy/deferred loads settle.

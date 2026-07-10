@@ -15,9 +15,9 @@
  *
  * SETUP:
  * ======
- * Global setup creates one "smoke-deck" with two plain slides.  This spec's
- * beforeAll injects a [data-free] element into the first slide via the PUT API so
- * the overlay can be exercised without rebuilding the binary or changing the
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never share
+ * a deck), then injects a [data-free] leaf into the first slide via the PUT API
+ * so the overlay can be exercised without rebuilding the binary or changing the
  * scaffold template.  The injected HTML is intentional: it exercises the "free
  * element with explicit data-x/y/w/h" path that P15 targets.
  *
@@ -35,8 +35,16 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import {
+  appendToFirstSlide,
+  createDeck,
+  getDeckHtml,
+  openDeckInEditor,
+  putDeckHtml,
+} from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-free-position';
 const FREE_EID = 'e2e-free-p15';
 
 // Logical coords for the injected free element — easy round numbers for diff checking.
@@ -46,23 +54,6 @@ const FREE_W = 300;
 const FREE_H = 100;
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
-
-/** Fetch the current deck.html from the API (returns the raw HTML string). */
-async function getDeckHtml(baseUrl: string, deckName: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deckName} → ${res.status}`);
-  return res.text();
-}
-
-/** PUT new deck.html to the API. */
-async function putDeckHtml(baseUrl: string, deckName: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deckName} → ${res.status}`);
-}
 
 /**
  * Parse `data-x` or `data-y` out of the raw deck HTML for the element with
@@ -79,19 +70,27 @@ function parseAttr(html: string, eid: string, attr: string): number {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-test.beforeAll(async ({ baseURL }) => {
+test.beforeAll(async () => {
   /**
-   * Inject a free element into the first <section> of the smoke deck.
-   * We splice the element before the closing </section> tag so it lives
-   * inside the first slide and gets an absolute-positioned CSS transform
-   * from decks-layout-init.js.
+   * Inject a free element into the first <section>, so it gets absolute
+   * positioning from `[data-free]` in decks-layout.css plus the logical
+   * left/top/width/height that decks-layout-init.js writes from data-x/y/w/h.
    *
-   * data-x/y/w/h are explicit so FreeTransformOverlay uses the attribute
-   * values (not a measured fallback) — making the logical→screen math
+   * data-x/y/w/h are explicit so FreeTransformOverlay.measureRect() uses the
+   * attribute values (not a measured fallback) — making the logical→screen math
    * deterministic for our overlay-alignment assertion.
+   *
+   * WHY A <p> AND NOT A <div>: the free element has to be *selectable by click*,
+   * and per spec canvas-interaction ("Click to select a leaf; click-through /
+   * outline panel to select containers") `resolveSelectable()` walks up to the
+   * nearest recognised LEAF tag. A <div> is a container, so a click on it
+   * resolves to nothing, the selection stays empty, and FreeTransformOverlay
+   * renders no `.move-frame` — which is exactly why both tests in this file had
+   * never passed. A <p data-free> is what the editor's own "Make free" command
+   * produces from a text leaf, so this fixture mirrors real authored output.
    */
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
 
   if (html.includes(`data-eid="${FREE_EID}"`)) {
     // Already injected (e.g. spec re-run without restarting server).
@@ -99,35 +98,20 @@ test.beforeAll(async ({ baseURL }) => {
   }
 
   const freeEl =
-    `<div data-free data-eid="${FREE_EID}" ` +
+    `<p data-free data-eid="${FREE_EID}" ` +
     `data-x="${FREE_X}" data-y="${FREE_Y}" ` +
-    `data-w="${FREE_W}" data-h="${FREE_H}">Free element</div>`;
+    `data-w="${FREE_W}" data-h="${FREE_H}">Free element</p>`;
 
-  // Insert before the first </section>.
-  html = html.replace('</section>', `${freeEl}</section>`);
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  html = appendToFirstSlide(html, freeEl);
+  await putDeckHtml(DECK, html);
 });
-
-// ── Shared setup: open the editor and wait for the deck to render ─────────────
-
-/** Navigate to the editor root and wait for the smoke deck's canvas to be ready. */
-async function openEditor(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
-  // The iframe is hidden (visibility:hidden) while loading and becomes visible
-  // once handleLoad() fires and isLoading is set to false.
-  await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
-  // Confirm reveal rendered at least one slide inside the iframe.
-  await expect(
-    page.frameLocator('iframe.reveal-frame-iframe').locator('.reveal .slides section').first(),
-  ).toBeAttached({ timeout: 10_000 });
-}
 
 // ── Test 1: overlay alignment ─────────────────────────────────────────────────
 
 test(
   'free-transform overlay move-frame aligns with the free element (P15-5)',
   async ({ page }) => {
-    await openEditor(page);
+    await openDeckInEditor(page, DECK);
 
     // ── 1. Click the free element inside the iframe to select it ──────────────
     // CanvasInteraction attaches a click handler to the iframe's document.
@@ -173,8 +157,8 @@ test(
 
 test(
   'dragging the move-frame writes updated data-x/y to disk (P15-5)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    await openDeckInEditor(page, DECK);
 
     // Select the free element.
     const freeLocator = page
@@ -187,8 +171,7 @@ test(
     await expect(moveFrame).toBeVisible({ timeout: 5_000 });
 
     // Record the initial on-disk data-x/y.
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const htmlBefore = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlBefore = await getDeckHtml(DECK);
     const xBefore = parseAttr(htmlBefore, FREE_EID, 'data-x');
     const yBefore = parseAttr(htmlBefore, FREE_EID, 'data-y');
     expect(xBefore).not.toBeNaN();
@@ -211,7 +194,7 @@ test(
     // Intercept the autosave PUT so we know when the commit has landed on disk.
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -225,7 +208,7 @@ test(
     await putPromise;
 
     // ── Assert data-x/y increased on disk ─────────────────────────────────────
-    const htmlAfter = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlAfter = await getDeckHtml(DECK);
     const xAfter = parseAttr(htmlAfter, FREE_EID, 'data-x');
     const yAfter = parseAttr(htmlAfter, FREE_EID, 'data-y');
 

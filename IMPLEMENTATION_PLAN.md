@@ -68,32 +68,67 @@ history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → th
   14,163,730 bytes). `.git` 22 MB → 3.5 MB. Re-grows on `git fetch`, which re-imports
   `origin/main`'s old objects; harmless, and gc'd once the force-push lands.
 
-- [ ] **Fix the 10 failing e2e tests** (see below), then:
+- [x] **Fixed the 10 failing e2e tests.** Suite is now 37/37 and order-independent (see below).
 - [ ] **Force-push `main`**, delete the 2 stale remote branches and the 24 remote tag refs.
   Note: `git fetch` re-creates the 21 local tags until the remote ones are deleted.
 - [ ] **Enable GitHub secret scanning + push protection** (free on public repos, currently off).
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
 
-## e2e: the suite has now been run (2026-07-10)
+## e2e: 37/37, and the suite is now order-independent (2026-07-10)
 
-`npm run test:e2e` against the real binary: **27 passed, 10 failed** of 37. None of the failures
-are regressions — the same 7 fail identically on the pre-rename `fd81ea6`, verified by running the
-four affected spec files against both trees. Two distinct problems:
+Four distinct root causes, not the two the earlier triage guessed. Two were real product/test
+bugs; two were harness bugs that made specs pass alone and fail in the full run.
 
-- [ ] **7 specs have never passed.** Written and type-checked, never executed, so nobody saw the
-  selectors fail. At least the three `context-menu` failures are **spec bugs over a working
-  product**: the failure snapshot shows `menu "Context menu"` with `menuitem "Delete"` present, and
-  relaxing `hasText: /^Delete$/` to `'Delete'` makes the test pass in 593 ms — the anchored regex
-  matches the button's raw `textContent`, which carries the template whitespace around
-  `<span class="cm-label">`. Do not assume the rest are the same shape: the two `free-position`
-  failures are `toBeAttached` on `.move-frame`, i.e. the element never renders, which smells like
-  the test never gets the element into a selected state.
-  Failing: `context-menu` 147/191/250, `free-position` 127/174, `slide-background` 293,
-  `slide-layouts` 196.
-- [ ] **3 specs pass alone and fail in the full suite** — `slide-background` 220/258 and
-  `slide-layouts` 148. All 37 tests share one workspace and one `smoke-deck`, so earlier specs
-  mutate the deck later specs assert on. Order-dependence in the harness, not in the app.
+- **A real rendering bug — free elements drifted from their declared coordinates.**
+  `[data-free]` is absolutely positioned, and `top`/`left` position the *margin* edge, so
+  reveal's own `.reveal p { margin: var(--r-block-margin) 0 }` (specificity 0,1,1) silently
+  offset every free text leaf from its `data-x`/`data-y` while the editor's overlay kept drawing
+  handles at the declared rect — a visible 7px gap at default zoom. Fixed by `margin: 0
+  !important` on `[data-free]` in `internal/deck/vendor/decks-layout.css`. `!important` because a
+  bare `[data-free]` rule loses the cascade to the theme; margin is *layout*, and the editor owns
+  layout (use padding to inset a free element). The thumbnail builder links the same stylesheet,
+  so all five encodings of the contract stayed in agreement with one edit. **Existing decks pick
+  this up only via `decks vendor <name>` / `decks upgrade <name>`** (Upgrade re-vendors first).
+
+- **The three `context-menu` specs had never passed, over a working product.**
+  `page.locator('.cm-item', { hasText: /^Delete$/ })` can never match: a `.cm-item`'s text is
+  `"Delete "` — `ContextMenu.svelte` leaves a space between `<span class="cm-label">` and the
+  `{#if item.submenu}` chevron block — so the anchored `$` fails. Now matched by accessible name
+  via `menuItem(page, 'Delete')` (`getByRole('menuitem', { name, exact: true })`, which trims).
+
+- **`free-position` used a fixture the product cannot select.** It injected `<div data-free>`, but
+  `resolveSelectable()` climbs to the nearest recognised *leaf* tag, per spec canvas-interaction
+  ("Click to select a leaf; click-through / outline panel to select containers"). A `<div>` is a
+  container, so the click selected nothing and `FreeTransformOverlay` rendered no `.move-frame`.
+  The fixture is now `<p data-free>`, which is what "Make free" actually produces. (A free
+  *container* is still only selectable from the outline panel — intended, but see follow-ups.)
+
+- **Harness bug 1: the editor opens `decks[0]`, not "your" deck.** `App.onMount` loads the first
+  entry of `GET /api/decks`, which Go returns sorted by folder name. The moment
+  `create-deck.spec.ts` created `e2e-created-deck`, every later spec's bare `page.goto('/')`
+  silently opened the wrong deck. Now `openDeckInEditor(page, deck)` clicks the deck's own sidebar
+  button and waits for the canvas iframe's `src` to name it.
+
+- **Harness bug 2: all 37 tests shared one mutable `smoke-deck`.** Specs spliced fixture HTML into
+  it with hand-rolled regexes, and a non-matching `String.replace` is a *silent* no-op. `qr.spec`'s
+  injected slide introduced an earlier `</div></div>`, so `slide-background`'s splice landed
+  *inside* a slide, where reveal never treats sections as slides. Every spec now scaffolds its own
+  deck via `POST /api/decks/{name}`, and the injection helpers throw when their anchor is missing.
+
+- **A trap for the next spec author: thumbnails are IntersectionObserver-gated.** `SlideThumbnail`
+  only builds `srcdoc` once the row scrolls into view (each thumbnail refetches ~7 stylesheets).
+  A test reading `iframe.thumb-frame`'s `srcdoc` must call `thumbnailSrcdocs(page)`, which scrolls
+  every row in first — otherwise rows below the fold read empty, and the number of decks in the
+  sidebar decides where the fold is. Thumbnails also carry **no `data-eid`**
+  (`cloneSubtreeStripEids`, pinned by `thumbnail-layout.test.ts`), so correlate a thumbnail with
+  its slide by rendered text, never by eid.
+
+New shared harness modules: `web/e2e/constants.ts` (STATE_FILE / TEST_PORT / BASE_URL / SMOKE_DECK,
+previously duplicated between setup and teardown) and `web/e2e/fixtures.ts` (`createDeck`,
+`getDeckHtml`/`putDeckHtml`, `appendSlides`/`prependSlides`/`appendToFirstSlide`,
+`openDeckInEditor`, `thumbnailSrcdocs`, `menuItem`). `getDeckHtml`/`putDeckHtml` had been
+copy-pasted into six specs.
 
 Still uncovered by any headless check: the **visual-only** confirmations several phases flagged
 (overlay alignment at non-1.0 zoom, drag/snap feel, toolbar and palette UX, live restyles).
@@ -112,9 +147,6 @@ Loose ends surfaced while building, none load-bearing.
   to `GET /api/capabilities` and disable the button up front instead.
 - [ ] **Feature e2e coverage.** The harness and a create-deck example exist; delete/pane-collapse/
   source-jump/theme-switching still lack specs (`web/e2e/<feature>.spec.ts` convention).
-- [x] **e2e global-setup pins `--dir`.** `web/e2e/global-setup.ts` passes `--dir <tmpDir>` to both
-  `new` and `serve` rather than relying on cwd-as-root. Confirmed working: the suite now runs, the
-  server comes up on :19999 against a temp workspace, and 27 of 37 tests pass.
 - [ ] **Frontend typecheck is `npm run check` (svelte-check), not `npx tsc`.** Bare `tsc` cannot
   resolve types exported from `<script module>` in `.svelte` files (e.g. `MenuItem` from
   `ContextMenu.svelte`) and reports phantom errors. Recorded in `CLAUDE.md`.
@@ -130,6 +162,18 @@ Loose ends surfaced while building, none load-bearing.
   (must be a simple folder name)`, so no traversal is possible. Open only as sugar: should
   `new decks/foo` mean `new foo`? Also note the message arrives via `log.Fatalf`, so it carries a
   `main.go:NNN:` prefix that the other commands' `fatalf` errors don't.
+- [ ] **A free *container* can't be selected from the canvas.** `resolveSelectable()` only resolves
+  a click to a recognised leaf tag, so a hand/AI-authored `<div data-free>` renders and positions
+  correctly but cannot be picked up on the canvas — only from the outline panel, which is what spec
+  canvas-interaction prescribes ("click-through / outline panel to select containers").
+  `FreeTransformOverlay` gates on `isFreeEl()` alone, so once selected *any* free element gets
+  handles. Decide whether a click should resolve to the nearest `[data-free]` ancestor even when it
+  is a container. _Done when:_ decided + (if adopted) a `<div data-free>` is click-selectable.
+- [ ] **`decks upgrade` is now required for pre-existing decks.** The `[data-free] { margin: 0 }`
+  fix lives in the vendored `decks-layout.css`, which existing decks hold a stale copy of. Harmless
+  pre-release (nothing is published), but if a deck predates this commit its free elements stay
+  offset until `decks vendor <name>`. Consider whether `decks validate` should warn on a stale
+  vendored asset.
 
 ## Cross-cutting (maintain throughout)
 

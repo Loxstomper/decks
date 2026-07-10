@@ -33,30 +33,18 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import { BASE_URL } from './constants.ts';
+import { createDeck, getDeckHtml, prependSlides, putDeckHtml } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-phase17';
 
 // Stable eids so re-runs are idempotent (we only inject once).
 const RICH_EID = 'e2e-rich-p17';
 const CHART_EID = 'e2e-chart-p17';
 const FOOTER_HIDDEN_EID = 'e2e-footerhidden-p17';
 
-// ── Helpers (mirror per-slide-theme.spec.ts) ─────────────────────────────────
-
-async function getDeckHtml(baseUrl: string, deck: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deck} → ${res.status}`);
-  return res.text();
-}
-
-async function putDeckHtml(baseUrl: string, deck: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deck} → ${res.status}`);
-}
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function isExternal(url: string): boolean {
   try {
@@ -77,11 +65,11 @@ const CHART_JSON = JSON.stringify({
   options: { animation: false, responsive: false },
 });
 
-// ── Setup: inject Phase 17 content into the smoke deck once ───────────────────
+// ── Setup: this spec scaffolds and owns its own deck (see fixtures.ts) ────────
 
-test.beforeAll(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+test.beforeAll(async () => {
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
   if (html.includes(`data-eid="${RICH_EID}"`)) return; // idempotent
 
   // Rich-text marks + an external link (navigation, not a resource load).
@@ -103,11 +91,8 @@ test.beforeAll(async ({ baseURL }) => {
   const footerHiddenSlide =
     `<section data-eid="${FOOTER_HIDDEN_EID}" data-footer-hidden><p>no footer here</p></section>`;
 
-  html = html.replace(
-    /(<div class="slides">)/,
-    `$1\n${richSlide}\n${chartSlide}\n${footerHiddenSlide}\n`,
-  );
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  html = prependSlides(html, `${richSlide}\n${chartSlide}\n${footerHiddenSlide}`);
+  await putDeckHtml(DECK, html);
 
   // Managed footer rule via custom.css (matches Lane G's managed block shape).
   const footerCss =
@@ -118,7 +103,7 @@ test.beforeAll(async ({ baseURL }) => {
     `  pointer-events: none; z-index: 30;\n` +
     `}\n` +
     `/* /decks:footer */\n`;
-  const cssRes = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(SMOKE_DECK)}/custom.css`, {
+  const cssRes = await fetch(`${BASE_URL}/api/decks/${encodeURIComponent(DECK)}/custom.css`, {
     method: 'PUT',
     headers: { 'Content-Type': 'text/css' },
     body: footerCss,
@@ -130,7 +115,7 @@ test.beforeAll(async ({ baseURL }) => {
 
 test.describe('Phase 17 — present route', () => {
   test('inline marks + link survive round-trip and render (P17-1..3,6,9)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     const marks = await page.evaluate((eid: string) => {
@@ -152,7 +137,7 @@ test.describe('Phase 17 — present route', () => {
   });
 
   test('chart canvas is rendered by Chart.js, offline (P17-15)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     // Navigate so the chart slide becomes current (the plugin renders on init +
     // slidechanged). Use reveal's URL hash by index is brittle; instead assert
@@ -172,40 +157,38 @@ test.describe('Phase 17 — present route', () => {
     expect(rendered.hasChart, 'Chart.js must have rendered into the canvas').toBe(true);
   });
 
-  test('present-mode plugins injected; on-disk deck.html unchanged (P17-19)', async ({ baseURL }) => {
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const before = await getDeckHtml(baseUrl, SMOKE_DECK);
+  test('present-mode plugins injected; on-disk deck.html unchanged (P17-19)', async () => {
+    const before = await getDeckHtml(DECK);
 
-    const presentRes = await fetch(`${baseUrl}/present/${encodeURIComponent(SMOKE_DECK)}/`);
+    const presentRes = await fetch(`${BASE_URL}/present/${encodeURIComponent(DECK)}/`);
     const presentHtml = await presentRes.text();
     expect(presentHtml).toContain('assets/vendor/chalkboard/plugin.js');
     expect(presentHtml).toContain('assets/vendor/laser/plugin.js');
     expect(presentHtml).toContain('registerPlugin');
 
     // The augmentation is in-memory only: the file on disk is byte-identical.
-    const after = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const after = await getDeckHtml(DECK);
     expect(after, 'present route must NOT mutate deck.html on disk').toBe(before);
     // And it must not have injected the present-only plugins into the file.
     expect(after).not.toContain('chalkboard/plugin.js');
   });
 
-  test('slide number toggles on via the API (P17-17)', async ({ page, baseURL }) => {
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(SMOKE_DECK)}/slide-number`, {
+  test('slide number toggles on via the API (P17-17)', async ({ page }) => {
+    const res = await fetch(`${BASE_URL}/api/decks/${encodeURIComponent(DECK)}/slide-number`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled: true, format: 'c/t' }),
     });
     expect(res.status).toBe(204);
 
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     // reveal renders the number into .slide-number when slideNumber is set.
     await expect(page.locator('.reveal .slide-number')).toBeVisible({ timeout: 8_000 });
   });
 
   test('footer overlay renders and is suppressed on a hidden slide (P17-18)', async ({ page }) => {
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
 
     // Read the ::after content of a normal section vs the footer-hidden one.
@@ -231,7 +214,7 @@ test.describe('Phase 17 — present route', () => {
     page.on('request', (req) => {
       if (isExternal(req.url())) external.push(req.url());
     });
-    await page.goto(`/present/${SMOKE_DECK}/`);
+    await page.goto(`/present/${DECK}/`);
     await page.locator('.reveal').waitFor({ timeout: 10_000 });
     await page.waitForTimeout(1000);
     expect(external, `external requests: ${external.join(', ')}`).toEqual([]);

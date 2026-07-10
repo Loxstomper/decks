@@ -16,14 +16,14 @@
  *
  * SETUP:
  * ======
- * Global setup creates "smoke-deck" (two plain slides, no data-eid elements).
- * This spec's beforeAll injects two leaf elements with known data-eid values into
- * the first slide via the PUT API so the context menu can be exercised without
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never share
+ * a deck), then injects two leaf elements with known data-eid values into the
+ * first slide via the PUT API so the context menu can be exercised without
  * modifying the scaffold template.
  *
  * Each test that mutates the deck (Delete, Duplicate) operates on its own eid so
- * tests stay independent even when the server persists state between runs.  The
- * Insert slide test acts on the slide-level menu and is additive.
+ * tests stay independent within this file.  The Insert slide test acts on the
+ * slide-level menu and is additive.
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
@@ -42,32 +42,22 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import {
+  appendToFirstSlide,
+  createDeck,
+  getDeckHtml,
+  menuItem,
+  openDeckInEditor,
+  putDeckHtml,
+} from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-context-menu';
 
 // Stable eids for the two injected test elements.
 // Each test that deletes an element uses a unique eid so they don't trample each other.
 const DELETE_EID = 'e2e-ctx-delete-p13';
 const DUPLICATE_EID = 'e2e-ctx-duplicate-p13';
-
-// ── API helpers ────────────────────────────────────────────────────────────────
-
-/** Fetch the current deck.html from the API (returns the raw HTML string). */
-async function getDeckHtml(baseUrl: string, deckName: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deckName} → ${res.status}`);
-  return res.text();
-}
-
-/** PUT new deck.html to the API. */
-async function putDeckHtml(baseUrl: string, deckName: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deckName} → ${res.status}`);
-}
 
 /** Count how many elements with the given data-eid appear in the HTML source. */
 function countEidInHtml(html: string, eid: string): number {
@@ -77,50 +67,28 @@ function countEidInHtml(html: string, eid: string): number {
 
 // ── Setup ─────────────────────────────────────────────────────────────────────
 
-test.beforeAll(async ({ baseURL }) => {
+test.beforeAll(async () => {
   /**
-   * Inject two leaf elements into the first <section> of the smoke deck.
-   * They are simple <p> elements with data-eid so the editor can classify
-   * them as "leaf" and the context menu shows the full element action set.
-   *
-   * Each element is only injected once (idempotent across re-runs).
+   * Inject two leaf elements into the first <section>. They are plain <p>
+   * elements with a data-eid so the editor classifies them as a "leaf" and the
+   * context menu offers the full element action set — `resolveSelectable()` only
+   * resolves a click to a recognised leaf tag, never to a <div>.
    */
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
 
-  const elementsToInject: Array<{ eid: string; text: string }> = [
+  for (const { eid, text } of [
     { eid: DELETE_EID, text: 'Delete me (e2e)' },
     { eid: DUPLICATE_EID, text: 'Duplicate me (e2e)' },
-  ];
-
-  let modified = false;
-  for (const { eid, text } of elementsToInject) {
+  ]) {
     if (!html.includes(`data-eid="${eid}"`)) {
-      const el = `<p data-eid="${eid}">${text}</p>`;
-      // Insert before the first </section> so it lives in slide 1.
-      html = html.replace('</section>', `${el}</section>`);
-      modified = true;
+      html = appendToFirstSlide(html, `<p data-eid="${eid}">${text}</p>`);
     }
   }
-
-  if (modified) {
-    await putDeckHtml(baseUrl, SMOKE_DECK, html);
-  }
+  await putDeckHtml(DECK, html);
 });
 
 // ── Shared helper ─────────────────────────────────────────────────────────────
-
-/**
- * Navigate to the editor root and wait for the smoke deck's canvas to be ready.
- * Returns once the iframe is visible and reveal.js has rendered at least one slide.
- */
-async function openEditor(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
-  await expect(
-    page.frameLocator('iframe.reveal-frame-iframe').locator('.reveal .slides section').first(),
-  ).toBeAttached({ timeout: 10_000 });
-}
 
 /**
  * Wait for the context menu to appear (`.cm-menu[role="menu"]`).
@@ -146,8 +114,8 @@ async function rightClickAndWaitForMenu(
 
 test(
   'right-click canvas element → menu opens → Delete removes the element (P13)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    await openDeckInEditor(page, DECK);
 
     // Locate the element to delete inside the iframe.
     const elLocator = page
@@ -160,14 +128,14 @@ test(
     await rightClickAndWaitForMenu(page, elLocator);
 
     // The menu must contain a "Delete" action (danger item).
-    const deleteItem = page.locator('.cm-item', { hasText: /^Delete$/ });
+    const deleteItem = menuItem(page, 'Delete');
     await expect(deleteItem).toBeVisible({ timeout: 3_000 });
 
     // ── 2. Click Delete → autosave fires ────────────────────────────────────
     // Intercept the autosave PUT so we know when the write has landed on disk.
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -177,8 +145,7 @@ test(
     await putPromise;
 
     // ── 3. Verify the element is absent from the persisted HTML ──────────────
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const htmlAfter = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlAfter = await getDeckHtml(DECK);
     expect(
       countEidInHtml(htmlAfter, DELETE_EID),
       `element with eid="${DELETE_EID}" should be gone after Delete`,
@@ -190,8 +157,8 @@ test(
 
 test(
   'right-click canvas element → menu opens → Duplicate creates a copy (P13)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    await openDeckInEditor(page, DECK);
 
     // Locate the element to duplicate inside the iframe.
     const elLocator = page
@@ -201,21 +168,21 @@ test(
     await expect(elLocator).toBeAttached({ timeout: 10_000 });
 
     // Record the eid count before duplicating (should be 1).
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const htmlBefore = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlBefore = await getDeckHtml(DECK);
     const countBefore = countEidInHtml(htmlBefore, DUPLICATE_EID);
     expect(countBefore).toBe(1);
 
     // ── 1. Right-click → menu opens ──────────────────────────────────────────
     await rightClickAndWaitForMenu(page, elLocator);
 
-    const duplicateItem = page.locator('.cm-item', { hasText: /^Duplicate$/ });
+    // "Duplicate", not "Duplicate slide" — exact accessible-name matching.
+    const duplicateItem = menuItem(page, 'Duplicate');
     await expect(duplicateItem).toBeVisible({ timeout: 3_000 });
 
     // ── 2. Click Duplicate → autosave fires ──────────────────────────────────
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -230,7 +197,7 @@ test(
     // the overall element count in the deck grew.  Additionally, the duplicate
     // must not share the original eid — deckStore.duplicateElement generates a
     // new one — so the source eid count stays at 1.
-    const htmlAfter = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlAfter = await getDeckHtml(DECK);
     expect(
       countEidInHtml(htmlAfter, DUPLICATE_EID),
       `original eid="${DUPLICATE_EID}" must still appear exactly once`,
@@ -249,12 +216,11 @@ test(
 
 test(
   'right-click empty slide area → slide menu opens → Insert slide adds a slide (P13-8)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    await openDeckInEditor(page, DECK);
 
     // Count sections before the operation.
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const htmlBefore = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlBefore = await getDeckHtml(DECK);
     // Count top-level <section> tags (each represents a slide).
     const sectionsBefore = (htmlBefore.match(/<section/g) ?? []).length;
 
@@ -282,13 +248,13 @@ test(
     const menu = contextMenuLocator(page);
     await expect(menu).toBeVisible({ timeout: 5_000 });
 
-    const insertSlideItem = page.locator('.cm-item', { hasText: /^Insert slide$/ });
+    const insertSlideItem = menuItem(page, 'Insert slide');
     await expect(insertSlideItem).toBeVisible({ timeout: 3_000 });
 
     // ── 2. Click Insert slide → autosave fires ───────────────────────────────
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -298,7 +264,7 @@ test(
     await putPromise;
 
     // ── 3. Verify the deck gained a section ──────────────────────────────────
-    const htmlAfter = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const htmlAfter = await getDeckHtml(DECK);
     const sectionsAfter = (htmlAfter.match(/<section/g) ?? []).length;
     expect(sectionsAfter).toBeGreaterThan(sectionsBefore);
   },

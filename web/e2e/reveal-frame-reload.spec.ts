@@ -17,8 +17,10 @@
  *
  * PREREQUISITES:
  * ==============
- *  • The default smoke-deck scaffold has two top-level slides (section 0 =
- *    "Your first slide", section 1 = "Slide 2").  No modifications needed.
+ *  • This spec scaffolds and owns its own deck (see fixtures.ts — specs never
+ *    share a deck). The scaffold template already has two top-level slides
+ *    (section 0 = "Your first slide", section 1 = "Slide 2"), so no fixture
+ *    injection is needed.
  *  • A second deck ("p11-reload-deck-b") is created via the "New deck" UI
  *    during the deck-switch test so the navigator renders a second button.
  *
@@ -34,8 +36,17 @@
 
 import { test, expect, type Page } from '@playwright/test';
 
-const SMOKE_DECK = 'smoke-deck';
+import { createDeck, openDeckInEditor } from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-reveal-reload';
 const SECOND_DECK = 'p11-reload-deck-b';
+
+// ── Setup ────────────────────────────────────────────────────────────────────
+
+test.beforeAll(async () => {
+  await createDeck(DECK);
+});
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -56,18 +67,6 @@ async function waitForCanvasReady(page: Page): Promise<void> {
   await expect(
     slidesFrame(page).locator('.reveal .slides section').first(),
   ).toBeAttached({ timeout: 10_000 });
-}
-
-/**
- * Navigate to the editor and wait for the smoke deck to be loaded and rendered.
- */
-async function openEditor(page: Page): Promise<void> {
-  await page.goto('/');
-  // Wait for the deck button to confirm the SPA has bootstrapped (GET /api/decks done).
-  await expect(page.locator('ul button', { hasText: SMOKE_DECK })).toBeVisible({
-    timeout: 10_000,
-  });
-  await waitForCanvasReady(page);
 }
 
 /**
@@ -130,7 +129,7 @@ test.describe('Canvas reload view-state preservation (P11)', () => {
   test(
     'same-deck reload preserves the current slide index (P11-1)',
     async ({ page }) => {
-      await openEditor(page);
+      await openDeckInEditor(page, DECK);
 
       // ── 1. Verify we start on slide 1 (section index 0) ───────────────────
       await expect(
@@ -147,10 +146,10 @@ test.describe('Canvas reload view-state preservation (P11)', () => {
 
       // ── 3. Trigger a reload via a PUT (simulates an autosave / external edit)
       // The app subscribes to the SSE stream; a PUT causes the server to emit
-      // a "deck changed" event for smoke-deck, which the app translates into
-      // frame.reload().  The reload() call in RevealFrame captures pendingRestore
-      // = { h: 1, v: 0 } BEFORE bumping reloadKey (P11-1).
-      await triggerReloadViaPut(page, SMOKE_DECK);
+      // a "deck changed" event for this spec's deck, which the app translates
+      // into frame.reload().  The reload() call in RevealFrame captures
+      // pendingRestore = { h: 1, v: 0 } BEFORE bumping reloadKey (P11-1).
+      await triggerReloadViaPut(page, DECK);
 
       // ── 4. Wait for the iframe to reload and become visible again ──────────
       // After reload(), the iframe is visibility:hidden (isLoading=true).
@@ -174,9 +173,9 @@ test.describe('Canvas reload view-state preservation (P11)', () => {
   test(
     'switching to a different deck resets the canvas to slide 1 (P11-1 guard)',
     async ({ page }) => {
-      await openEditor(page);
+      await openDeckInEditor(page, DECK);
 
-      // ── 1. Navigate to slide 2 of the smoke deck ───────────────────────────
+      // ── 1. Navigate to slide 2 of this spec's deck ─────────────────────────
       await navigateToSlideN(page, 1);
       await expect(
         slidesFrame(page).locator('.reveal .slides > section').nth(1),
@@ -204,15 +203,15 @@ test.describe('Canvas reload view-state preservation (P11)', () => {
         slidesFrame(page).locator('.reveal .slides > section').nth(0),
       ).toHaveClass(/present/, { timeout: 8_000 });
 
-      // ── 3. Switch back to the smoke deck ──────────────────────────────────
-      const smokeDeckBtn = page.locator('ul button', { hasText: SMOKE_DECK });
-      await expect(smokeDeckBtn).toBeVisible({ timeout: 5_000 });
-      await smokeDeckBtn.click();
+      // ── 3. Switch back to this spec's deck ─────────────────────────────────
+      const deckBtn = page.locator('ul button', { hasText: DECK });
+      await expect(deckBtn).toBeVisible({ timeout: 5_000 });
+      await deckBtn.click();
 
-      // Wait for the canvas to reload with the smoke deck.
+      // Wait for the canvas to reload with this spec's deck.
       await waitForCanvasReady(page);
 
-      // ── 4. Assert smoke-deck opened at slide 1, NOT the previously-viewed 2 ──
+      // ── 4. Assert the deck opened at slide 1, NOT the previously-viewed 2 ────
       // A deck switch changes deckUrl, which rebuilds the {#key} block without
       // setting pendingRestore — so reveal starts fresh at slide 0 (slide 1 UI).
       await expect(

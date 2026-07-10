@@ -9,7 +9,7 @@
  *     "▾" button beside "+ Slide") and selecting a preset inserts a new slide
  *     carrying that layout's `data-layout` marker and its starter content.
  *
- *  2. change-layout-preserves-content: Right-clicking the empty slide background
+ *  2. change-layout-preserves-content: Right-clicking a slide's Navigator row
  *     → "Change layout" submenu → picking a preset re-flows the slide WITHOUT
  *     dropping any content elements the user had authored.
  *
@@ -19,9 +19,9 @@
  *
  * SETUP DEPENDENCY:
  * =================
- * Global setup (e2e/global-setup.ts) creates "smoke-deck" in a fresh temp
- * workspace and writes the temp-dir path + server PID to `.e2e-state.json`.
- * Test 3 reads that state file to know where to write the user-template file.
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never share a
+ * deck). Global setup creates the temp workspace and records its path in
+ * `.e2e-state.json`; test 3 reads that to know where to write the template file.
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
@@ -38,13 +38,23 @@
  *   cd web && npx tsc -p e2e/tsconfig.json
  */
 
-import { readFileSync, mkdirSync, writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from '@playwright/test';
-import { STATE_FILE } from './global-setup';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import {
+  appendSlides,
+  createDeck,
+  getDeckHtml,
+  menuItem,
+  openDeckInEditor,
+  putDeckHtml,
+  thumbnailSrcdocs,
+  workspaceDir,
+} from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-slide-layouts';
 
 // Stable eid prefix for slides injected by THIS spec — unique per test so
 // reruns and parallel (serial workers) don't collide.
@@ -55,78 +65,58 @@ const CONTENT_SLIDE  = 'e2e-layout-slide-p14'; // the section itself
 // The user-template name (sans extension) that test 3 writes to templates/.
 const USER_TEMPLATE_NAME = 'e2e-foo-p14';
 
-// ── API helpers ────────────────────────────────────────────────────────────────
-
-/** Fetch the current deck.html from the API (returns the raw HTML string). */
-async function getDeckHtml(baseUrl: string, deckName: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deckName} → ${res.status}`);
-  return res.text();
-}
-
-/** PUT new deck.html to the API. */
-async function putDeckHtml(baseUrl: string, deckName: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deckName)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deckName} → ${res.status}`);
-}
-
-/** Read the temp-workspace path written by global-setup. */
-function readWorkspaceDir(): string {
-  const state = JSON.parse(readFileSync(STATE_FILE, 'utf8')) as { tmpDir: string };
-  return state.tmpDir;
-}
 
 // ── Setup: ensure the content slide exists before test 2 runs ─────────────────
 
-test.beforeAll(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+/** The <h2> text of the injected content slide. Thumbnails carry no eid (the
+ *  clone strips them), so this text is how we locate the slide's navigator row. */
+const CONTENT_TITLE = 'Authored title';
+
+test.beforeAll(async () => {
+  await createDeck(DECK);
+  let html = await getDeckHtml(DECK);
 
   // Idempotent: only inject the content slide once (handles reruns against a
-  // persisted workspace). Insert before the first </section> close tag so the
-  // new slide ends up inside the slides container as a top-level section.
+  // persisted workspace).
   if (!html.includes(`data-eid="${CONTENT_SLIDE}"`)) {
-    // Build a minimal well-formed slide with two known-eid leaves.
+    // A minimal well-formed slide with two known-eid leaves inside a container,
+    // so "Change layout" has real authored content that it must not drop (P14-4).
     const newSlide =
       `<section data-eid="${CONTENT_SLIDE}">` +
       `<div data-eid="e2e-c-p14" data-lay="stack">` +
-      `<h2 data-eid="${CONTENT_EID_H}">Authoured title</h2>` +
+      `<h2 data-eid="${CONTENT_EID_H}">${CONTENT_TITLE}</h2>` +
       `<p data-eid="${CONTENT_EID_P}">Authored body</p>` +
       `</div>` +
       `</section>`;
-    // Splice it after the first existing top-level </section> so it appears
-    // as a second slide, keeping the existing first slide intact.
-    const insertAfter = html.indexOf('</section>');
-    if (insertAfter !== -1) {
-      html =
-        html.slice(0, insertAfter + '</section>'.length) +
-        '\n' + newSlide +
-        html.slice(insertAfter + '</section>'.length);
-    } else {
-      // Fallback: prepend to </div> closing the slides container.
-      html = html.replace('</div>', newSlide + '</div>');
-    }
-    await putDeckHtml(baseUrl, SMOKE_DECK, html);
+    html = appendSlides(html, newSlide);
+    await putDeckHtml(DECK, html);
   }
 });
 
-// ── Shared helpers ────────────────────────────────────────────────────────────
+// ── Navigator helpers ─────────────────────────────────────────────────────────
 
 /**
- * Navigate to the editor root and wait for the smoke deck's canvas to be ready.
- * Returns once the iframe is visible and reveal.js has rendered at least one slide.
+ * Index of the navigator row whose thumbnail renders `text`.
+ *
+ * Rows carry no `data-eid`, and neither do thumbnails (`applyThumbnailLayout`
+ * clones through `cloneSubtreeStripEids`), so matching the rendered text is the
+ * only stable way to correlate a row with a slide. Resolved dynamically rather
+ * than hard-coded, because earlier tests in this file insert slides.
+ *
+ * `thumbnailSrcdocs()` scrolls every row into view first — thumbnails are
+ * IntersectionObserver-gated and offscreen rows never build a srcdoc.
  */
-async function openEditor(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
-  await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
-  await expect(
-    page.frameLocator('iframe.reveal-frame-iframe').locator('.reveal .slides section').first(),
-  ).toBeAttached({ timeout: 10_000 });
+async function navigatorRowShowing(
+  page: import('@playwright/test').Page,
+  text: string,
+): Promise<number> {
+  const srcdocs = await thumbnailSrcdocs(page);
+  const index = srcdocs.findIndex((s) => s.includes(text));
+  expect(index, `no navigator row whose thumbnail renders "${text}"`).toBeGreaterThanOrEqual(0);
+  return index;
 }
+
+// ── Shared helpers ────────────────────────────────────────────────────────────
 
 /**
  * Open the Navigator layout-picker dropdown (the "▾" button next to "+ Slide")
@@ -147,8 +137,8 @@ async function openLayoutPicker(page: import('@playwright/test').Page): Promise<
 
 test(
   'new-slide-from-layout inserts preset structure + starter content (P14-3)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    await openDeckInEditor(page, DECK);
     await openLayoutPicker(page);
 
     // Pick the "Title body" preset (built-in bundled preset, data-layout="title-body").
@@ -160,7 +150,7 @@ test(
     // Intercept the autosave PUT that follows the layout insertion.
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -169,8 +159,7 @@ test(
     await putPromise;
 
     // ── Verify the new slide landed on disk ────────────────────────────────────
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const html = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const html = await getDeckHtml(DECK);
 
     // The preset section must carry its layout marker.
     expect(html, 'new slide should carry data-layout="title-body"').toContain(
@@ -195,82 +184,58 @@ test(
 
 test(
   'change-layout on a non-empty slide preserves all content (P14-4)',
-  async ({ page, baseURL }) => {
-    await openEditor(page);
+  async ({ page }) => {
+    // `slideMenuItems()` renders "Change layout" DISABLED until the preset list
+    // resolves, and that disabled state is baked in when the menu opens — retrying
+    // the assertion would never recover. `ensurePresets()` fires on mount, so wait
+    // for its response before opening any menu. Registered before we navigate.
+    const presetsLoaded = page.waitForResponse(
+      (resp) => resp.url().includes('/api/templates') && resp.ok(),
+      { timeout: 12_000 },
+    );
+    await openDeckInEditor(page, DECK);
+    await presetsLoaded;
 
-    // Navigate to our injected content slide in the Navigator by clicking its
-    // thumbnail row. The row carries role="option" and belongs to the Navigator's
-    // ol.nav-list; we look for the slide-row that renders the injected section.
-    // We navigate by clicking the second slide-row (index 1 if 0-based) since we
-    // appended our slide after the first existing slide.
-    //
-    // Safer: wait for the iframe to render the injected content, then operate.
-    // We locate the content slide via the iframe's DOM.
     const frame = page.frameLocator('iframe.reveal-frame-iframe');
-    const contentSlide = frame.locator(`section[data-eid="${CONTENT_SLIDE}"]`);
-
-    // Some reveal decks need navigation to reach a non-first slide. We jump to
-    // our slide by pressing ArrowRight in the iframe until it's current. But the
-    // easiest reliable approach is to click the slide's navigator row.
-    //
-    // The navigator slide rows are `div.slide-row[role="option"]` inside the ol.
-    // We can't predict the index easily, so we wait for the iframe to become
-    // attached then use the slide's data-eid presence in the deck source to
-    // confirm setup, and then trigger the context menu against it.
-    await expect(contentSlide).toBeAttached({ timeout: 12_000 });
-
-    // Click the Navigator row that corresponds to our content slide so it becomes
-    // the current canvas slide (required for the slide context menu to target it).
-    const navRows = page.locator('.slide-row[role="option"]');
-    // Try each row until we find the one whose click brings our eid into the frame.
-    // With the setup above, our slide is typically at index 1.
-    // We use a more robust approach: navigate via ArrowRight key in the iframe.
-    const iframeEl = page.locator('iframe.reveal-frame-iframe');
-    await iframeEl.click(); // give focus to the iframe
-    // Press ArrowRight once to move to the second slide (our injected content slide).
-    // If the deck has more slides before ours, we may need more presses; but in the
-    // test setup it's always the second slide.
-    await page.keyboard.press('ArrowRight');
-    // Wait briefly for reveal to animate.
-    await page.waitForTimeout(400);
-
-    // ── Right-click the slide background to open the slide-level context menu ──
-    const slideSection = frame.locator('.reveal .slides section').first();
-    await expect(slideSection).toBeAttached({ timeout: 8_000 });
-
-    // Click near the bottom of the current slide (away from any element, targeting
-    // the empty slide background so the slide-level menu opens rather than the
-    // element menu). Mirrors context-menu.spec.ts test 3 pattern.
-    const slideBox = await slideSection.boundingBox();
-    const clickY = slideBox ? slideBox.height * 0.85 : 300;
-
-    await slideSection.click({
-      button: 'right',
-      position: { x: 50, y: clickY },
+    await expect(frame.locator(`section[data-eid="${CONTENT_SLIDE}"]`)).toBeAttached({
+      timeout: 12_000,
     });
 
+    // ── Open the slide menu from the Navigator row ────────────────────────────
+    // The navigator row is a first-class trigger surface for the slide menu (spec
+    // canvas-interaction: "the canvas … and the outline panel rows share one menu
+    // and one action registry"), and `onRowContextMenu` jumps to the slide *and*
+    // targets it by eid in a single gesture.
+    //
+    // This test used to right-click the canvas instead: advance reveal with
+    // ArrowRight, then right-click `.reveal .slides section` *.first()*. But
+    // `.first()` is slide 1 — once reveal advances, that section is translated
+    // off-screen, the click never reaches the iframe's contextmenu handler, and no
+    // menu ever opened. Hence the test had never passed.
+    const rowIndex = await navigatorRowShowing(page, CONTENT_TITLE);
+    await page.locator('.slide-row[role="option"]').nth(rowIndex).click({ button: 'right' });
+
     // ── The slide-level context menu should open ───────────────────────────────
-    const menu = page.locator('.cm-menu[role="menu"]').first();
-    await expect(menu).toBeVisible({ timeout: 5_000 });
+    await expect(page.locator('.cm-menu[role="menu"]').first()).toBeVisible({ timeout: 5_000 });
 
-    // "Change layout" item must be present (enabled once presets are loaded).
-    const changeLayoutItem = page.locator('.cm-item', { hasText: /^Change layout$/ });
+    const changeLayoutItem = menuItem(page, 'Change layout');
     await expect(changeLayoutItem).toBeVisible({ timeout: 5_000 });
+    await expect(changeLayoutItem, 'presets must be loaded, else the item is inert').toBeEnabled();
 
-    // ── Hover/click the "Change layout" item to open its submenu ──────────────
+    // ── Hover the "Change layout" item to open its submenu ────────────────────
     await changeLayoutItem.hover();
     // The submenu renders inline; wait for a nested .cm-menu--sub to appear.
     const submenu = page.locator('.cm-menu--sub').first();
     await expect(submenu).toBeVisible({ timeout: 5_000 });
 
     // Pick "Title body" from the submenu.
-    const titleBodySub = page.locator('.cm-item', { hasText: /^Title body$/i }).last();
+    const titleBodySub = menuItem(page, 'Title body');
     await expect(titleBodySub).toBeVisible({ timeout: 5_000 });
 
     // Intercept the autosave PUT.
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -279,8 +244,7 @@ test(
     await putPromise;
 
     // ── Verify the authored content survived the layout swap ──────────────────
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-    const html = await getDeckHtml(baseUrl, SMOKE_DECK);
+    const html = await getDeckHtml(DECK);
 
     // The layout marker was updated.
     expect(html, 'slide should now carry data-layout="title-body"').toContain(
@@ -321,8 +285,7 @@ test(
   async ({ page }) => {
     // ── Write the user-template file into the workspace templates/ dir ────────
     // The workspace path is in the state file written by global-setup.
-    const workspaceDir = readWorkspaceDir();
-    const templatesDir = join(workspaceDir, 'templates');
+    const templatesDir = join(workspaceDir(), 'templates');
     mkdirSync(templatesDir, { recursive: true });
 
     const snippetName = USER_TEMPLATE_NAME;
@@ -336,12 +299,11 @@ test(
     writeFileSync(join(templatesDir, `${snippetName}.html`), snippetHtml, 'utf8');
 
     // ── Open the editor and the layout picker ─────────────────────────────────
-    await openEditor(page);
-
-    // The GET /api/templates response is cached in layoutPresets after the first
-    // fetch. We reload so the picker fetches again and picks up the new file.
-    await page.reload();
-    await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
+    // `layoutPresets` caches the GET /api/templates response after the first fetch,
+    // so open once, then re-open (a fresh page load re-fetches) to pick up the file
+    // we just wrote.
+    await openDeckInEditor(page, DECK);
+    await openDeckInEditor(page, DECK);
 
     await openLayoutPicker(page);
 

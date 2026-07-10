@@ -17,6 +17,11 @@
  * survives the sanitizing writeback to disk (the model unit suite covers the
  * pure applySpanStyle/serializer logic; this proves the UI wiring).
  *
+ * SETUP:
+ * ======
+ * This spec scaffolds and owns its own deck (see fixtures.ts — specs never
+ * share a deck), rather than the global-setup `smoke-deck`.
+ *
  * CANNOT RUN WITHOUT THE BUILT BINARY (Playwright, not vitest):
  *   npm run test:e2e        (or npm run test:e2e:docker)
  * Type-check without running:
@@ -25,27 +30,20 @@
 
 import { test, expect } from '@playwright/test';
 
-// Keep in sync with global-setup.ts SMOKE_DECK constant.
-const SMOKE_DECK = 'smoke-deck';
+import {
+  appendToFirstSlide,
+  createDeck,
+  getDeckHtml,
+  openDeckInEditor,
+  putDeckHtml,
+} from './fixtures.ts';
+
+/** This spec's private deck. Never share a deck between spec files. */
+const DECK = 'e2e-selection-toolbar';
 // Stable eid so re-runs are idempotent (we only inject the slide once).
 const SIZE_EID = 'e2e-fontsize-tb';
 
-// ── Helpers (mirror free-position.spec.ts / phase17.spec.ts) ──────────────────
-
-async function getDeckHtml(baseUrl: string, deck: string): Promise<string> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`);
-  if (!res.ok) throw new Error(`GET /api/decks/${deck} → ${res.status}`);
-  return res.text();
-}
-
-async function putDeckHtml(baseUrl: string, deck: string, html: string): Promise<void> {
-  const res = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(deck)}`, {
-    method: 'PUT',
-    headers: { 'Content-Type': 'text/html' },
-    body: html,
-  });
-  if (!res.ok) throw new Error(`PUT /api/decks/${deck} → ${res.status}`);
-}
+// ── Helpers ─────────────────────────────────────────────────────────────────
 
 /** Extract the inner HTML of the <p data-eid="<eid>">…</p> leaf, or '' if absent. */
 function leafInner(html: string, eid: string): string {
@@ -53,19 +51,9 @@ function leafInner(html: string, eid: string): string {
   return re.exec(html)?.[1] ?? '';
 }
 
-/**
- * Open the editor on the smoke deck. The SPA opens the alphabetically-first deck
- * by default (App.svelte loads decks[0]); other specs in the suite create decks
- * that sort before "smoke-deck", so we must explicitly select it via the deck
- * switcher rather than relying on the default.
- */
-async function openEditor(page: import('@playwright/test').Page): Promise<void> {
-  await page.goto('/');
-  const deckBtn = page.locator('ul button', { hasText: SMOKE_DECK });
-  await expect(deckBtn).toBeVisible({ timeout: 10_000 });
-  await deckBtn.click();
-  await expect(page.locator('iframe.reveal-frame-iframe')).toBeVisible({ timeout: 12_000 });
-}
+test.beforeAll(async () => {
+  await createDeck(DECK);
+});
 
 // ── Setup: a plain text leaf on the FIRST (always-visible) slide ──────────────
 //
@@ -76,32 +64,26 @@ async function openEditor(page: import('@playwright/test').Page): Promise<void> 
 //
 // beforeEach (not beforeAll) so the leaf is reset to plain text before every run
 // — the test itself writes a font-size run into it, and we want repeatability.
-test.beforeEach(async ({ baseURL }) => {
-  const baseUrl = baseURL ?? 'http://localhost:19999';
-  let html = await getDeckHtml(baseUrl, SMOKE_DECK);
+test.beforeEach(async () => {
+  let html = await getDeckHtml(DECK);
   const plain = `<p data-eid="${SIZE_EID}">Resize this text</p>`;
   if (html.includes(`data-eid="${SIZE_EID}"`)) {
     // Reset any prior edit (e.g. a font-size span run) back to the plain leaf.
     html = html.replace(new RegExp(`<p[^>]*data-eid="${SIZE_EID}"[^>]*>[\\s\\S]*?</p>`), plain);
   } else {
-    html = html.replace('</section>', `${plain}</section>`); // into the first slide
+    html = appendToFirstSlide(html, plain);
   }
-  await putDeckHtml(baseUrl, SMOKE_DECK, html);
+  await putDeckHtml(DECK, html);
 });
 
 // ── Test ──────────────────────────────────────────────────────────────────────
 
 test.describe('Selection toolbar — font size (P17-7)', () => {
-  test('picking a size wraps the selection in a font-size run and saves it', async ({
-    page,
-    baseURL,
-  }) => {
-    const baseUrl = baseURL ?? 'http://localhost:19999';
-
+  test('picking a size wraps the selection in a font-size run and saves it', async ({ page }) => {
     // Sanity: the leaf starts with no inline font-size run.
-    expect(leafInner(await getDeckHtml(baseUrl, SMOKE_DECK), SIZE_EID)).not.toContain('font-size');
+    expect(leafInner(await getDeckHtml(DECK), SIZE_EID)).not.toContain('font-size');
 
-    await openEditor(page);
+    await openDeckInEditor(page, DECK);
 
     // Double-click the leaf → enter edit + select all its contents. It is on the
     // first slide, so reveal renders it as the current (visible) slide.
@@ -124,7 +106,7 @@ test.describe('Selection toolbar — font size (P17-7)', () => {
     // Picking applies the run, commits via applyRichTextEdit → autosave PUT.
     const putPromise = page.waitForResponse(
       (resp) =>
-        resp.url().includes(`/api/decks/${encodeURIComponent(SMOKE_DECK)}`) &&
+        resp.url().includes(`/api/decks/${encodeURIComponent(DECK)}`) &&
         resp.request().method() === 'PUT',
       { timeout: 10_000 },
     );
@@ -132,7 +114,7 @@ test.describe('Selection toolbar — font size (P17-7)', () => {
     await putPromise;
 
     // The on-disk leaf now carries a sanitized font-size span run.
-    const inner = leafInner(await getDeckHtml(baseUrl, SMOKE_DECK), SIZE_EID);
+    const inner = leafInner(await getDeckHtml(DECK), SIZE_EID);
     expect(inner).toContain('<span');
     expect(inner).toMatch(/font-size:\s*1\.5em/);
 
