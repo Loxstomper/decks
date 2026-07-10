@@ -1,0 +1,72 @@
+version: 2
+
+project_name: decks
+
+# The binary embeds web/dist via //go:embed. Building Go without building the
+# frontend first yields five binaries that all abort with web.ErrNotBuilt, so
+# this hook is load-bearing, not a convenience.
+before:
+  hooks:
+    # Deliberately no `go mod tidy`: it can rewrite go.sum, and GoReleaser aborts
+    # on a dirty git tree.
+    - npm --prefix web ci
+    - npm --prefix web run build
+
+builds:
+  - id: decks
+    main: ./cmd/decks
+    binary: decks
+    # No cgo anywhere in the tree, so every target cross-compiles from one runner.
+    env:
+      - CGO_ENABLED=0
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w -X main.version={{ .Version }}
+
+archives:
+  - id: decks
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # .Version strips the leading `v`, so: decks_0.0.1_darwin_arm64.tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    files:
+      - README.md
+      - LICENSE
+      - THIRD_PARTY_NOTICES.md
+
+checksum:
+  name_template: checksums.txt
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+
+release:
+  draft: false
+  # auto == mark as prerelease when the tag carries a -rc/-alpha/-beta suffix.
+  # A plain v0.0.1 is a normal release; semver already says 0.y.z is unstable.
+  prerelease: auto
+  footer: |
+    ## Install
+
+    Download the archive for your platform, extract it, and put `decks` on your `$PATH`.
+
+    ```bash
+    decks new my-talk
+    decks
+    ```
+
+    `go install` is not supported: it never runs the frontend build, so it produces a
+    binary with no editor in it. Build from source with `cd web && npm run build` first.

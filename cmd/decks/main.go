@@ -38,12 +38,23 @@ import (
 	slideweb "github.com/Loxstomper/decks/web"
 )
 
+// version is stamped at release time by GoReleaser via
+// -ldflags "-X main.version=<tag>". A binary built any other way says "dev",
+// which is the honest answer: it came from a working tree, not a release.
+var version = "dev"
+
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
 
+	// Scanned before parseGlobalFlags, which rejects every leading `-` token it
+	// does not recognise.
 	for _, a := range os.Args[1:] {
-		if a == "-h" || a == "--help" || a == "help" {
+		switch a {
+		case "-h", "--help", "help":
 			fmt.Println(usage)
+			return
+		case "-v", "--version", "version":
+			fmt.Printf("decks %s\n", version)
 			return
 		}
 	}

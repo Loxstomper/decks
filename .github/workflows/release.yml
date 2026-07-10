@@ -1,0 +1,46 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  # A tag must not ship a red build. Reuses ci.yml verbatim rather than
+  # re-listing the checks, so the two can never drift.
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # GoReleaser creates the GitHub Release
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # GoReleaser needs full history and tags to build the changelog.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The .goreleaser.yaml `before` hooks run `npm ci` and `npm run build`:
+      # the binary embeds web/dist, and without it every archive would ship a
+      # binary that aborts with web.ErrNotBuilt.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

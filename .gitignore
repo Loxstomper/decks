@@ -34,3 +34,6 @@ coverage.*
 .idea/
 .vscode/
 *.swp
+
+# GoReleaser output
+/dist/

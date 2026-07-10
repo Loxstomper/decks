@@ -23,6 +23,7 @@ const usage = `Usage:
   decks [--dir <path>] add-slide <deck>  append a starter <section>
   decks [--dir <path>] validate <deck>   check a deck against the spec rules
   decks [--dir <path>] install-skill     (re)install the Claude Code authoring skill
+  decks --version                        print the version and exit
 
 <deck> is a deck name, a path to one (decks/my-talk), or "." from inside a deck folder.
 A bare word is always a name, never a relative path.
