@@ -1,0 +1,27 @@
+version: 2
+
+# Pinning actions to commit SHAs (see .github/workflows/ci.yml) freezes them
+# until something bumps them. Without this file the pins rot: a pinned SHA is
+# immune to tag-repointing attacks but equally immune to security fixes.
+# Dependabot rewrites both the SHA and its trailing `# vX.Y.Z` comment.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+
+  - package-ecosystem: npm
+    directory: "/web"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"

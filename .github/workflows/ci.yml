@@ -10,13 +10,24 @@ on:
 permissions:
   contents: read
 
+# Every third-party action is pinned to an immutable commit SHA, not a tag.
+# A tag is a movable pointer: `actions/checkout@v4` can be repointed at new code
+# by anyone who can push a tag to that repo, which is exactly how the
+# tj-actions/changed-files compromise executed. The trailing comment records the
+# human-readable version so Dependabot can bump both together.
+#
+# persist-credentials: false stops actions/checkout leaving a GITHUB_TOKEN in
+# .git/config, where any dependency's build script could read it.
+
 jobs:
   go:
     name: Go
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
@@ -40,13 +51,21 @@ jobs:
       run:
         working-directory: web
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      # `npm ci` installs strictly from package-lock.json, which pins every one of
+      # the 271 packages by exact version + integrity hash. Never `npm install` here:
+      # it may resolve new versions and rewrite the lockfile.
+      #
+      # Not --ignore-scripts: esbuild needs its install script to fetch a platform
+      # binary, and the vite build fails without it.
       - run: npm ci
       # svelte-check, not tsc: bare tsc cannot resolve types exported from
       # <script module> in .svelte files and reports phantom errors.
@@ -57,12 +76,14 @@ jobs:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
           cache: npm
@@ -82,7 +103,7 @@ jobs:
         working-directory: web
         run: npm run test:e2e
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: failure()
         with:
           name: playwright-report

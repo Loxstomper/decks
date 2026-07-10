@@ -134,19 +134,6 @@ the layout vocabulary, canvas interaction, theming, presenting, and the invarian
 together. Start at [`specs/README.md`](specs/README.md). Specs describe *what and why*;
 [`IMPLEMENTATION_PLAN.md`](IMPLEMENTATION_PLAN.md) describes *how and when*.
 
-## How this was built
-
-Most of this codebase was written by [Claude Code](https://claude.com/claude-code) running in a
-loop. I wrote the specs, then a prompt that told the agent to pick the single most important
-unfinished task, implement it, test it, update the plan, and commit — over and over.
-[`PROMPT_BUILD.md`](PROMPT_BUILD.md) is that prompt. Only one line has been removed from it since:
-an instruction to tag every green build, which is what produced the 21 `0.0.x` tags that used to
-be in this repo.
-
-It went further than I expected, and the places where it went wrong are the interesting part —
-that layout contract implemented five times is exactly the kind of cross-cutting duplication a
-phase-at-a-time agent is worst at noticing.
-
 ## License
 
 MIT — see [`LICENSE`](LICENSE).

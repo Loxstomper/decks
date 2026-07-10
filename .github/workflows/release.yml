@@ -19,12 +19,16 @@ jobs:
     permissions:
       contents: write # GoReleaser creates the GitHub Release
     steps:
-      - uses: actions/checkout@v4
+      # Pinned to immutable commit SHAs; see the note in ci.yml.
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           # GoReleaser needs full history and tags to build the changelog.
           fetch-depth: 0
+          # GoReleaser talks to the API with GITHUB_TOKEN below; it never pushes
+          # over git, so the checkout does not need credentials left on disk.
+          persist-credentials: false
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
           go-version-file: go.mod
           cache: true
@@ -32,15 +36,17 @@ jobs:
       # The .goreleaser.yaml `before` hooks run `npm ci` and `npm run build`:
       # the binary embeds web/dist, and without it every archive would ship a
       # binary that aborts with web.ErrNotBuilt.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: 20
           cache: npm
           cache-dependency-path: web/package-lock.json
 
-      - uses: goreleaser/goreleaser-action@v6
+      - uses: goreleaser/goreleaser-action@f06c13b6b1a9625abc9e6e439d9c05a8f2190e94 # v7.2.3
         with:
-          version: "~> v2"
+          # An exact CLI version, not "~> v2": that range would silently pull a
+          # newer GoReleaser into a release build.
+          version: v2.17.0
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
