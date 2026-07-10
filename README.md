@@ -6,7 +6,8 @@ disk stays the source of truth.
 Drag things around on a canvas. Or edit `deck.html` in your editor. Or let Claude Code edit it.
 All three write the same file, and none of them destroys the others' work.
 
-<!-- TODO: demo.gif — canvas drag on the left, deck.html updating on the right -->
+![The decks editor: slide navigator on the left, canvas in the middle, outline and properties on
+the right, and the deck's HTML source live beneath them.](docs/demo.webp)
 
 ## Quickstart
 
