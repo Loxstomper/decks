@@ -72,6 +72,29 @@ jobs:
       - run: npm run check
       - run: npx vitest run
 
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          # gitleaks scans history, not just the tip: a secret committed and later
+          # deleted is still in the objects, and still published.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # `go run <module>@<version>` rather than a marketplace action: one less
+      # third-party action to trust, and the module is version-pinned and verified
+      # against the Go checksum database.
+      - name: gitleaks
+        run: |
+          go run github.com/zricethezav/gitleaks/v8@v8.30.1 git \
+            --no-banner -c .gitleaks.toml --log-opts="--all" --redact
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest

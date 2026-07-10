@@ -1,0 +1,20 @@
+# gitleaks configuration.
+#
+# Extends the stock ruleset rather than replacing it, so new upstream rules are
+# picked up automatically. Only documented, verified false positives are
+# allowlisted -- never a real secret, and never a blanket path exclusion that
+# would hide future ones.
+[extend]
+useDefault = true
+
+[[rules]]
+id = "generic-api-key"
+[rules.allowlist]
+# The shortcut-help table assigns keyboard chords to a field literally named
+# `keys`, which is enough for the generic-api-key heuristic:
+#     { keys: 'Cmd/Ctrl+Shift+Z', description: 'Redo' }
+# Scoped to that one file and to strings that look like key chords, so an actual
+# credential in the same file would still be reported.
+regexTarget = "match"
+regexes = ['''keys:\s*'(Cmd|Ctrl|Shift|Alt|Meta|Backspace|Delete|Esc|Enter|Tab|Space|Arrow)[^']*\'''']
+paths = ['''web/src/lib/commands/ShortcutHelp\.svelte''']
