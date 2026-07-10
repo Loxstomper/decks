@@ -111,9 +111,13 @@ Known gaps, in the order you'll hit them:
 The binary embeds `web/dist/`, so **the frontend build must run first**:
 
 ```bash
-cd web && npm install && npm run build
+cd web && npm ci && npm run build
 cd .. && go build -o bin/decks ./cmd/decks
 ```
+
+`npm ci`, not `npm install`: it installs strictly from `package-lock.json`, which pins every
+package by exact version and integrity hash. `npm install` may resolve newer versions inside the
+declared ranges and rewrite the lockfile.
 
 `go install` does not work and cannot be made to work: it never runs the frontend build, so it
 produces a binary with no editor in it. (The binary tells you so if you try.) Use a release binary

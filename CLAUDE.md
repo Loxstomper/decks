@@ -9,7 +9,8 @@ operational only (commands, gotchas).
 
 ## Build & run
 - Frontend build **must run before** `go build` (the binary embeds `web/dist/`):
-  - `cd web && npm install && npm run build`   # outputs to web/dist/
+  - `cd web && npm ci && npm run build`        # outputs to web/dist/. `ci`, never `install`:
+                                               # installs from the lockfile, never rewrites it.
   - `go build -o bin/decks ./cmd/decks`          # single binary
 - Run server: `decks` (or `go run ./cmd/decks`). Default port **3000** (override in `config.toml`: `port = 8080`).
 - Scaffold a deck: `decks new <name>` → `decks/<name>/{deck.html,custom.css,assets/}` (with reveal.js vendored offline into `assets/vendor/reveal/`).
