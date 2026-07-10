@@ -19,8 +19,10 @@ independently completable, and verifiable.
 
 ## Where we are
 
-**Phases 0–21 are complete** (tags `0.0.1`–`0.0.21`; Phase 19, the QR block, landed on
-`main` untagged). That covers: the Go+Svelte skeleton and
+**Phases 0–21 are complete.** Each phase's work is recorded in its commit — `git log --oneline |
+grep Phase` walks the whole build. (The per-phase `0.0.x` tags the build loop created were build
+markers, not releases; they were removed before open-sourcing. `0.0.1` is now the first real
+release.) That covers: the Go+Svelte skeleton and
 single-binary embed; the live editor shell and source-preserving document model; text editing with
 per-command undo/autosave; the five layout primitives and alignment-as-intent; free positioning
 with smart guides; content blocks and the acquire→localize asset pipeline; slides, motion, and
@@ -99,14 +101,14 @@ Loose ends surfaced while building, none load-bearing.
 
 | # | Theme | Status |
 |---|---|---|
-| M1 | Usable — visual editing + alignment beats hand-authoring | ✅ Phase 3 (`0.0.4`) |
-| M2 | Rich — full content + assets | ✅ Phase 5 (`0.0.6`) |
-| M3 | Complete — motion, theming, present, export | ✅ Phase 7 (`0.0.8`) |
-| M4 | AI-native — Claude Code skill + safe handoff | ✅ Phase 8 (`0.0.9`) |
-| M5 | Polished — adjustable chrome, e2e coverage | ✅ Phase 9 (`0.0.10`) |
-| M6 | Per-slide theming | ✅ Phases 10 + 18 (`0.0.12`, `0.0.17`) |
-| M7 | Slides-app parity — context menu, layouts, thumbnails, backgrounds | ✅ Phases 11–16 (`0.0.11`–`0.0.16`) |
-| M8 | Everyday-authoring parity — inline text, links, charts, palette | ✅ Phase 17 (`0.0.18`) |
+| M1 | Usable — visual editing + alignment beats hand-authoring | ✅ Phase 3 |
+| M2 | Rich — full content + assets | ✅ Phase 5 |
+| M3 | Complete — motion, theming, present, export | ✅ Phase 7 |
+| M4 | AI-native — Claude Code skill + safe handoff | ✅ Phase 8 |
+| M5 | Polished — adjustable chrome, e2e coverage | ✅ Phase 9 |
+| M6 | Per-slide theming | ✅ Phases 10 + 18 |
+| M7 | Slides-app parity — context menu, layouts, thumbnails, backgrounds | ✅ Phases 11–16 |
+| M8 | Everyday-authoring parity — inline text, links, charts, palette | ✅ Phase 17 |
 | M9 | **Installable CLI** — `decks` on `$PATH`, run from anywhere | ✅ Phase 20 (core) |
 | M10 | **AI-native distribution** — the binary ships the skill that teaches its own contract | ✅ P21-2 |
 | M11 | **Run from anywhere** — workspace found by walking up; deck named by name, path, or `.` | ✅ Phase 21 |
