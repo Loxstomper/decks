@@ -126,6 +126,25 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
+
+    # Run in Playwright's own image, which bakes in the browsers AND the system
+    # libraries they need.
+    #
+    # WHY NOT `npx playwright install --with-deps chromium` + a browser cache:
+    # on a bare runner that step took 471s, of which apt-get was 456s and the
+    # actual browser download 14s. Caching ~/.cache/ms-playwright would have saved
+    # the 14s and left the 456s untouched. The image removes both.
+    #
+    # The image tag MUST track @playwright/test in web/package-lock.json: its
+    # browsers are the ones that Playwright version expects, and a mismatch makes
+    # Playwright re-download them (silently undoing this). The guard below fails
+    # the job loudly on drift.
+    container:
+      image: mcr.microsoft.com/playwright:v1.61.1-noble
+      # Run as the runner's own uid rather than root: Chromium's sandbox refuses
+      # to start as root, and checkout would otherwise leave root-owned files.
+      options: --user 1001
+
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
@@ -140,13 +159,23 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      # To bump Playwright: change the version in web/package.json, run `npm i`,
+      # then update the `container.image` tag above to match.
+      - name: Assert the container matches the pinned Playwright version
+        working-directory: web
+        run: |
+          image_version=1.61.1
+          locked=$(node -p "require('./package-lock.json').packages['node_modules/@playwright/test'].version")
+          if [ "$locked" != "$image_version" ]; then
+            echo "::error::Playwright image v$image_version but package-lock pins $locked."
+            echo "Update container.image in .github/workflows/ci.yml to v$locked-noble."
+            exit 1
+          fi
+          echo "Playwright $locked matches the container image."
+
       - name: Install deps
         working-directory: web
         run: npm ci
-
-      - name: Install Chromium
-        working-directory: web
-        run: npx playwright install --with-deps chromium
 
       # `npm run test:e2e` builds the frontend, then `go build -o bin/decks
       # ./cmd/decks`, then runs Playwright against the real binary on port 19999.
