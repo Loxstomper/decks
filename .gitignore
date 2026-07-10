@@ -22,8 +22,12 @@ web/playwright-report/
 web/e2e/.e2e-state.json
 
 # Go build output
-/decks
 /bin/
+# The binary was once named `slides` and ignored by that name. The rename dropped
+# that line, un-ignoring a stale artifact, and `git add -A` committed 14 MB of it.
+# Keep the guard: an old checkout can still produce this file.
+/slides
+# Workspace runtime dirs, re-created on run
 /decks
 /shared
 *.test
