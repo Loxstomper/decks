@@ -172,6 +172,11 @@ func runServe(flagDir string) {
 
 	staticFS, err := slideweb.DistFS()
 	if err != nil {
+		// ErrNotBuilt is already a complete, actionable message; don't bury it
+		// behind an "embed:" prefix.
+		if errors.Is(err, slideweb.ErrNotBuilt) {
+			log.Fatal(err)
+		}
 		log.Fatalf("embed: %v", err)
 	}
 
