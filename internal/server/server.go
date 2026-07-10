@@ -1,4 +1,4 @@
-// Package server implements the slides-builder HTTP server.
+// Package server implements the decks HTTP server.
 //
 // Routes:
 //
@@ -43,11 +43,11 @@ import (
 	"strconv"
 	"strings"
 
-	"slides-builder/internal/assets"
-	"slides-builder/internal/deck"
-	"slides-builder/internal/provider"
-	"slides-builder/internal/validate"
-	"slides-builder/internal/watch"
+	"github.com/Loxstomper/decks/internal/assets"
+	"github.com/Loxstomper/decks/internal/deck"
+	"github.com/Loxstomper/decks/internal/provider"
+	"github.com/Loxstomper/decks/internal/validate"
+	"github.com/Loxstomper/decks/internal/watch"
 )
 
 // Server holds the HTTP mux and its dependencies.
@@ -231,7 +231,7 @@ func (s *Server) handleDeckWrite(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// handleDeckCreate scaffolds a new deck using the same logic as `slides new`.
+// handleDeckCreate scaffolds a new deck using the same logic as `decks new`.
 //
 //	POST /api/decks/{name}
 //
@@ -1291,7 +1291,7 @@ func (s *Server) handleExportPDF(w http.ResponseWriter, r *http.Request) {
 
 	// Write the PDF to a temp file; Chrome writes the complete file before we
 	// read it, avoiding partial-read races.
-	tmp, err := os.CreateTemp("", "slides-export-*.pdf")
+	tmp, err := os.CreateTemp("", "decks-export-*.pdf")
 	if err != nil {
 		http.Error(w, "pdf export: create temp: "+err.Error(), http.StatusInternalServerError)
 		return

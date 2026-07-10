@@ -8,17 +8,17 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/skill"
+	"github.com/Loxstomper/decks/internal/skill"
 )
 
 // installedPath is the workspace-relative location Claude Code discovers skills at.
 func installedPath(root, name string) string {
-	return filepath.Join(root, ".claude", "skills", "slides-authoring", name)
+	return filepath.Join(root, ".claude", "skills", "decks-authoring", name)
 }
 
 // TestFilesShipsBothDocs — the skill is the how-to guide *and* its contract reference.
 // Shipping only SKILL.md would leave its "see AUTHORING.md" pointer dangling in a
-// workspace that is a separate repo from slides-builder.
+// workspace that is a separate repo from decks.
 func TestFilesShipsBothDocs(t *testing.T) {
 	files, err := skill.Files()
 	if err != nil {
@@ -40,7 +40,7 @@ func TestRenderKeepsFrontmatterFirst(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Render: %v", err)
 	}
-	if !bytes.HasPrefix(got, []byte("---\nname: slides-authoring\n")) {
+	if !bytes.HasPrefix(got, []byte("---\nname: decks-authoring\n")) {
 		t.Fatalf("rendered SKILL.md must open with its YAML frontmatter, got:\n%.80s", got)
 	}
 
@@ -73,8 +73,8 @@ func TestRenderStampsHeader(t *testing.T) {
 		for _, want := range []string{
 			"GENERATED",
 			"do not edit",
-			"internal/skill/assets/slides-authoring/",
-			"slides install-skill",
+			"internal/skill/assets/decks-authoring/",
+			"decks install-skill",
 		} {
 			if !bytes.Contains(got, []byte(want)) {
 				t.Errorf("%s: header missing %q", name, want)
@@ -93,7 +93,7 @@ func TestRenderPreservesBody(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Contains(skillMD, []byte("# slides-authoring skill")) {
+	if !bytes.Contains(skillMD, []byte("# decks-authoring skill")) {
 		t.Error("SKILL.md body was lost")
 	}
 	// A spot-check of the data-* vocabulary the skill exists to teach.
@@ -142,7 +142,7 @@ func TestInstallWritesSkill(t *testing.T) {
 
 // TestInstallIsIdempotentNoOp — re-installing an unchanged skill must not touch a single
 // file.  A decks repo commits the skill as a build artifact; rewriting identical bytes
-// would churn mtimes and produce spurious diffs on every `slides new`.
+// would churn mtimes and produce spurious diffs on every `decks new`.
 func TestInstallIsIdempotentNoOp(t *testing.T) {
 	root := t.TempDir()
 	if _, err := skill.Install(root); err != nil {
@@ -239,12 +239,12 @@ func TestInstallCreatesOnlyTheSkillDir(t *testing.T) {
 	}
 }
 
-// TestRepoInstalledCopyIsCurrent is the anti-drift guard for slides-builder's *own*
+// TestRepoInstalledCopyIsCurrent is the anti-drift guard for decks's *own*
 // workspace.  This repo commits its installed skill so a fresh clone gives Claude Code
 // the skill without first building the binary — which means the committed copy can go
 // stale the moment someone edits the source under internal/skill/assets/.
 //
-// If this fails, run `slides install-skill` from the repo root and commit the result.
+// If this fails, run `decks install-skill` from the repo root and commit the result.
 func TestRepoInstalledCopyIsCurrent(t *testing.T) {
 	repoRoot := filepath.Join("..", "..") // test cwd is the package dir.
 
@@ -261,11 +261,11 @@ func TestRepoInstalledCopyIsCurrent(t *testing.T) {
 		got, err := os.ReadFile(path)
 		if err != nil {
 			t.Fatalf("the repo's committed skill is missing %s: %v\n"+
-				"run `slides install-skill` from the repo root and commit the result", path, err)
+				"run `decks install-skill` from the repo root and commit the result", path, err)
 		}
 		if !bytes.Equal(got, want) {
-			t.Errorf("%s has drifted from internal/skill/assets/slides-authoring/%s\n"+
-				"run `slides install-skill` from the repo root and commit the result", path, name)
+			t.Errorf("%s has drifted from internal/skill/assets/decks-authoring/%s\n"+
+				"run `decks install-skill` from the repo root and commit the result", path, name)
 		}
 	}
 }
@@ -278,14 +278,14 @@ func TestSkillTeachesTheCurrentCLI(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(got)
-	for _, cmd := range []string{"slides new ", "slides validate ", "slides add-slide ", "slides vendor "} {
+	for _, cmd := range []string{"decks new ", "decks validate ", "decks add-slide ", "decks vendor "} {
 		if !strings.Contains(text, cmd) {
 			t.Errorf("SKILL.md no longer documents %q", cmd)
 		}
 	}
 	// The skill must not tell Claude Code to run the binary from the workspace root
 	// (Phase 20 put it on $PATH and made it resolve the root itself).
-	if strings.Contains(text, "./slides") {
-		t.Error(`SKILL.md still tells Claude Code to run "./slides"; the binary lives on $PATH`)
+	if strings.Contains(text, "./decks") {
+		t.Error(`SKILL.md still tells Claude Code to run "./decks"; the binary lives on $PATH`)
 	}
 }

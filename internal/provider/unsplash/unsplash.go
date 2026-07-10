@@ -20,8 +20,8 @@ import (
 	"strings"
 	"time"
 
-	"slides-builder/internal/assets"
-	"slides-builder/internal/provider"
+	"github.com/Loxstomper/decks/internal/assets"
+	"github.com/Loxstomper/decks/internal/provider"
 )
 
 const (

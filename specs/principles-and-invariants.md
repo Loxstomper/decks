@@ -42,7 +42,7 @@ Cross-cutting rules every other spec depends on.
 
 ## Validation
 
-- `slides validate` ([Claude Code integration](claude-code-integration.md)) gates both Claude Code edits and the
+- `decks validate` ([Claude Code integration](claude-code-integration.md)) gates both Claude Code edits and the
   editor's save path. Malformed decks are surfaced, not silently broken.
 
 ## Testing

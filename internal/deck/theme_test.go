@@ -98,23 +98,23 @@ func TestThemeBackgrounds(t *testing.T) {
 }
 
 // TestInjectSlideThemesLink_PreP10Deck verifies P18-2: a deck whose <head>
-// links slides-layout.css but not slides-slide-themes.css gets the link added
+// links decks-layout.css but not decks-slide-themes.css gets the link added
 // exactly once, ordered right after the layout link; re-running is a no-op.
 func TestInjectSlideThemesLink_PreP10Deck(t *testing.T) {
 	const head = `<head>
-  <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
+  <link rel="stylesheet" href="assets/vendor/decks-layout.css" />
   <link rel="stylesheet" href="custom.css" />
 </head>`
 	out, changed := injectSlideThemesLink(head)
 	if !changed {
 		t.Fatalf("expected the link to be injected")
 	}
-	if n := strings.Count(out, "slides-slide-themes.css"); n != 1 {
+	if n := strings.Count(out, "decks-slide-themes.css"); n != 1 {
 		t.Fatalf("expected exactly one slide-themes link, got %d:\n%s", n, out)
 	}
 	// Ordering: layout link → slide-themes link → custom.css link.
-	li := strings.Index(out, "slides-layout.css")
-	si := strings.Index(out, "slides-slide-themes.css")
+	li := strings.Index(out, "decks-layout.css")
+	si := strings.Index(out, "decks-slide-themes.css")
 	ci := strings.Index(out, "custom.css")
 	if !(li < si && si < ci) {
 		t.Errorf("link ordering wrong (layout=%d themes=%d custom=%d):\n%s", li, si, ci, out)
@@ -130,8 +130,8 @@ func TestInjectSlideThemesLink_PreP10Deck(t *testing.T) {
 // already links the stylesheet) is left byte-stable.
 func TestInjectSlideThemesLink_ScaffoldUnchanged(t *testing.T) {
 	const head = `<head>
-  <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
-  <link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />
+  <link rel="stylesheet" href="assets/vendor/decks-layout.css" />
+  <link rel="stylesheet" href="assets/vendor/decks-slide-themes.css" />
   <link rel="stylesheet" href="custom.css" />
 </head>`
 	out, changed := injectSlideThemesLink(head)

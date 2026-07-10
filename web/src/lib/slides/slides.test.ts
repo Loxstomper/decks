@@ -548,11 +548,11 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
     expect(doc).toContain('assets/vendor/reveal/theme/black.css');
   });
 
-  it('links slides-slide-themes.css for per-slide data-theme overrides', () => {
+  it('links decks-slide-themes.css for per-slide data-theme overrides', () => {
     const model = parseDeck(DECK);
     const s1 = topLevelSlides(model)[0];
     const doc = buildThumbnailSrcdoc('My Deck', s1);
-    expect(doc).toContain('assets/vendor/slides-slide-themes.css');
+    expect(doc).toContain('assets/vendor/decks-slide-themes.css');
   });
 
   it('forces .fragment elements visible so all content shows in the thumbnail', () => {
@@ -727,7 +727,7 @@ describe('buildThumbnailSrcdoc (P6-2)', () => {
       const model = parseDeck(GRID);
       const s1 = topLevelSlides(model)[0];
       const doc = buildThumbnailSrcdoc('My Deck', s1);
-      // Numeric layout resolved to inline style (mirrors slides-layout-init.js).
+      // Numeric layout resolved to inline style (mirrors decks-layout-init.js).
       expect(doc).toContain('grid-template-columns: repeat(3, 1fr)');
       // Gap is applied (logical px).
       expect(doc).toContain('gap: 24px');

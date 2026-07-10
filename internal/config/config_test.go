@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"slides-builder/internal/config"
+	"github.com/Loxstomper/decks/internal/config"
 )
 
 func TestDefaults_WhenFileAbsent(t *testing.T) {

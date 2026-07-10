@@ -82,7 +82,7 @@
           kind: 'error',
           text:
             'PDF export requires headless Chrome, which was not found on this server. ' +
-            'Install Google Chrome or Chromium and restart the slides-builder server.',
+            'Install Google Chrome or Chromium and restart the decks server.',
         };
         return;
       }
@@ -99,7 +99,7 @@
     } catch {
       message = {
         kind: 'error',
-        text: 'Could not reach the export endpoint. Is the slides-builder server running?',
+        text: 'Could not reach the export endpoint. Is the decks server running?',
       };
     } finally {
       pdfBusy = false;
@@ -128,7 +128,7 @@
     } catch {
       message = {
         kind: 'error',
-        text: 'Could not reach the export endpoint. Is the slides-builder server running?',
+        text: 'Could not reach the export endpoint. Is the decks server running?',
       };
     } finally {
       zipBusy = false;

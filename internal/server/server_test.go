@@ -14,12 +14,12 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/assets"
-	"slides-builder/internal/deck"
-	"slides-builder/internal/provider"
-	"slides-builder/internal/provider/giphy"
-	"slides-builder/internal/provider/unsplash"
-	"slides-builder/internal/server"
+	"github.com/Loxstomper/decks/internal/assets"
+	"github.com/Loxstomper/decks/internal/deck"
+	"github.com/Loxstomper/decks/internal/provider"
+	"github.com/Loxstomper/decks/internal/provider/giphy"
+	"github.com/Loxstomper/decks/internal/provider/unsplash"
+	"github.com/Loxstomper/decks/internal/server"
 )
 
 // newTestServer creates a Server backed by a temp workspace (no watcher, no static FS).

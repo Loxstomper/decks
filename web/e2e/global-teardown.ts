@@ -1,5 +1,5 @@
 /**
- * e2e/global-teardown.ts — Playwright global teardown for slides-builder.
+ * e2e/global-teardown.ts — Playwright global teardown for decks.
  *
  * Runs once after all specs complete (pass or fail). Reads the state file
  * written by global-setup.ts, kills the server process, and removes the
@@ -35,7 +35,7 @@ export default async function globalTeardown(): Promise<void> {
   if (state.pid) {
     try {
       process.kill(state.pid, 'SIGTERM');
-      console.log(`[e2e teardown] Sent SIGTERM to slides server (pid=${state.pid}).`);
+      console.log(`[e2e teardown] Sent SIGTERM to decks server (pid=${state.pid}).`);
     } catch (err: unknown) {
       // ESRCH = already exited — not an error.
       if ((err as NodeJS.ErrnoException).code !== 'ESRCH') {

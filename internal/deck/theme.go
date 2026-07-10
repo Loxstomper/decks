@@ -77,7 +77,7 @@ func themeVars(name string) (map[string]string, error) {
 // backgrounds at deck level, not per section.
 func GenerateSlideThemesCSS() []byte {
 	var b bytes.Buffer
-	b.WriteString("/* slides-builder per-slide themes (P10-1) — GENERATED, do not edit.\n")
+	b.WriteString("/* decks per-slide themes (P10-1) — GENERATED, do not edit.\n")
 	b.WriteString("   Derived from the embedded reveal.js theme CSS (single source of truth):\n")
 	b.WriteString("   each block re-declares a theme's --r-* custom properties scoped to a\n")
 	b.WriteString("   section[data-theme] so an individual slide restyles its text/headings/links.\n")

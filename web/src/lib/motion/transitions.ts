@@ -5,7 +5,7 @@
  * Reveal transitions are controlled via:
  *   • Per-slide:  `data-transition` / `data-transition-speed` on `<section>` elements.
  *   • Deck-level: stored as `data-transition` / `data-transition-speed` on the
- *     `.reveal` root div; the slides-layout-init.js companion script reads these
+ *     `.reveal` root div; the decks-layout-init.js companion script reads these
  *     attributes after Reveal initializes and calls `Reveal.configure()` to apply
  *     them as the deck default.
  *
@@ -129,7 +129,7 @@ export function getDeckTransition(model: DeckModel): {
 /**
  * Set the deck-level transition preference on the `<div class="reveal">`.
  *
- * The companion slides-layout-init.js picks up these attributes at runtime and
+ * The companion decks-layout-init.js picks up these attributes at runtime and
  * calls `Reveal.configure({ transition, transitionSpeed })` after Reveal is ready,
  * overriding the hardcoded transition in the Reveal.initialize() call (which
  * lives in a passthrough <script> we cannot modify from the model layer).

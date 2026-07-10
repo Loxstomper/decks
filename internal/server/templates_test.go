@@ -8,7 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // TestTemplateList_BuiltinsOnly verifies GET /api/templates returns the bundled

@@ -35,7 +35,7 @@ import type { ElementNode } from './types';
 // to disagree with the TS model on which names are valid.
 
 /**
- * The set of bundled reveal.js theme names supported by slides-builder (P10).
+ * The set of bundled reveal.js theme names supported by decks (P10).
  *
  * Mirrors `allowedTheme` in internal/validate/validate.go — keep in sync.
  */

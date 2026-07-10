@@ -152,8 +152,8 @@ const USER_CSS = `:root {
 describe('setFooterBlock / clearFooterBlock (P17-18)', () => {
   it('inserts a managed footer block keyed off :not([data-footer-hidden])', () => {
     const out = setFooterBlock(USER_CSS, 'Acme Inc — Confidential');
-    expect(out).toContain('/* slides-builder:footer */');
-    expect(out).toContain('/* /slides-builder:footer */');
+    expect(out).toContain('/* decks:footer */');
+    expect(out).toContain('/* /decks:footer */');
     expect(out).toContain('.reveal .slides section:not([data-footer-hidden])::after');
     expect(out).toContain('content: "Acme Inc — Confidential";');
     // User CSS + :root block preserved verbatim.
@@ -172,13 +172,13 @@ describe('setFooterBlock / clearFooterBlock (P17-18)', () => {
     const b = setFooterBlock(a, 'New');
     expect(b).toContain('content: "New";');
     expect(b).not.toContain('content: "Old";');
-    expect((b.match(/slides-builder:footer \*\//g) ?? []).length).toBe(2); // open + close once
+    expect((b.match(/decks:footer \*\//g) ?? []).length).toBe(2); // open + close once
   });
 
   it('clears the footer block and restores the user CSS', () => {
     const withFooter = setFooterBlock(USER_CSS, 'Bye');
     const cleared = clearFooterBlock(withFooter);
-    expect(cleared).not.toContain('slides-builder:footer');
+    expect(cleared).not.toContain('decks:footer');
     expect(cleared).toContain('--r-main-color: #fff;');
     expect(cleared).toContain('.reveal h1 { color: hotpink; }');
   });

@@ -1,6 +1,6 @@
-/* slides-layout-init.js — Applies numeric data-* layout attributes to CSS.
+/* decks-layout-init.js — Applies numeric data-* layout attributes to CSS.
  *
- * Companion script for slides-layout.css (spec layout-vocabulary, offline-first spec principles-and-invariants).
+ * Companion script for decks-layout.css (spec layout-vocabulary, offline-first spec principles-and-invariants).
  * Load this BEFORE Reveal.initialize() so layout is applied before reveal
  * measures slide dimensions.
  *
@@ -163,7 +163,7 @@
       }
     } catch (e) {
       if (typeof console !== 'undefined') {
-        console.warn('[slides-layout] propagateVerticalBackground:', e);
+        console.warn('[decks-layout] propagateVerticalBackground:', e);
       }
     }
   }
@@ -181,7 +181,7 @@
   }
 
   // ── Deck-level transition override (P6-8, spec motion-and-transitions) ────────────────────────
-  // The slides-builder motion panel stores the deck default transition as
+  // The decks motion panel stores the deck default transition as
   // data-transition / data-transition-speed on <div class="reveal">.  We cannot
   // modify the passthrough Reveal.initialize() <script> from the model layer
   // (spec principles-and-invariants — never destroy the unknown), so we call Reveal.configure() here
@@ -208,7 +208,7 @@
       }
     } catch (e) {
       // Non-fatal: log but don't break presentation.
-      if (typeof console !== 'undefined') console.warn('[slides-layout] deck transition:', e);
+      if (typeof console !== 'undefined') console.warn('[decks-layout] deck transition:', e);
     }
   }, false);
 

@@ -1,4 +1,4 @@
-module slides-builder
+module github.com/Loxstomper/decks
 
 go 1.23.0
 

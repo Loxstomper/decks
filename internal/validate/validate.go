@@ -1,4 +1,4 @@
-// Package validate implements `slides validate`: an independent, spec-driven
+// Package validate implements `decks validate`: an independent, spec-driven
 // checker for deck.html files (spec claude-code-integration "the sleeper feature", spec principles-and-invariants validation
 // + offline-first).
 //

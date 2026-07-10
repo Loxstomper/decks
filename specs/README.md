@@ -1,4 +1,4 @@
-# slides-builder — Specifications
+# decks — Specifications
 
 A local-first, WYSIWYG slide editor built on **reveal.js** — a Google-Slides-style visual
 canvas *and* hand/AI-editable HTML source, kept in sync. Runs entirely locally as a single
@@ -42,7 +42,7 @@ feature investigation this project grew out of.)
 | Logical canvas | 1920×1080, configurable aspect ratio |
 | Layout contract | `data-*` attributes; editor owns layout, you own styling |
 | Project layout | `decks/<name>/{deck.html, custom.css, assets/}` |
-| Workspace root | `--dir` › `$SLIDES_DIR` › nearest ancestor with `decks/` › error |
+| Workspace root | `--dir` › `$DECKS_DIR` › nearest ancestor with `decks/` › error |
 | AI interface | Claude Code **skill** + CLI first; MCP later |
 
 ## Spec index

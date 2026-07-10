@@ -6,7 +6,7 @@
 // Every new deck receives a private copy under assets/vendor/reveal/ so the deck
 // is fully self-contained and renders with zero network access.  The workspace-level
 // copy at shared/vendor/reveal/ serves as a human-readable reference; it is kept in
-// sync by EnsureSharedVendor (called from both "slides new" and "slides vendor").
+// sync by EnsureSharedVendor (called from both "decks new" and "decks vendor").
 package deck
 
 import (
@@ -34,13 +34,13 @@ import (
 //go:embed vendor/reveal
 var revealVendor embed.FS
 
-// layoutVendor holds the slides-builder layout vocabulary files:
-//   - vendor/slides-layout.css     — CSS for enum data-* attributes (spec layout-vocabulary)
-//   - vendor/slides-layout-init.js — applies numeric data-* to inline styles
+// layoutVendor holds the decks layout vocabulary files:
+//   - vendor/decks-layout.css     — CSS for enum data-* attributes (spec layout-vocabulary)
+//   - vendor/decks-layout-init.js — applies numeric data-* to inline styles
 //
 // These are shipped alongside reveal so decks render layout offline (spec principles-and-invariants).
 //
-//go:embed vendor/slides-layout.css vendor/slides-layout-init.js
+//go:embed vendor/decks-layout.css vendor/decks-layout-init.js
 var layoutVendor embed.FS
 
 // highlightVendor holds the reveal.js highlight plugin (P5-9, spec principles-and-invariants):
@@ -76,7 +76,7 @@ var mathVendor embed.FS
 //go:embed vendor/notes
 var notesVendor embed.FS
 
-// chartVendor holds Chart.js + the slides-builder chart plugin (P17-14/15):
+// chartVendor holds Chart.js + the decks chart plugin (P17-14/15):
 //   - vendor/chart/chart.umd.js — Chart.js 4.x UMD bundle (exposes window.Chart)
 //   - vendor/chart/plugin.js    — thin reveal plugin reading data-chart-data JSON
 //
@@ -86,7 +86,7 @@ var notesVendor embed.FS
 //go:embed vendor/chart
 var chartVendor embed.FS
 
-// qrVendor holds the QR generator + the slides-builder QR plugin (P19):
+// qrVendor holds the QR generator + the decks QR plugin (P19):
 //   - vendor/qr/qrcode.js — qrcode-generator (Kazuhiko Arase, MIT; exposes the
 //     global `qrcode`), the matrix/error-correction core.
 //   - vendor/qr/plugin.js  — thin reveal plugin reading data-qr + data-qr-*,
@@ -140,10 +140,10 @@ const deckHTML = `<!doctype html>
   <link rel="stylesheet" href="assets/vendor/reveal/reset.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/reveal.css" />
   <link rel="stylesheet" href="assets/vendor/reveal/theme/black.css" />
-  <!-- slides-builder layout vocabulary – enum data-* → flex/grid (spec layout-vocabulary) -->
-  <link rel="stylesheet" href="assets/vendor/slides-layout.css" />
+  <!-- decks layout vocabulary – enum data-* → flex/grid (spec layout-vocabulary) -->
+  <link rel="stylesheet" href="assets/vendor/decks-layout.css" />
   <!-- Per-slide themes – section[data-theme] re-binds reveal --r-* vars (P10-1) -->
-  <link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />
+  <link rel="stylesheet" href="assets/vendor/decks-slide-themes.css" />
   <!-- Highlight.js Monokai theme – loaded before plugin to avoid FOUC (P5-9) -->
   <link rel="stylesheet" href="assets/vendor/highlight/monokai.min.css" />
   <link rel="stylesheet" href="custom.css" />
@@ -166,7 +166,7 @@ const deckHTML = `<!doctype html>
   </div>
 
   <!-- Numeric data-* → inline styles companion (data-gap, data-pad, free coords) -->
-  <script src="assets/vendor/slides-layout-init.js"></script>
+  <script src="assets/vendor/decks-layout-init.js"></script>
   <script src="assets/vendor/reveal/reveal.js"></script>
   <!-- Highlight plugin – syntax highlights <code class="language-*"> blocks (P5-9) -->
   <script src="assets/vendor/highlight/plugin.js"></script>
@@ -190,7 +190,7 @@ const deckHTML = `<!doctype html>
       // Full logical canvas at origin: free coords are identity (spec scaling-and-resolution, Phase 15).
       // center:false + margin:0 stop reveal from inset-offsetting the slide, so a
       // [data-free] element at data-x=0,data-y=0 lands at the true canvas top-left.
-      // Structured 'stack' slides still center via data-justify in slides-layout.css.
+      // Structured 'stack' slides still center via data-justify in decks-layout.css.
       center: false,
       margin: 0,
       hash: true,
@@ -339,12 +339,12 @@ func New(root, name string) error {
 	return nil
 }
 
-// Vendor copies the embedded reveal.js distribution, slides-builder layout
+// Vendor copies the embedded reveal.js distribution, decks layout
 // files, and plugin vendor files (highlight.js, math/KaTeX) into an existing
 // deck at decks/<name>/assets/vendor/, replacing any prior version.  It also
 // refreshes the workspace-level reference.
 //
-// This is the backing implementation of the `slides vendor <name>` CLI command.
+// This is the backing implementation of the `decks vendor <name>` CLI command.
 func Vendor(root, name string) error {
 	if err := validateName(name); err != nil {
 		return err
@@ -357,19 +357,19 @@ func Vendor(root, name string) error {
 	}
 	log.Printf("deck: vendored reveal.js %s → %s/reveal", revealVersion, vendorDir)
 
-	// Layout vocabulary files → assets/vendor/slides-layout.{css,js}
+	// Layout vocabulary files → assets/vendor/decks-layout.{css,js}
 	if err := copyEmbeddedLayout(vendorDir); err != nil {
 		return fmt.Errorf("vendor: copy layout to deck: %w", err)
 	}
-	log.Printf("deck: vendored slides-layout → %s", vendorDir)
+	log.Printf("deck: vendored decks-layout → %s", vendorDir)
 
-	// Per-slide theme stylesheet → assets/vendor/slides-slide-themes.css (P10-1).
+	// Per-slide theme stylesheet → assets/vendor/decks-slide-themes.css (P10-1).
 	// Derived from the embedded reveal theme CSS so a section[data-theme] can
 	// restyle its own --r-* vars (per-slide theming, single source of truth).
 	if err := writeSlideThemesCSS(vendorDir); err != nil {
 		return fmt.Errorf("vendor: write slide themes to deck: %w", err)
 	}
-	log.Printf("deck: vendored slides-slide-themes.css → %s", vendorDir)
+	log.Printf("deck: vendored decks-slide-themes.css → %s", vendorDir)
 
 	// Highlight plugin → assets/vendor/highlight/ (P5-9, spec principles-and-invariants offline-first)
 	if err := copyEmbeddedFS(highlightVendor, "vendor/highlight", filepath.Join(vendorDir, "highlight")); err != nil {
@@ -643,28 +643,28 @@ func SetSlideNumber(root, name string, enabled bool, format string) error {
 	return Write(root, name, []byte(out))
 }
 
-// slideThemesLinkRE detects an existing slides-slide-themes.css <link> so the
+// slideThemesLinkRE detects an existing decks-slide-themes.css <link> so the
 // injection is idempotent (matches any quoting/whitespace around the href).
-var slideThemesLinkRE = regexp.MustCompile(`<link[^>]+slides-slide-themes\.css`)
+var slideThemesLinkRE = regexp.MustCompile(`<link[^>]+decks-slide-themes\.css`)
 
 // slideThemesLinkTag is the exact <link> tag the scaffold emits, reused so an
 // upgraded deck's head matches a freshly scaffolded one byte-for-byte.
-const slideThemesLinkTag = `<link rel="stylesheet" href="assets/vendor/slides-slide-themes.css" />`
+const slideThemesLinkTag = `<link rel="stylesheet" href="assets/vendor/decks-slide-themes.css" />`
 
 // injectSlideThemesLink ensures deck.html links the per-slide theme stylesheet
 // (P18-2). Decks scaffolded before Phase 10 never had the <link> written into
 // their <head>; vendor/upgrade copied the file but left the markup alone, so
 // data-theme overrides had no rules to match. This adds the link exactly once,
-// ordered right after the slides-layout.css link (matching the scaffold:
-// slides-layout.css → slides-slide-themes.css → custom.css). Pure + idempotent:
+// ordered right after the decks-layout.css link (matching the scaffold:
+// decks-layout.css → decks-slide-themes.css → custom.css). Pure + idempotent:
 // returns the HTML unchanged (changed=false) when the link is already present,
 // or when no anchor to position it against is found.
 func injectSlideThemesLink(html string) (string, bool) {
 	if slideThemesLinkRE.MatchString(html) {
 		return html, false
 	}
-	// Anchor on the slides-layout.css link line so ordering matches the scaffold.
-	anchorRE := regexp.MustCompile(`(?m)^([ \t]*)<link[^>]+slides-layout\.css[^>]*>[^\n]*\n`)
+	// Anchor on the decks-layout.css link line so ordering matches the scaffold.
+	anchorRE := regexp.MustCompile(`(?m)^([ \t]*)<link[^>]+decks-layout\.css[^>]*>[^\n]*\n`)
 	loc := anchorRE.FindStringSubmatchIndex(html)
 	if loc == nil {
 		// No layout link to anchor against (unusual). Fall back to before the
@@ -778,7 +778,7 @@ func injectQrPlugin(html string) (string, bool) {
 // Phase 15 coordinate-identity reveal config. It:
 //
 //  1. Re-vendors via Vendor() so the deck picks up updated CSS/JS (notably the
-//     slides-layout.css canvas/containing-block rules).
+//     decks-layout.css canvas/containing-block rules).
 //  2. Rewrites deck.html's Reveal.initialize to add center:false + margin:0 when
 //     absent. The rewrite is byte-stable when those keys already exist (a deck
 //     scaffolded by the current template is left untouched) and idempotent.
@@ -815,27 +815,27 @@ func Upgrade(root, name string) error {
 }
 
 // writeSlideThemesCSS writes the DERIVED per-slide theme stylesheet (P10-1)
-// into destDir as slides-slide-themes.css. The content is generated from the
+// into destDir as decks-slide-themes.css. The content is generated from the
 // embedded reveal theme CSS (GenerateSlideThemesCSS), not copied from an
 // embedded file, so it always reflects the bundled themes.
 func writeSlideThemesCSS(destDir string) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("writeSlideThemesCSS: mkdir: %w", err)
 	}
-	dest := filepath.Join(destDir, "slides-slide-themes.css")
+	dest := filepath.Join(destDir, "decks-slide-themes.css")
 	if err := os.WriteFile(dest, GenerateSlideThemesCSS(), 0o644); err != nil {
 		return fmt.Errorf("writeSlideThemesCSS: write %s: %w", dest, err)
 	}
 	return nil
 }
 
-// copyEmbeddedLayout copies slides-layout.css and slides-layout-init.js from
+// copyEmbeddedLayout copies decks-layout.css and decks-layout-init.js from
 // the embedded layoutVendor FS into destDir (flat, no subdirectory).
 func copyEmbeddedLayout(destDir string) error {
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
 		return fmt.Errorf("copyEmbeddedLayout: mkdir: %w", err)
 	}
-	for _, name := range []string{"slides-layout.css", "slides-layout-init.js"} {
+	for _, name := range []string{"decks-layout.css", "decks-layout-init.js"} {
 		src, err := layoutVendor.Open("vendor/" + name)
 		if err != nil {
 			return fmt.Errorf("copyEmbeddedLayout: open %s: %w", name, err)

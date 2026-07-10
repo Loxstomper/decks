@@ -66,7 +66,7 @@ func TestResolveDeckArg_Resolves(t *testing.T) {
 }
 
 // TestResolveDeckArg_BareNameBeatsPath pins the disambiguation rule. From inside
-// decks/intro/, `slides validate assets` asks for a deck named "assets" — it must NOT
+// decks/intro/, `decks validate assets` asks for a deck named "assets" — it must NOT
 // silently resolve to the deck "intro" just because decks/intro/assets happens to exist.
 // A path-first reading would do exactly that, and the user would never know.
 func TestResolveDeckArg_BareNameBeatsPath(t *testing.T) {
@@ -193,7 +193,7 @@ func TestResolveDeckArg_Empty(t *testing.T) {
 }
 
 // TestDeckArgStartDir — naming a deck by path also says where its workspace is, so the
-// upward search starts there. Without this, `slides validate /abs/ws/decks/intro` from an
+// upward search starts there. Without this, `decks validate /abs/ws/decks/intro` from an
 // unrelated cwd fails at workspace resolution, before the argument naming the workspace is
 // ever read.
 func TestDeckArgStartDir(t *testing.T) {
@@ -248,7 +248,7 @@ func TestDeckArgStartDir_FindsWorkspaceFromAnAbsolutePath(t *testing.T) {
 }
 
 // TestResolveWorkspaceAndDeck covers the composition: the cwd's workspace is tried first,
-// the deck's own path is a fallback, and an explicit --dir / $SLIDES_DIR pins the root.
+// the deck's own path is a fallback, and an explicit --dir / $DECKS_DIR pins the root.
 func TestResolveWorkspaceAndDeck(t *testing.T) {
 	w1 := deckWorkspace(t) // decks/{intro,other}
 	w2 := deckWorkspace(t) // a second, unrelated workspace
@@ -267,7 +267,7 @@ func TestResolveWorkspaceAndDeck(t *testing.T) {
 		{"absolute path from a dir with no workspace", "", "", nowhere, introIn1, w1, "intro"},
 		{"absolute path into another workspace", "", "", introIn1, farIn2, w2, "intro"},
 		{"--dir pins the root", w1, "", nowhere, "other", w1, "other"},
-		{"$SLIDES_DIR pins the root", "", w1, nowhere, "intro", w1, "intro"},
+		{"$DECKS_DIR pins the root", "", w1, nowhere, "intro", w1, "intro"},
 	}
 
 	for _, tc := range tests {
@@ -292,7 +292,7 @@ func TestResolveWorkspaceAndDeck_PinnedRootWins(t *testing.T) {
 
 	for _, tc := range []struct{ name, flagDir, envDir string }{
 		{"--dir", w1, ""},
-		{"$SLIDES_DIR", "", w1},
+		{"$DECKS_DIR", "", w1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, _, err := resolveWorkspaceAndDeck(tc.flagDir, tc.envDir, w1, other2)

@@ -2,7 +2,7 @@
  * thumbnail-layout.test.ts — P12-4.
  *
  * Verifies the pure static port of the numeric layout vocabulary mirrors
- * `slides-layout-init.js` exactly: every numeric data-* mapping, nested
+ * `decks-layout-init.js` exactly: every numeric data-* mapping, nested
  * elements, merging into an existing inline style, raw-vs-numeric cols/basis,
  * and free coordinates — all without mutating the input model.
  */

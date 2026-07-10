@@ -33,7 +33,7 @@ filesystem boundary (read/write/watch); the Svelte client owns the rich editing 
 │  • deck/file API: list, create, read, write, asset upload│
 │  • fsnotify watcher → SSE "file changed" events          │
 │  • headless-Chrome driver for PDF export                  │
-│  • CLI subcommands (slides new / add-slide / validate)   │
+│  • CLI subcommands (decks new / add-slide / validate)   │
 └───────────────▲───────────────────────┬─────────────────┘
        SSE + REST│                       │ serves
                  │                       ▼

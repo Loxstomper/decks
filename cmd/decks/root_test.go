@@ -36,7 +36,7 @@ func asNoWorkspace(t *testing.T, err error) *noWorkspaceError {
 }
 
 // TestFindRoot_Precedence pins the precedence chain from spec project-structure:
-// --dir › $SLIDES_DIR › upward search.  Each case wires up all three sources so a
+// --dir › $DECKS_DIR › upward search.  Each case wires up all three sources so a
 // regression that consults them out of order fails loudly rather than passing by luck.
 func TestFindRoot_Precedence(t *testing.T) {
 	base := t.TempDir()
@@ -90,7 +90,7 @@ func TestFindRoot_NearestAncestorWins(t *testing.T) {
 
 // TestFindRoot_NotFound covers the walk terminating at the filesystem root.  The error
 // must be the recoverable sentinel naming the *start* directory: that is the directory
-// `slides new` will initialize, and the one every other command names in its error.
+// `decks new` will initialize, and the one every other command names in its error.
 func TestFindRoot_NotFound(t *testing.T) {
 	start := mkDir(t, filepath.Join(t.TempDir(), "not", "a", "workspace"))
 
@@ -125,8 +125,8 @@ func TestFindRoot_RelativeStartIsAbsolute(t *testing.T) {
 	}
 }
 
-// TestFindRoot_ExplicitDirMustExist — a --dir/$SLIDES_DIR typo is a *hard* error, never a
-// recoverable one: `slides new --dir /typo` must fail rather than create /typo.  This is
+// TestFindRoot_ExplicitDirMustExist — a --dir/$DECKS_DIR typo is a *hard* error, never a
+// recoverable one: `decks new --dir /typo` must fail rather than create /typo.  This is
 // the invariant that keeps "never scaffold an unproven root" true even for explicit paths.
 func TestFindRoot_ExplicitDirMustExist(t *testing.T) {
 	missing := filepath.Join(t.TempDir(), "nope")
@@ -136,7 +136,7 @@ func TestFindRoot_ExplicitDirMustExist(t *testing.T) {
 		flagDir, envDir string
 	}{
 		{"--dir", missing, ""},
-		{"$SLIDES_DIR", "", missing},
+		{"$DECKS_DIR", "", missing},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := findRoot(t.TempDir(), tc.flagDir, tc.envDir)
@@ -172,8 +172,8 @@ func TestFindRoot_ExplicitDirIsAFile(t *testing.T) {
 }
 
 // TestFindRoot_ExplicitDirWithoutMarker — an existing --dir that is not yet a workspace
-// yields the recoverable sentinel naming it, so `slides new --dir ~/talks intro`
-// initializes ~/talks while `slides --dir ~/talks serve` refuses.
+// yields the recoverable sentinel naming it, so `decks new --dir ~/talks intro`
+// initializes ~/talks while `decks --dir ~/talks serve` refuses.
 func TestFindRoot_ExplicitDirWithoutMarker(t *testing.T) {
 	bare := mkDir(t, filepath.Join(t.TempDir(), "talks"))
 
@@ -182,7 +182,7 @@ func TestFindRoot_ExplicitDirWithoutMarker(t *testing.T) {
 		flagDir, envDir string
 	}{
 		{"--dir", bare, ""},
-		{"$SLIDES_DIR", "", bare},
+		{"$DECKS_DIR", "", bare},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := findRoot(t.TempDir(), tc.flagDir, tc.envDir)
@@ -216,7 +216,7 @@ func TestFindRoot_MarkerMustBeADirectory(t *testing.T) {
 
 // TestFindRoot_CreatesNothing is the load-bearing safety test for Phase 20: resolution
 // reads the filesystem and never writes to it.  A failure here is the original bug —
-// `slides` in ~/Downloads littering empty decks/ templates/ shared/ themes/.
+// `decks` in ~/Downloads littering empty decks/ templates/ shared/ themes/.
 func TestFindRoot_CreatesNothing(t *testing.T) {
 	base := t.TempDir()
 	start := mkDir(t, filepath.Join(base, "downloads"))

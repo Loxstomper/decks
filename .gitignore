@@ -22,8 +22,8 @@ web/playwright-report/
 web/e2e/.e2e-state.json
 
 # Go build output
-/slides-builder
-/slides
+/decks
+/bin/
 /decks
 /shared
 *.test

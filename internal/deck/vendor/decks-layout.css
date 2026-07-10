@@ -1,4 +1,4 @@
-/* slides-layout.css — Layout vocabulary for slides-builder (spec layout-vocabulary).
+/* decks-layout.css — Layout vocabulary for decks (spec layout-vocabulary).
  *
  * Maps data-* attributes on layout containers to the corresponding flex/grid CSS.
  * Shipped offline alongside reveal.js (spec principles-and-invariants — zero external URLs).
@@ -10,13 +10,13 @@
  *     data-align    cross-axis:  start | center | end | stretch
  *     data-justify  main-axis:   start | center | end | between | around
  *
- *   Numeric / computed attributes (handled by slides-layout-init.js companion):
+ *   Numeric / computed attributes (handled by decks-layout-init.js companion):
  *     data-gap   logical px → gap
  *     data-pad   logical px → padding
  *     data-cols  integer or template → grid-template-columns
  *     data-rows  integer or template → grid-template-rows
  *
- *   Child attributes (handled by slides-layout-init.js):
+ *   Child attributes (handled by decks-layout-init.js):
  *     data-grow  flex-grow factor
  *     data-basis flex-basis (logical px or %)
  *     data-span  grid-column / grid-row span
@@ -27,7 +27,7 @@
  * WHY TWO FILES:
  *   CSS attr() only supports string values in the `content` property in all
  *   browsers. Numeric attributes (gap, pad, coords) require a companion script
- *   (slides-layout-init.js) to write them as inline styles. Enum attributes are
+ *   (decks-layout-init.js) to write them as inline styles. Enum attributes are
  *   handled here via attribute selectors — no script needed.
  */
 
@@ -110,7 +110,7 @@
 
 /* ── Free element — absolute-positioning escape hatch ────────────────────── */
 /* Position and size (data-x/y/w/h/rot in logical coords) are applied by
-   slides-layout-init.js because CSS attr() cannot set numeric property values
+   decks-layout-init.js because CSS attr() cannot set numeric property values
    portably. Only the base rule is needed here. */
 
 [data-free] {

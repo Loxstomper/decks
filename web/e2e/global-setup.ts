@@ -1,12 +1,12 @@
 /**
- * e2e/global-setup.ts — Playwright global setup for slides-builder.
+ * e2e/global-setup.ts — Playwright global setup for decks.
  *
  * Runs once before all specs. Responsibilities:
- *  1. Locate the pre-built `slides` binary (must already be compiled).
+ *  1. Locate the pre-built `decks` binary (must already be compiled).
  *  2. Create a temp workspace directory.
  *  3. Write a config.toml to that workspace so the server uses TEST_PORT.
- *  4. Scaffold a test deck: `slides --dir <tmp> new smoke-deck`.
- *  5. Start `slides --dir <tmp> serve` and wait until GET /health returns 200.
+ *  4. Scaffold a test deck: `decks --dir <tmp> new smoke-deck`.
+ *  5. Start `decks --dir <tmp> serve` and wait until GET /health returns 200.
  *  6. Write the temp-dir path and PID to a shared-state file so
  *     global-teardown.ts can clean up.
  *
@@ -67,18 +67,18 @@ async function waitForServer(port: number, timeoutMs = 15_000): Promise<void> {
 export default async function globalSetup(): Promise<void> {
   // Repo root is two levels above web/ (web/e2e/ → web/ → repo-root)
   const repoRoot = resolve(__dirname, '..', '..');
-  const binaryPath = join(repoRoot, 'slides');
+  const binaryPath = join(repoRoot, 'bin', 'decks');
 
   if (!existsSync(binaryPath)) {
     throw new Error(
-      `slides binary not found at ${binaryPath}.\n` +
-        'Run `go build -o slides ./cmd/slides` from the repo root first,\n' +
+      `decks binary not found at ${binaryPath}.\n` +
+        'Run `go build -o bin/decks ./cmd/decks` from the repo root first,\n' +
         'or use `npm run test:e2e` which builds it automatically.',
     );
   }
 
   // Create a temp workspace directory so we never touch the real decks/.
-  const tmpDir = await mkdtemp(join(tmpdir(), 'slides-e2e-'));
+  const tmpDir = await mkdtemp(join(tmpdir(), 'decks-e2e-'));
 
   // Write config.toml pointing at the test port.
   writeFileSync(
@@ -87,7 +87,7 @@ export default async function globalSetup(): Promise<void> {
   );
 
   // Scaffold the test deck.
-  // `slides new <name>` creates decks/<name>/{deck.html,custom.css,assets/}.
+  // `decks new <name>` creates decks/<name>/{deck.html,custom.css,assets/}.
   //
   // We pass `--dir tmpDir` rather than relying on cwd: the binary resolves its
   // workspace by walking up from the cwd looking for decks/, so a cwd-only setup
@@ -102,7 +102,7 @@ export default async function globalSetup(): Promise<void> {
     proc.stderr?.on('data', (d: Buffer) => (stderr += d.toString()));
     proc.on('close', (code) => {
       if (code === 0) resolve();
-      else reject(new Error(`slides new failed (exit ${code}):\n${stderr}`));
+      else reject(new Error(`decks new failed (exit ${code}):\n${stderr}`));
     });
   });
 
@@ -116,11 +116,11 @@ export default async function globalSetup(): Promise<void> {
   });
 
   // Surface server stderr to the Playwright reporter if anything goes wrong.
-  server.stderr?.on('data', (d: Buffer) => process.stderr.write(`[slides-server] ${d}`));
-  server.stdout?.on('data', (d: Buffer) => process.stdout.write(`[slides-server] ${d}`));
+  server.stderr?.on('data', (d: Buffer) => process.stderr.write(`[decks-server] ${d}`));
+  server.stdout?.on('data', (d: Buffer) => process.stdout.write(`[decks-server] ${d}`));
 
   server.on('error', (err) => {
-    throw new Error(`Failed to start slides server: ${err.message}`);
+    throw new Error(`Failed to start decks server: ${err.message}`);
   });
 
   // Persist PID + tmpDir so teardown can kill the process and remove the dir.

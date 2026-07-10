@@ -5,7 +5,7 @@
  * ===============
  *  1. A slide with `data-theme="solarized-dark"` shows a different computed
  *     --r-main-color and text color than an adjacent unthemed slide.  This
- *     exercises P10-1's generated slides-slide-themes.css, which scopes
+ *     exercises P10-1's generated decks-slide-themes.css, which scopes
  *     --r-* custom properties to section[data-theme], and CSS inheritance,
  *     which carries those vars into the slide's content nodes.
  *
@@ -14,7 +14,7 @@
  *     route served for both live presentation and PDF export (?print-pdf).
  *     The present route delegates to os.DirFS(deckDir) and serves deck.html
  *     plus all assets under that directory, including
- *     assets/vendor/slides-slide-themes.css which was written at scaffold time.
+ *     assets/vendor/decks-slide-themes.css which was written at scaffold time.
  *     PDF export (handleExportPDF) drives headless Chrome against the same URL
  *     with ?print-pdf appended, so scoped CSS vars and backgrounds render
  *     identically in PDFs.
@@ -28,7 +28,7 @@
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
- * This is an e2e spec; it requires the `slides` binary + a running server.
+ * This is an e2e spec; it requires the `decks` binary + a running server.
  * Run it with:
  *   npm run test:e2e
  * or in Docker:
@@ -108,7 +108,7 @@ test.beforeAll(async ({ baseURL }) => {
   // Build a themed horizontal slide that also has a vertical child.
   // The vertical child has NO data-theme so it inherits from the stack (CSS var
   // inheritance).  data-background-color on the stack is propagated to the child
-  // by slides-layout-init.js (P10-7).
+  // by decks-layout-init.js (P10-7).
   const themedSlide =
     `<section data-eid="${THEMED_EID}" data-theme="${THEME_NAME}" ` +
     `data-background-color="#002b36">` +
@@ -143,7 +143,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
    *
    * The present route (/present/{name}/) serves deck.html directly from the
    * deck directory via os.DirFS.  deck.html links:
-   *   assets/vendor/slides-slide-themes.css    ← generated at scaffold time
+   *   assets/vendor/decks-slide-themes.css    ← generated at scaffold time
    * That CSS contains `.reveal section[data-theme="solarized-dark"] { --r-*: … }`.
    * The scoped --r-main-color is then consumed by reveal.js typography rules
    * (color: var(--r-main-color)), so the computed color differs between slides.
@@ -189,14 +189,14 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
     expect(
       themedColor,
       `section[data-theme="${THEME_NAME}"] must have --r-main-color ${THEME_COLOR} ` +
-      `(from slides-slide-themes.css); got "${themedColor}"`,
+      `(from decks-slide-themes.css); got "${themedColor}"`,
     ).toBe(THEME_COLOR);
 
     // The themed and plain slides must differ — this is the core assertion.
     expect(
       themedColor,
       `Themed slide (--r-main-color: ${themedColor}) must differ from plain slide (${plainColor}) — ` +
-      `slides-slide-themes.css scoping is not working`,
+      `decks-slide-themes.css scoping is not working`,
     ).not.toBe(plainColor);
   });
 
@@ -271,7 +271,7 @@ test.describe('Per-slide theme fidelity — present route (P10-7 + P10-8)', () =
 
   /**
    * Offline guard: the present route must not fetch any external resources.
-   * This is the P9-2 invariant; slides-slide-themes.css must be served from
+   * This is the P9-2 invariant; decks-slide-themes.css must be served from
    * the deck's vendored assets, not a CDN.
    */
   test('present route makes no external http(s) requests (offline guard)', async ({ page }) => {

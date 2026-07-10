@@ -51,7 +51,7 @@ box) still track it, which is why the mismatch shows up **only in free mode**.
 
 > Implication for existing decks: the requirement is enforced in the scaffold template; decks
 > authored before it carry the old `Reveal.initialize` and need their config rewritten (a
-> `slides upgrade`-style migration — `slides vendor` does not rewrite `deck.html`).
+> `decks upgrade`-style migration — `decks vendor` does not rewrite `deck.html`).
 
 ### Aspect presets
 

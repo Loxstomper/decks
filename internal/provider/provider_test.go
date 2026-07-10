@@ -3,9 +3,9 @@ package provider_test
 import (
 	"testing"
 
-	"slides-builder/internal/provider"
-	"slides-builder/internal/provider/giphy"
-	"slides-builder/internal/provider/unsplash"
+	"github.com/Loxstomper/decks/internal/provider"
+	"github.com/Loxstomper/decks/internal/provider/giphy"
+	"github.com/Loxstomper/decks/internal/provider/unsplash"
 )
 
 // ── Registry ──────────────────────────────────────────────────────────────────

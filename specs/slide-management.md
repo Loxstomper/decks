@@ -9,10 +9,10 @@ structure. All operations are DOM operations on `<section>` elements.
 
 ## Creating a deck (from the browser)
 
-- A deck can be created **from the editor UI**, not only the `slides new` CLI — a "**+ New
+- A deck can be created **from the editor UI**, not only the `decks new` CLI — a "**+ New
   deck**" affordance in the navigator prompts for a name and creates the deck.
 - It is the **same scaffold** as the CLI: a `POST /api/decks/{name}` runs the identical
-  `slides new` logic server-side (`decks/<name>/{deck.html, custom.css, assets/}` with
+  `decks new` logic server-side (`decks/<name>/{deck.html, custom.css, assets/}` with
   reveal vendored offline, see [Project structure](project-structure.md)), then the editor opens it.
 - Name validation reuses `deck.ValidName`; creating an existing name is rejected (no clobber).
   Creation is offline and writes no external URLs.
@@ -81,7 +81,7 @@ otherwise do the work, so the thumbnail is **faithful to the actual slide**:
   never a hardcoded default. Switching the deck theme restyles the thumbnails.
 - **Numeric layout applied.** The numeric layout vocabulary (`data-gap`/`data-pad`/`data-cols`/
   `data-rows`/`data-grow`/`data-basis`/`data-span`, and free `data-x/y/w/h/rot`) is normally
-  applied by `slides-layout-init.js` at runtime; with no JS the thumbnail builder emits the
+  applied by `decks-layout-init.js` at runtime; with no JS the thumbnail builder emits the
   equivalent **inline styles** so grids, spacing, and free-positioned elements match.
 - **Fragments show their final state** (forced visible), rather than vanishing under reveal's
   `opacity:0` default.

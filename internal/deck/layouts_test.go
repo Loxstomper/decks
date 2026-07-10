@@ -7,7 +7,7 @@ import (
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/atom"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // TestBundledLayouts_NonEmpty verifies the expected built-in presets are all

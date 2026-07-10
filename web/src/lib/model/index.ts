@@ -56,7 +56,7 @@ export type { LogicalRect } from './free';
 // P8-7: pure structural diff between two models ("highlight what Claude changed").
 export { diffModels, isEmptyDiff } from './diff';
 export type { ModelDiff } from './diff';
-// P8-3: client-side + remote save validation (the editor's "slides validate" guard).
+// P8-3: client-side + remote save validation (the editor's "decks validate" guard).
 export { validateSource, validateModel, validateRemote, normalizeRemote } from './validate';
 export type { ValidationError, ValidationResult } from './validate';
 export {

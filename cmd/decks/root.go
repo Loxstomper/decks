@@ -7,22 +7,22 @@ import (
 	"path/filepath"
 	"strings"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // EnvDir is the environment variable naming the workspace root (spec project-structure,
 // "Workspace resolution").  It lets a wrapper script or a Claude Code hook pin the
 // workspace without threading --dir through every invocation.
-const EnvDir = "SLIDES_DIR"
+const EnvDir = "DECKS_DIR"
 
 const usage = `Usage:
-  slides [--dir <path>] [serve]           start the editor (default action)
-  slides [--dir <path>] new <name>        create a deck; initializes a workspace if there is none
-  slides [--dir <path>] vendor <deck>     (re)vendor reveal.js into an existing deck
-  slides [--dir <path>] upgrade <deck>    re-vendor + migrate an existing deck's reveal config
-  slides [--dir <path>] add-slide <deck>  append a starter <section>
-  slides [--dir <path>] validate <deck>   check a deck against the spec rules
-  slides [--dir <path>] install-skill     (re)install the Claude Code authoring skill
+  decks [--dir <path>] [serve]           start the editor (default action)
+  decks [--dir <path>] new <name>        create a deck; initializes a workspace if there is none
+  decks [--dir <path>] vendor <deck>     (re)vendor reveal.js into an existing deck
+  decks [--dir <path>] upgrade <deck>    re-vendor + migrate an existing deck's reveal config
+  decks [--dir <path>] add-slide <deck>  append a starter <section>
+  decks [--dir <path>] validate <deck>   check a deck against the spec rules
+  decks [--dir <path>] install-skill     (re)install the Claude Code authoring skill
 
 <deck> is a deck name, a path to one (decks/my-talk), or "." from inside a deck folder.
 A bare word is always a name, never a relative path.
@@ -36,20 +36,20 @@ Every command except "new" requires an existing workspace and exits non-zero wit
 
 // noWorkspaceError reports that a directory was resolved but is not a workspace: it
 // holds no decks/ marker.  Dir is the directory that would have become the root — the
-// explicit --dir/$SLIDES_DIR path, or the cwd the upward search started from.
+// explicit --dir/$DECKS_DIR path, or the cwd the upward search started from.
 //
 // This is the signal that separates the one initializing command from the rest:
-// `slides new` recovers from it (Dir becomes a fresh workspace), every other command
+// `decks new` recovers from it (Dir becomes a fresh workspace), every other command
 // treats it as fatal.  Distinguishing it from a hard error matters — a mistyped --dir
 // must never be silently created (spec project-structure, "Never scaffold an unproven root").
 type noWorkspaceError struct{ Dir string }
 
 func (e *noWorkspaceError) Error() string {
-	return fmt.Sprintf("%s is not a slides workspace (no %s/)", e.Dir, deck.DecksDir)
+	return fmt.Sprintf("%s is not a decks workspace (no %s/)", e.Dir, deck.DecksDir)
 }
 
 // findRoot resolves the workspace root, in the precedence order fixed by spec
-// project-structure: flagDir (--dir) › envDir ($SLIDES_DIR) › the nearest ancestor of
+// project-structure: flagDir (--dir) › envDir ($DECKS_DIR) › the nearest ancestor of
 // startDir containing decks/.
 //
 // It is pure with respect to the filesystem — it only reads (Stat), never creates.
@@ -61,8 +61,8 @@ func (e *noWorkspaceError) Error() string {
 //   - *noWorkspaceError — a directory was named or reached, but holds no decks/.
 //   - anything else — a hard error (a --dir that does not exist, or is a file).
 //
-// An explicit --dir/$SLIDES_DIR must already exist, but need not yet be a workspace:
-// `slides new` initializes it. That is why the marker check happens for every
+// An explicit --dir/$DECKS_DIR must already exist, but need not yet be a workspace:
+// `decks new` initializes it. That is why the marker check happens for every
 // resolution source alike, and yields the same recoverable sentinel.
 func findRoot(startDir, flagDir, envDir string) (string, error) {
 	if flagDir != "" {
@@ -93,7 +93,7 @@ func findRoot(startDir, flagDir, envDir string) (string, error) {
 	return "", &noWorkspaceError{Dir: start}
 }
 
-// explicitRoot validates a root named outright by --dir or $SLIDES_DIR.  The path must
+// explicitRoot validates a root named outright by --dir or $DECKS_DIR.  The path must
 // already exist and be a directory; it is never created, so a typo fails loudly instead
 // of scaffolding somewhere unintended.
 func explicitRoot(dir, source string) (string, error) {
@@ -173,7 +173,7 @@ func ensureAuxDirs(root string) error {
 }
 
 // initWorkspace turns dir into a workspace by creating the decks/ marker plus the
-// auxiliary directories.  Only `slides new` calls this, and only once a root has been
+// auxiliary directories.  Only `decks new` calls this, and only once a root has been
 // established — either named explicitly, or because no enclosing workspace exists and
 // the cwd is therefore the user's intended one.
 func initWorkspace(dir string) error {

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/validate"
+	"github.com/Loxstomper/decks/internal/validate"
 )
 
 // TestInsertStarterSlide_ByteStableRest verifies that inserting a slide leaves

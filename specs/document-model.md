@@ -20,7 +20,7 @@ manipulates and preserves everything else verbatim.
   `DOMParser` → `outerHTML`: that normalizes whitespace/attribute order/entities and would
   churn every file on save — the opposite of the byte-stable invariant below.)
 - **Well-formed input.** The parser targets well-formed reveal HTML — explicit close tags, no
-  HTML5 tag-omission. `slides validate` ([Claude Code integration](claude-code-integration.md)) gates malformed
+  HTML5 tag-omission. `decks validate` ([Claude Code integration](claude-code-integration.md)) gates malformed
   input rather than the parser guessing.
 - **Passthrough.** Nodes the editor doesn't understand stay in the tree untouched (their `raw`
   bytes pass straight through on save). The editor recognizes elements by their classes /

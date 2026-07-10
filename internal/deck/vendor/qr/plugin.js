@@ -1,5 +1,5 @@
 /*!
- * slides-builder QR plugin (P19) — offline, self-authored.
+ * decks QR plugin (P19) — offline, self-authored.
  *
  * Renders a scannable QR code from a single declarative attribute on a <div>:
  *   <div data-qr="https://example.com"
@@ -120,7 +120,7 @@
       el._sbQrSig = sig;
     } catch (e) {
       // Never throw into the deck (e.g. payload too long for any version).
-      console.warn('[slides-qr] render failed:', e);
+      console.warn('[decks-qr] render failed:', e);
       el.innerHTML = '';
       el._sbQrSig = undefined;
     }

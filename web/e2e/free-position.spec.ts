@@ -23,7 +23,7 @@
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
- * This is an e2e spec; it requires the `slides` binary + a running server.
+ * This is an e2e spec; it requires the `decks` binary + a running server.
  * Run it with:
  *   npm run test:e2e
  * or in Docker:
@@ -84,7 +84,7 @@ test.beforeAll(async ({ baseURL }) => {
    * Inject a free element into the first <section> of the smoke deck.
    * We splice the element before the closing </section> tag so it lives
    * inside the first slide and gets an absolute-positioned CSS transform
-   * from slides-layout-init.js.
+   * from decks-layout-init.js.
    *
    * data-x/y/w/h are explicit so FreeTransformOverlay uses the attribute
    * values (not a measured fallback) — making the logical→screen math

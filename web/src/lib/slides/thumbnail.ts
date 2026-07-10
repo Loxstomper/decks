@@ -8,7 +8,7 @@
  * document that:
  *   1. links the deck's OWN stylesheets by root-relative URL
  *      (`/decks/<name>/assets/vendor/reveal/reveal.css`, the theme, the
- *      slides-layout vocabulary, the highlight theme, and `custom.css`), and
+ *      decks-layout vocabulary, the highlight theme, and `custom.css`), and
  *   2. embeds the single slide's serialized `<section>` markup inside the
  *      `.reveal > .slides` scaffold, then
  *   3. statically lays that one section out at the logical 1920×1080 canvas and
@@ -21,7 +21,7 @@
  * positions/scales `.slides` via JavaScript; with no JS we neutralise that with a
  * small override stylesheet that pins the section to the full logical canvas and
  * forces it visible. The result inherits the deck's real theme (fonts, colours,
- * backgrounds) and the slides-layout flex/grid vocabulary, so it visually
+ * backgrounds) and the decks-layout flex/grid vocabulary, so it visually
  * approximates the slide.
  *
  * OFFLINE (spec principles-and-invariants): every stylesheet / background-image URL this builder emits is
@@ -283,7 +283,7 @@ export function buildThumbnailSrcdoc(
   const theme = opts?.theme ?? 'black';
   // Resolve the numeric layout vocabulary (gap/pad/grid/grow/basis/span + free
   // x/y/w/h/rot) into inline styles BEFORE serializing, so the script-free
-  // thumbnail renders the same static geometry the runtime slides-layout-init.js
+  // thumbnail renders the same static geometry the runtime decks-layout-init.js
   // produces on the live canvas. Operates on a clone — the model is untouched.
   const laidOut = applyThumbnailLayout(section);
   // P17-16: charts are JS-driven; swap each <canvas data-chart> for a static SVG
@@ -391,7 +391,7 @@ export function buildThumbnailSrcdoc(
     }
     /* Re-assert each top-level section's real display so it wins over reveal's
        display:none (no JS adds a .present class). For a section carrying data-lay
-       this mirrors slides-layout.css; the attribute selectors raise specificity
+       this mirrors decks-layout.css; the attribute selectors raise specificity
        above reveal's "section" rule, which a bare [data-lay] rule cannot.
        A plain section (no data-lay) falls back to a vertically-centred column. */
     .reveal .slides > section[data-lay="stack"]  { display: flex; flex-direction: column; }
@@ -439,8 +439,8 @@ export function buildThumbnailSrcdoc(
 <link rel="stylesheet" href="${base}assets/vendor/reveal/reset.css">
 <link rel="stylesheet" href="${base}assets/vendor/reveal/reveal.css">
 <link rel="stylesheet" href="${base}assets/vendor/reveal/theme/${theme}.css">
-<link rel="stylesheet" href="${base}assets/vendor/slides-layout.css">
-<link rel="stylesheet" href="${base}assets/vendor/slides-slide-themes.css">
+<link rel="stylesheet" href="${base}assets/vendor/decks-layout.css">
+<link rel="stylesheet" href="${base}assets/vendor/decks-slide-themes.css">
 <link rel="stylesheet" href="${base}assets/vendor/highlight/monokai.min.css">
 <link rel="stylesheet" href="${base}custom.css">
 <style>${overrideCss}</style>

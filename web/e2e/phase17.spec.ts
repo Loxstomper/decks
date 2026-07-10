@@ -111,13 +111,13 @@ test.beforeAll(async ({ baseURL }) => {
 
   // Managed footer rule via custom.css (matches Lane G's managed block shape).
   const footerCss =
-    `/* slides-builder:footer */\n` +
+    `/* decks:footer */\n` +
     `.reveal .slides section:not([data-footer-hidden])::after {\n` +
     `  content: "Confidential — e2e"; position: fixed; left: 0; right: 0; bottom: 0.6em;\n` +
     `  text-align: center; font-size: 0.4em; color: #888; opacity: 0.7;\n` +
     `  pointer-events: none; z-index: 30;\n` +
     `}\n` +
-    `/* /slides-builder:footer */\n`;
+    `/* /decks:footer */\n`;
   const cssRes = await fetch(`${baseUrl}/api/decks/${encodeURIComponent(SMOKE_DECK)}/custom.css`, {
     method: 'PUT',
     headers: { 'Content-Type': 'text/css' },

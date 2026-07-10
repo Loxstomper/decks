@@ -18,9 +18,9 @@ themes/                   # custom reveal themes (optional)
 .claude/skills/           # the authoring skill, installed FROM the binary (generated — see [11])
 ```
 
-The `slides` binary itself lives on `$PATH`, not in the workspace. A workspace is any directory
+The `decks` binary itself lives on `$PATH`, not in the workspace. A workspace is any directory
 containing `decks/`; it is commonly its own git repo (a private decks repo), separate from the
-slides-builder source tree.
+decks source tree.
 
 ## Notes
 
@@ -45,12 +45,12 @@ The binary is expected to be on `$PATH` and invoked from wherever you happen to 
 deck folder, elsewhere in the workspace, or outside it entirely. It resolves the workspace root
 in this precedence order:
 
-1. **`--dir <path>`** — a global flag, before the subcommand (`slides --dir ~/talks new intro`),
+1. **`--dir <path>`** — a global flag, before the subcommand (`decks --dir ~/talks new intro`),
    mirroring `git -C`. The path must already exist; it is never created.
-2. **`$SLIDES_DIR`** — same semantics. Lets a wrapper script or a Claude Code hook point at a
+2. **`$DECKS_DIR`** — same semantics. Lets a wrapper script or a Claude Code hook point at a
    workspace without threading a flag through every invocation.
 3. **Upward search** — walk from the cwd toward the filesystem root; the nearest ancestor
-   containing a `decks/` directory is the workspace root. So `slides validate my-talk` works
+   containing a `decks/` directory is the workspace root. So `decks validate my-talk` works
    from inside `decks/my-talk/`, the way `git` works from anywhere in a repo.
 4. **Not found** — an error, *not* a silently-created workspace (see below).
 
@@ -61,28 +61,28 @@ cannot serve as one. Once the root is resolved, `config.toml` is read from it.
 ### Never scaffold an unproven root
 
 Creating the workspace directories is only safe **after** the root is established. Otherwise a
-mistyped `cd` followed by `slides` litters empty `decks/`, `templates/`, `shared/`, and
+mistyped `cd` followed by `decks` litters empty `decks/`, `templates/`, `shared/`, and
 `themes/` directories into an unrelated folder and serves an empty editor.
 
-- **`slides new <name>`** is the one initializing command. If a workspace is found, the deck is
-  created there (so `slides new intro` from inside `decks/my-talk/` lands it beside it, at
+- **`decks new <name>`** is the one initializing command. If a workspace is found, the deck is
+  created there (so `decks new intro` from inside `decks/my-talk/` lands it beside it, at
   `decks/intro`). If none is found, the cwd *becomes* a workspace — scaffolded, then the deck
   created.
 - **Every other subcommand** (`serve`, `vendor`, `upgrade`, `add-slide`, `validate`) requires an
   existing workspace and exits non-zero without one, naming both escape hatches:
 
   ```
-  error: ~/Downloads is not a slides workspace (no decks/).
-    slides new <name>     initialize one here
-    slides --dir <path>   use an existing one
+  error: ~/Downloads is not a decks workspace (no decks/).
+    decks new <name>     initialize one here
+    decks --dir <path>   use an existing one
   ```
 
 - **The `decks/` marker is required of every resolution source alike.** An explicit `--dir` /
-  `$SLIDES_DIR` must *exist*, but existing is not the same as being a workspace: pointing either
+  `$DECKS_DIR` must *exist*, but existing is not the same as being a workspace: pointing either
   at a directory without `decks/` is the same "not a workspace" condition as an upward search that
-  found nothing. `slides new` initializes it; everything else refuses. One rule, so the safety
-  property doesn't depend on how the root was named — and `slides --dir ~/Downloads` can no more
-  litter a workspace than `cd ~/Downloads && slides` can.
+  found nothing. `decks new` initializes it; everything else refuses. One rule, so the safety
+  property doesn't depend on how the root was named — and `decks --dir ~/Downloads` can no more
+  litter a workspace than `cd ~/Downloads && decks` can.
 - Missing *non-deck* directories (`templates/`, `shared/`, `themes/`) inside an already-resolved
   root are created on demand; their absence is not an error, and readers already treat an absent
   `shared/` as empty. They are never the marker, so creating them can never manufacture a

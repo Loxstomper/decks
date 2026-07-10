@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // ── Unit tests for font helpers ───────────────────────────────────────────────

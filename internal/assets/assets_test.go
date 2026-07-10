@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/assets"
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/assets"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // makeWorkspace creates a temp workspace with an empty decks/ directory and

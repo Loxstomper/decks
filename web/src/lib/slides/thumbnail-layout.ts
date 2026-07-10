@@ -5,10 +5,10 @@
  * WHY THIS EXISTS:
  * ================
  * Slide thumbnails are rendered script-free (no reveal.js, no
- * slides-layout-init.js running in the DOM). But the layout contract resolves
+ * decks-layout-init.js running in the DOM). But the layout contract resolves
  * its numeric `data-*` attributes (gap, padding, grid templates, flex, free
  * coordinates) into inline styles AT RUNTIME via
- * `internal/deck/vendor/slides-layout-init.js`. Without that script a thumbnail
+ * `internal/deck/vendor/decks-layout-init.js`. Without that script a thumbnail
  * would lose all numeric layout.
  *
  * This module is a faithful, pure mirror of that script's `applyToElement`
@@ -76,7 +76,7 @@ function mergeStyle(el: ElementNode, additions: Decl[]): void {
 /**
  * Resolve the numeric `data-*` layout attributes of a single (already-cloned)
  * element into inline-style declarations. Mirrors `applyToElement` in
- * `slides-layout-init.js` exactly.
+ * `decks-layout-init.js` exactly.
  */
 function layoutDeclsFor(el: ElementNode): Decl[] {
   const out: Decl[] = [];
@@ -145,7 +145,7 @@ function applyRecursive(node: SlideNode): void {
 
 /**
  * Deep-clone `section` and write inline styles equivalent to the runtime
- * `slides-layout-init.js` for every numeric `data-*` layout attribute, applied
+ * `decks-layout-init.js` for every numeric `data-*` layout attribute, applied
  * recursively across the whole subtree. The input model is never mutated.
  *
  * @param section a `<section>` (or any) element node from the deck model

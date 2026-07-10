@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // resolveDeckArg turns a deck argument into a bare deck name relative to root.
@@ -15,17 +15,17 @@ import (
 // Phase 20 made the binary find its workspace from anywhere; this is what makes that pay
 // off. A deck can now be named the way you'd name a file:
 //
-//	slides validate my-talk            a bare name (as before)
-//	slides validate decks/my-talk      a path, from the workspace root
-//	slides validate .                  from inside decks/my-talk/ (or any subdir of it)
-//	slides validate ../other           from inside decks/my-talk/
-//	slides validate /abs/ws/decks/x    an absolute path
+//	decks validate my-talk            a bare name (as before)
+//	decks validate decks/my-talk      a path, from the workspace root
+//	decks validate .                  from inside decks/my-talk/ (or any subdir of it)
+//	decks validate ../other           from inside decks/my-talk/
+//	decks validate /abs/ws/decks/x    an absolute path
 //
 // # Name or path?
 //
 // An argument is treated as a path only if it *looks* like one — it contains a separator,
 // or is "." / "..". Otherwise it is a bare deck name. Without that rule the two forms are
-// genuinely ambiguous: run `slides validate assets` from inside decks/my-talk/ and a
+// genuinely ambiguous: run `decks validate assets` from inside decks/my-talk/ and a
 // path-first reading would silently resolve the *deck* my-talk (because decks/my-talk/assets
 // lies inside it), when the user plainly asked for a deck called "assets".
 //
@@ -103,7 +103,7 @@ func isDir(path string) bool {
 // cwd cannot answer — an absolute deck path from an unrelated directory, or from inside a
 // *different* workspace, both of which fully determine the deck without a --dir.
 //
-// An explicit --dir / $SLIDES_DIR pins the root outright, so no fallback applies: the deck
+// An explicit --dir / $DECKS_DIR pins the root outright, so no fallback applies: the deck
 // must live in the workspace the user named.
 func mustWorkspaceAndDeck(flagDir, arg string) (root, name string) {
 	cwd, err := os.Getwd()
@@ -131,7 +131,7 @@ func resolveWorkspaceAndDeck(flagDir, envDir, cwd, arg string) (root, name strin
 		}
 	}
 
-	// An explicit --dir / $SLIDES_DIR pins the root; never look elsewhere.
+	// An explicit --dir / $DECKS_DIR pins the root; never look elsewhere.
 	if flagDir == "" && envDir == "" {
 		if start := deckArgStartDir(cwd, arg); start != cwd {
 			if alt, altErr := findRoot(start, "", ""); altErr == nil {
@@ -153,13 +153,13 @@ func resolveWorkspaceAndDeck(flagDir, envDir, cwd, arg string) (root, name strin
 // given a deck argument.
 //
 // If you name a deck by path, you have told us where it is, so the workspace is found from
-// *there* rather than from the cwd. Without this, `slides validate ~/talks/decks/intro`
+// *there* rather than from the cwd. Without this, `decks validate ~/talks/decks/intro`
 // from an unrelated directory fails at workspace resolution — before the argument naming
 // the workspace is ever read — which is a confusing way to refuse a fully-qualified path.
 //
 // A bare name says nothing about location, so it falls back to the cwd. So does a path that
 // leads nowhere, letting the normal not-found diagnostics happen instead of a walk from an
-// imaginary directory. --dir / $SLIDES_DIR still win: this only feeds the upward search.
+// imaginary directory. --dir / $DECKS_DIR still win: this only feeds the upward search.
 func deckArgStartDir(cwd, arg string) string {
 	if arg == "" || !looksLikePath(arg) {
 		return cwd

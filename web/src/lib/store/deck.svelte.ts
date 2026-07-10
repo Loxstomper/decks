@@ -1611,7 +1611,7 @@ class DeckStore {
   /**
    * P6-8: Set the deck-level default transition on the `<div class="reveal">`.
    *
-   * The companion slides-layout-init.js picks up `data-transition` and
+   * The companion decks-layout-init.js picks up `data-transition` and
    * `data-transition-speed` from the reveal div at runtime and calls
    * `Reveal.configure()` to apply them as the deck default, overriding the
    * hardcoded value in the passthrough `<script>` block (spec principles-and-invariants offline-safe).
@@ -1826,7 +1826,7 @@ class DeckStore {
       });
       if (!res.ok) {
         // 422 Unprocessable Entity == server-side validation rejected the bytes
-        // (the Go save path's own "slides validate"). Surface those problems
+        // (the Go save path's own "decks validate"). Surface those problems
         // instead of a generic error, and DO NOT advance the saved baseline.
         if (res.status === 422) {
           this.validationErrors = await readValidationErrors(res);

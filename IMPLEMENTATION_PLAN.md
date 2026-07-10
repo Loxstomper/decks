@@ -1,4 +1,4 @@
-# slides-builder — Implementation Plan
+# decks — Implementation Plan
 
 Atomic task breakdown derived from [`specs/`](specs/README.md). Each task is small,
 independently completable, and verifiable.
@@ -24,11 +24,11 @@ independently completable, and verifiable.
 single-binary embed; the live editor shell and source-preserving document model; text editing with
 per-command undo/autosave; the five layout primitives and alignment-as-intent; free positioning
 with smart guides; content blocks and the acquire→localize asset pipeline; slides, motion, and
-theming; presenting, PDF, and bundle export; the Claude Code skill, `slides validate`, and
+theming; presenting, PDF, and bundle export; the Claude Code skill, `decks validate`, and
 turn-taking; per-slide theme overrides and backgrounds; thumbnail fidelity; the context menu;
 slide-layout presets; inline rich text, links, charts, command palette, footers, present-mode
-polish; the QR block; workspace resolution (the `slides` binary now runs from anywhere on
-`$PATH`), and skill distribution (the binary embeds the `slides-authoring` skill and installs it
+polish; the QR block; workspace resolution (the `decks` binary now runs from anywhere on
+`$PATH`), and skill distribution (the binary embeds the `decks-authoring` skill and installs it
 into each workspace), and a deck can be named by name, by path, or as `.` from inside its folder.
 
 **Everything below is what remains.**
@@ -71,17 +71,17 @@ Loose ends surfaced while building, none load-bearing.
 - [ ] **e2e global-setup now pins `--dir`.** `web/e2e/global-setup.ts` passes `--dir <tmpDir>` to
   both `new` and `serve` rather than relying on cwd-as-root. It has **not been executed** (no
   browsers in this env) — the workspace-resolution change it depends on is covered by
-  `cmd/slides/root_test.go` and by manual binary smoke tests instead.
+  `cmd/decks/root_test.go` and by manual binary smoke tests instead.
 - [ ] **Frontend typecheck is `npm run check` (svelte-check), not `npx tsc`.** Bare `tsc` cannot
   resolve types exported from `<script module>` in `.svelte` files (e.g. `MenuItem` from
   `ContextMenu.svelte`) and reports phantom errors. Recorded in `CLAUDE.md`.
 - [ ] **The layout contract is now re-encoded five times.** `layout.ts`, `validate.go`,
-  `slides-layout-init.js`, `thumbnail-layout.ts`, and the prose skill
-  (`internal/skill/assets/slides-authoring/`). `TestRepoInstalledCopyIsCurrent` pins the repo's
+  `decks-layout-init.js`, `thumbnail-layout.ts`, and the prose skill
+  (`internal/skill/assets/decks-authoring/`). `TestRepoInstalledCopyIsCurrent` pins the repo's
   committed `.claude/skills/` copy to the embedded bytes, but nothing checks the *prose* against
   the *validator's* allowed-sets — a vocabulary change can still update the code and leave the
   skill teaching the old rules. A generated allowed-values table in `AUTHORING.md` would close it.
-- [ ] **`slides new` still takes only a bare name**, unlike the other deck commands — the deck
+- [ ] **`decks new` still takes only a bare name**, unlike the other deck commands — the deck
   doesn't exist yet, so a path can't be resolved against it. This is *safe*, not broken:
   `deck.validateName` rejects `new decks/foo` and `new ../escape` with `deck name "…" is invalid
   (must be a simple folder name)`, so no traversal is possible. Open only as sugar: should
@@ -107,6 +107,6 @@ Loose ends surfaced while building, none load-bearing.
 | M6 | Per-slide theming | ✅ Phases 10 + 18 (`0.0.12`, `0.0.17`) |
 | M7 | Slides-app parity — context menu, layouts, thumbnails, backgrounds | ✅ Phases 11–16 (`0.0.11`–`0.0.16`) |
 | M8 | Everyday-authoring parity — inline text, links, charts, palette | ✅ Phase 17 (`0.0.18`) |
-| M9 | **Installable CLI** — `slides` on `$PATH`, run from anywhere | ✅ Phase 20 (core) |
+| M9 | **Installable CLI** — `decks` on `$PATH`, run from anywhere | ✅ Phase 20 (core) |
 | M10 | **AI-native distribution** — the binary ships the skill that teaches its own contract | ✅ P21-2 |
 | M11 | **Run from anywhere** — workspace found by walking up; deck named by name, path, or `.` | ✅ Phase 21 |

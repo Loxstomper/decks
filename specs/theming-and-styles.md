@@ -34,8 +34,8 @@ fatally, break PDF export, where `?print-pdf` renders every slide visible at onc
 
 1. **Global** — the `<head>` theme `<link>`. The base every slide inherits.
 2. **Named per-slide bundle** — `data-theme="<bundled-theme>"` on a `<section>`. A generated,
-   vendored stylesheet (`slides-slide-themes.css`, embedded + copied into the deck like
-   `slides-layout.css`) carries, for each bundled theme, a scoped block that both **rebinds the
+   vendored stylesheet (`decks-slide-themes.css`, embedded + copied into the deck like
+   `decks-layout.css`) carries, for each bundled theme, a scoped block that both **rebinds the
    theme's `--r-*` custom properties** *and* **re-asserts the colour properties at section
    scope**:
 
@@ -86,12 +86,12 @@ once: the `--r-*` vars inherit via CSS, and reveal already propagates a stack's
 - **`data-theme` is a recognized attribute**, accepted by `validate` and the editor model
   ([Principles & invariants](principles-and-invariants.md)); its value must name a bundled theme. It is *not* a
   layout primitive ([Layout vocabulary](layout-vocabulary.md)) — it carries no reflow semantics.
-- **Offline.** `slides-slide-themes.css` and its `name → background` map are generated at
+- **Offline.** `decks-slide-themes.css` and its `name → background` map are generated at
   vendor time from the bundled theme CSS (`:root`/`.reveal` `--r-*` values) and shipped
   locally — zero external URLs.
 - **The deck must link the stylesheet.** `data-theme` only takes effect if the deck's `<head>`
-  links `slides-slide-themes.css`. The scaffold template links it; decks created *before*
-  per-slide theming are migrated by `slides upgrade` / `vendor`, which **injects the missing
+  links `decks-slide-themes.css`. The scaffold template links it; decks created *before*
+  per-slide theming are migrated by `decks upgrade` / `vendor`, which **injects the missing
   `<link>`** (byte-stable otherwise). Without the link, only the managed `data-background-color`
   shows — the symptom that flagged this.
 - **UI.** The theme picker gains a **Whole deck / This slide** scope toggle (the latter

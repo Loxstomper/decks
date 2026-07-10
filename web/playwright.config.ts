@@ -1,5 +1,5 @@
 /**
- * playwright.config.ts — Playwright E2E configuration for slides-builder.
+ * playwright.config.ts — Playwright E2E configuration for decks.
  *
  * Tests live in web/e2e/*.spec.ts and run against the BUILT binary
  * (embedded frontend + Go API + a temp workspace). They are intentionally
@@ -18,7 +18,7 @@
  *     -v "$(pwd)/..":/workspace \
  *     -w /workspace/web \
  *     mcr.microsoft.com/playwright:v1.49.1-jammy \
- *     bash -c "npm ci && cd .. && go build -o slides ./cmd/slides && cd web && npm run test:e2e:docker"
+ *     bash -c "npm ci && cd .. && go build -o bin/decks ./cmd/decks && cd web && npm run test:e2e:docker"
  *
  * (The :docker script skips the Go build step — the binary is already built
  * by the docker command above. See test:e2e:docker in package.json.)

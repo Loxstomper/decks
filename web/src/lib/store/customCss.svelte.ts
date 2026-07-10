@@ -106,7 +106,7 @@ class CustomCssStore {
 
   /**
    * P17-18: Set (or update) the deck footer. Inserts/replaces ONLY the managed
-   * footer block (delimited by the slides-builder:footer marker comments) — a
+   * footer block (delimited by the decks:footer marker comments) — a
    * fixed overlay rendered via `section:not([data-footer-hidden])::after` (text)
    * and `::before` (optional local logo). User free-form CSS and the `:root`
    * block are untouched.
@@ -243,10 +243,10 @@ function escapeRegex(s: string): string {
 //
 // The footer is a single, clearly-delimited managed region in custom.css:
 //
-//   /* slides-builder:footer */
+//   /* decks:footer */
 //   .reveal .slides section:not([data-footer-hidden])::after { … text … }
 //   .reveal .slides section:not([data-footer-hidden])::before { … logo … }
-//   /* /slides-builder:footer */
+//   /* /decks:footer */
 //
 // WHY THIS SELECTOR: reveal renders every slide as a <section> but hides the
 // non-current ones (display:none), so a fixed `::after` on
@@ -258,8 +258,8 @@ function escapeRegex(s: string): string {
 // free-form CSS and the :root block (managed by setCssVar) are never modified.
 
 /** Opening + closing marker comments delimiting the managed footer region. */
-const FOOTER_OPEN = '/* slides-builder:footer */';
-const FOOTER_CLOSE = '/* /slides-builder:footer */';
+const FOOTER_OPEN = '/* decks:footer */';
+const FOOTER_CLOSE = '/* /decks:footer */';
 
 /**
  * Matches the whole managed footer region INCLUDING the blank line(s) preceding
@@ -267,7 +267,7 @@ const FOOTER_CLOSE = '/* /slides-builder:footer */';
  * whitespace. Non-greedy body so it stops at the first close marker.
  */
 const footerBlockRe =
-  /\n*\/\* slides-builder:footer \*\/[\s\S]*?\/\* \/slides-builder:footer \*\/\n?/;
+  /\n*\/\* decks:footer \*\/[\s\S]*?\/\* \/decks:footer \*\/\n?/;
 
 /**
  * CSS-escape a string for use inside a double-quoted `content:` value: backslash

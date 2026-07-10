@@ -1,5 +1,5 @@
 /**
- * e2e/smoke.spec.ts — Smoke test for the slides-builder editor.
+ * e2e/smoke.spec.ts — Smoke test for the decks editor.
  *
  * Opens the editor in a real browser and asserts:
  *  1. The deck name appears in the navigator (deck-list sidebar).

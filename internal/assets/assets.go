@@ -1,4 +1,4 @@
-// Package assets implements the asset copy pipeline for slides-builder.
+// Package assets implements the asset copy pipeline for decks.
 //
 // # Storage model (spec assets-and-media, spec principles-and-invariants)
 //

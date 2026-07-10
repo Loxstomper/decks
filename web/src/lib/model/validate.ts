@@ -1,11 +1,11 @@
 /**
- * validate.ts — Client-side deck validation (P8-3 / spec claude-code-integration "slides validate").
+ * validate.ts — Client-side deck validation (P8-3 / spec claude-code-integration "decks validate").
  *
  * WHY THIS EXISTS:
  * ================
  * Both Claude Code and the editor's save path write `deck.html`; spec claude-code-integration says a
  * malformed deck must be "caught instead of silently breaking the canvas". The
- * single source of truth for validation is the Go `slides validate` /
+ * single source of truth for validation is the Go `decks validate` /
  * POST /api/decks/{name}/validate endpoint, but the editor ALSO keeps this fast,
  * synchronous, offline guard so:
  *
@@ -233,7 +233,7 @@ export function validateSource(html: string): ValidationResult {
 // ─── Remote (Go) validation — single source of truth, best-effort ───────────
 
 /**
- * Call Lane A's `POST /api/decks/{name}/validate` (spec claude-code-integration "slides validate").
+ * Call Lane A's `POST /api/decks/{name}/validate` (spec claude-code-integration "decks validate").
  *
  * Contract assumed (tolerant): the endpoint receives the HTML body and returns
  * JSON `{ ok: boolean, errors?: Array<{ code?, message, eid? }> }`. We map that

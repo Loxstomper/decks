@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"slides-builder/internal/deck"
+	"github.com/Loxstomper/decks/internal/deck"
 )
 
 // makeWorkspace creates a temp workspace with an empty decks/ directory.
@@ -148,7 +148,7 @@ func TestRead_NotFound(t *testing.T) {
 
 // ── Offline-first / vendor tests ──────────────────────────────────────────────
 
-// TestNew_VendorFilesPresent verifies that slides new copies all required
+// TestNew_VendorFilesPresent verifies that decks new copies all required
 // reveal.js vendor files into assets/vendor/reveal/ (spec principles-and-invariants – offline-first).
 func TestNew_VendorFilesPresent(t *testing.T) {
 	root := makeWorkspace(t)
@@ -324,7 +324,7 @@ func TestSolarizedDark_VendoredAndOffline(t *testing.T) {
 }
 
 // TestVendor_RevendorExistingDeck verifies that Vendor() restores deleted
-// vendor files in an existing deck (the `slides vendor <name>` use-case).
+// vendor files in an existing deck (the `decks vendor <name>` use-case).
 func TestVendor_RevendorExistingDeck(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -374,8 +374,8 @@ func TestEnsureSharedVendor(t *testing.T) {
 
 // ── Layout CSS / P3-1 vendor tests ───────────────────────────────────────────
 
-// TestNew_LayoutCSSPresent verifies that slides new copies slides-layout.css
-// and slides-layout-init.js into assets/vendor/ (spec layout-vocabulary, spec principles-and-invariants offline-first).
+// TestNew_LayoutCSSPresent verifies that decks new copies decks-layout.css
+// and decks-layout-init.js into assets/vendor/ (spec layout-vocabulary, spec principles-and-invariants offline-first).
 func TestNew_LayoutCSSPresent(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -384,7 +384,7 @@ func TestNew_LayoutCSSPresent(t *testing.T) {
 	}
 
 	vendorDir := filepath.Join(root, "decks", "layout-test", "assets", "vendor")
-	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+	for _, f := range []string{"decks-layout.css", "decks-layout-init.js"} {
 		p := filepath.Join(vendorDir, f)
 		info, err := os.Stat(p)
 		if err != nil {
@@ -398,7 +398,7 @@ func TestNew_LayoutCSSPresent(t *testing.T) {
 }
 
 // TestNew_DeckHTMLLinksLayoutCSS asserts that the scaffolded deck.html references
-// slides-layout.css via a relative path (offline-first, spec principles-and-invariants).
+// decks-layout.css via a relative path (offline-first, spec principles-and-invariants).
 func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -413,8 +413,8 @@ func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
 
 	// The deck must reference the layout CSS and init script via relative paths.
 	for _, want := range []string{
-		"assets/vendor/slides-layout.css",
-		"assets/vendor/slides-layout-init.js",
+		"assets/vendor/decks-layout.css",
+		"assets/vendor/decks-layout-init.js",
 	} {
 		if !bytes.Contains(html, []byte(want)) {
 			t.Errorf("deck.html missing expected relative path %q", want)
@@ -430,7 +430,7 @@ func TestNew_DeckHTMLLinksLayoutCSS(t *testing.T) {
 }
 
 // TestVendor_LayoutCSSRevendored verifies that Vendor() restores deleted layout
-// files in an existing deck (the `slides vendor <name>` use-case, P3-1).
+// files in an existing deck (the `decks vendor <name>` use-case, P3-1).
 func TestVendor_LayoutCSSRevendored(t *testing.T) {
 	root := makeWorkspace(t)
 
@@ -440,7 +440,7 @@ func TestVendor_LayoutCSSRevendored(t *testing.T) {
 
 	// Delete the layout files to simulate removal.
 	vendorDir := filepath.Join(root, "decks", "layout-revendor", "assets", "vendor")
-	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+	for _, f := range []string{"decks-layout.css", "decks-layout-init.js"} {
 		if err := os.Remove(filepath.Join(vendorDir, f)); err != nil {
 			t.Fatalf("remove %s: %v", f, err)
 		}
@@ -452,7 +452,7 @@ func TestVendor_LayoutCSSRevendored(t *testing.T) {
 	}
 
 	// Layout files must be restored.
-	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+	for _, f := range []string{"decks-layout.css", "decks-layout-init.js"} {
 		p := filepath.Join(vendorDir, f)
 		if _, err := os.Stat(p); err != nil {
 			t.Errorf("after Vendor(): layout file missing: %s: %v", f, err)
@@ -472,7 +472,7 @@ func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 	vendorDir := filepath.Join(root, "decks", "layout-offline", "assets", "vendor")
 	re := regexp.MustCompile(`https?://\S+`)
 
-	for _, f := range []string{"slides-layout.css", "slides-layout-init.js"} {
+	for _, f := range []string{"decks-layout.css", "decks-layout-init.js"} {
 		content, err := os.ReadFile(filepath.Join(vendorDir, f))
 		if err != nil {
 			t.Fatalf("read %s: %v", f, err)
@@ -488,7 +488,7 @@ func TestLayoutCSS_NoExternalURLs(t *testing.T) {
 
 // ── Highlight + KaTeX plugin vendor tests (P5-9, P5-10) ─────────────────────
 
-// TestNew_HighlightPluginPresent verifies that slides new copies the highlight
+// TestNew_HighlightPluginPresent verifies that decks new copies the highlight
 // plugin files into assets/vendor/highlight/ (P5-9, spec principles-and-invariants offline-first).
 func TestNew_HighlightPluginPresent(t *testing.T) {
 	root := makeWorkspace(t)
@@ -510,7 +510,7 @@ func TestNew_HighlightPluginPresent(t *testing.T) {
 	}
 }
 
-// TestNew_KaTeXPluginPresent verifies that slides new copies the math/KaTeX
+// TestNew_KaTeXPluginPresent verifies that decks new copies the math/KaTeX
 // plugin and fonts into assets/vendor/math/ and assets/vendor/katex/ (P5-10).
 func TestNew_KaTeXPluginPresent(t *testing.T) {
 	root := makeWorkspace(t)
@@ -592,7 +592,7 @@ func TestNew_DeckHTMLLinksHighlightAndKaTeX(t *testing.T) {
 }
 
 // TestVendor_RevendorsPlugins verifies that Vendor() restores deleted plugin
-// files in an existing deck (the `slides vendor <name>` use-case).
+// files in an existing deck (the `decks vendor <name>` use-case).
 func TestVendor_RevendorsPlugins(t *testing.T) {
 	root := makeWorkspace(t)
 	if err := deck.New(root, "plugin-revendor"); err != nil {

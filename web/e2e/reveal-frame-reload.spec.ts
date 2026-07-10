@@ -24,7 +24,7 @@
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
- * This is an e2e Playwright spec; it requires the `slides` binary + server.
+ * This is an e2e Playwright spec; it requires the `decks` binary + server.
  * Run with:
  *   npm run test:e2e
  * or in Docker:

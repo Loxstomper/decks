@@ -27,7 +27,7 @@
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
- * This is an e2e spec; it requires the `slides` binary + a running server.
+ * This is an e2e spec; it requires the `decks` binary + a running server.
  * Run with:
  *   npm run test:e2e
  * or in Docker:

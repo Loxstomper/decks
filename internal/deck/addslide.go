@@ -7,7 +7,7 @@ import (
 
 // starterSection is the body of the slide appended by AddSlide. It is a minimal
 // VALID reveal.js slide (a heading + paragraph) so the result passes
-// `slides validate`. It carries no data-eid — stable ids are stamped by the
+// `decks validate`. It carries no data-eid — stable ids are stamped by the
 // editor model (web/src/lib/model) on load; an author-added slide need not
 // predeclare one.
 const starterSection = "<section>\n" +
@@ -16,7 +16,7 @@ const starterSection = "<section>\n" +
 	"%[1]s</section>"
 
 // AddSlide appends a starter <section> to decks/<name>/deck.html (spec claude-code-integration
-// `slides add-slide`).  It inserts the new slide just before the closing
+// `decks add-slide`).  It inserts the new slide just before the closing
 // </div> of the `.slides` container, matching the existing child indentation,
 // and leaves every other byte of the file untouched (byte-stability is a core
 // invariant — spec principles-and-invariants idempotent round-trip — so the editor and Claude Code do

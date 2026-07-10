@@ -17,7 +17,7 @@
    * TYPE ↔ JSON SYNC: changing the type field rewrites the JSON's `type` field
    *   (and reseeds the starter template if the user has not diverged from it), so
    *   the `data-chart` attribute and the JSON `type` stay consistent — the
-   *   contract the vendored plugin and `slides validate` both rely on.
+   *   contract the vendored plugin and `decks validate` both rely on.
    *
    * OFFLINE-FIRST (spec principles-and-invariants): the emitted markup carries zero external URLs;
    *   Chart.js + the plugin are vendored into the deck by the scaffold (P17-14).

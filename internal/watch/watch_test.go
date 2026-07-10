@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"slides-builder/internal/watch"
+	"github.com/Loxstomper/decks/internal/watch"
 )
 
 func TestWatcher_ReceivesChangeEvent(t *testing.T) {

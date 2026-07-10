@@ -24,7 +24,7 @@
  *     P9-2 invariant).
  *
  *  5. Vertical-stack cascade (P16-5 + propagateVerticalBackground in
- *     slides-layout-init.js): a vertical-stack section carrying data-background-*
+ *     decks-layout-init.js): a vertical-stack section carrying data-background-*
  *     attributes propagates each attribute to child sections that lack it, before
  *     Reveal.initialize() builds its background layer.  The cascade is per-attribute
  *     — a child with its own value for a specific attribute keeps that value (inner
@@ -60,7 +60,7 @@
  *
  * CANNOT RUN WITHOUT THE BUILT BINARY:
  * =====================================
- * This spec requires the `slides` binary + a running server.  Run with:
+ * This spec requires the `decks` binary + a running server.  Run with:
  *   npm run test:e2e
  * or in Docker:
  *   npm run test:e2e:docker
@@ -355,7 +355,7 @@ test.describe('Slide image background — canvas + present + thumbnail + offline
 
 test.describe('Vertical background cascade — propagateVerticalBackground() (P16-5)', () => {
   /**
-   * propagateVerticalBackground() in slides-layout-init.js runs before
+   * propagateVerticalBackground() in decks-layout-init.js runs before
    * Reveal.initialize() and copies each data-background-* attribute from a
    * vertical-stack section to child sections that lack that specific attribute.
    *
@@ -365,7 +365,7 @@ test.describe('Vertical background cascade — propagateVerticalBackground() (P1
    *  - Each attribute is evaluated independently, so a child can override one attr
    *    while still inheriting the others from the stack.
    *
-   * All assertions are made on the present route because slides-layout-init.js runs as
+   * All assertions are made on the present route because decks-layout-init.js runs as
    * a <script> tag — the script-free thumbnail iframes do not execute it.
    */
 

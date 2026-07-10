@@ -6,7 +6,7 @@
  * the rationale (byte-stable round-trip / never-destroy-the-unknown).
  *
  * Scope: this is a pragmatic parser for the well-formed HTML that reveal decks
- * use (explicit closing tags; the editor and `slides validate` gate malformed
+ * use (explicit closing tags; the editor and `decks validate` gate malformed
  * input — spec claude-code-integration/principles-and-invariants). It handles the edge cases that actually occur in
  * AI-authored decks and that the golden corpus exercises:
  *   - elements, attributes (quoted / unquoted / boolean), case preserved

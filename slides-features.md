@@ -128,7 +128,7 @@ Cloud/SaaS/team/billing features with no bearing on running locally:
 
 ---
 
-## Recommended next steps for `slides-builder`
+## Recommended next steps for `decks`
 
 A concrete build order, highest leverage first:
 

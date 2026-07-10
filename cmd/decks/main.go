@@ -1,19 +1,19 @@
-// slides-builder CLI entrypoint.
+// decks CLI entrypoint.
 //
 // Usage:
 //
-//	slides [serve]           start the HTTP server (default action)
-//	slides new <name>        scaffold a new deck
-//	slides vendor <deck>     (re)vendor reveal.js into an existing deck
-//	slides upgrade <deck>    re-vendor + migrate reveal config (Phase 15)
-//	slides add-slide <deck>  append a starter <section> to a deck (P8-1)
-//	slides validate <deck>   check a deck against the spec rules (P8-2)
-//	slides install-skill     (re)install the Claude Code authoring skill (P21-2)
+//	decks [serve]           start the HTTP server (default action)
+//	decks new <name>        scaffold a new deck
+//	decks vendor <deck>     (re)vendor reveal.js into an existing deck
+//	decks upgrade <deck>    re-vendor + migrate reveal config (Phase 15)
+//	decks add-slide <deck>  append a starter <section> to a deck (P8-1)
+//	decks validate <deck>   check a deck against the spec rules (P8-2)
+//	decks install-skill     (re)install the Claude Code authoring skill (P21-2)
 //
 // <deck> is a bare name, a path (decks/my-talk), or "." from inside a deck folder
 // (P21-1, see deckarg.go). <name> for `new` is always a bare name.
 //
-// A global --dir <path> (before the subcommand) or $SLIDES_DIR selects the workspace;
+// A global --dir <path> (before the subcommand) or $DECKS_DIR selects the workspace;
 // otherwise it is found by walking up from the cwd.  See root.go and spec
 // project-structure, "Workspace resolution".
 package main
@@ -26,16 +26,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"slides-builder/internal/config"
-	"slides-builder/internal/deck"
-	"slides-builder/internal/provider"
-	"slides-builder/internal/provider/giphy"
-	"slides-builder/internal/provider/unsplash"
-	"slides-builder/internal/server"
-	"slides-builder/internal/skill"
-	"slides-builder/internal/validate"
-	"slides-builder/internal/watch"
-	slideweb "slides-builder/web"
+	"github.com/Loxstomper/decks/internal/config"
+	"github.com/Loxstomper/decks/internal/deck"
+	"github.com/Loxstomper/decks/internal/provider"
+	"github.com/Loxstomper/decks/internal/provider/giphy"
+	"github.com/Loxstomper/decks/internal/provider/unsplash"
+	"github.com/Loxstomper/decks/internal/server"
+	"github.com/Loxstomper/decks/internal/skill"
+	"github.com/Loxstomper/decks/internal/validate"
+	"github.com/Loxstomper/decks/internal/watch"
+	slideweb "github.com/Loxstomper/decks/web"
 )
 
 func main() {
@@ -58,27 +58,27 @@ func main() {
 		runServe(dir)
 	case args[0] == "new":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides new <name>")
+			fatalf("usage: decks new <name>")
 		}
 		runNew(dir, args[1])
 	case args[0] == "vendor":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides vendor <deck>")
+			fatalf("usage: decks vendor <deck>")
 		}
 		runVendor(dir, args[1])
 	case args[0] == "upgrade":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides upgrade <deck>")
+			fatalf("usage: decks upgrade <deck>")
 		}
 		runUpgrade(dir, args[1])
 	case args[0] == "add-slide":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides add-slide <deck>")
+			fatalf("usage: decks add-slide <deck>")
 		}
 		runAddSlide(dir, args[1])
 	case args[0] == "validate":
 		if len(args) < 2 || args[1] == "" {
-			fatalf("usage: slides validate <deck>")
+			fatalf("usage: decks validate <deck>")
 		}
 		runValidate(dir, args[1])
 	case args[0] == "install-skill":
@@ -88,7 +88,7 @@ func main() {
 	}
 }
 
-// resolve resolves the workspace root from the cwd, honouring --dir and $SLIDES_DIR.
+// resolve resolves the workspace root from the cwd, honouring --dir and $DECKS_DIR.
 func resolve(flagDir string) (string, error) {
 	cwd, err := os.Getwd()
 	if err != nil {
@@ -133,9 +133,9 @@ func mustWorkspaceFrom(flagDir, startDir string) string {
 func workspaceFatal(err error) {
 	var nw *noWorkspaceError
 	if errors.As(err, &nw) {
-		fatalf("error: %s is not a slides workspace (no %s/).\n"+
-			"  slides new <name>     initialize one here\n"+
-			"  slides --dir <path>   use an existing one",
+		fatalf("error: %s is not a decks workspace (no %s/).\n"+
+			"  decks new <name>     initialize one here\n"+
+			"  decks --dir <path>   use an existing one",
 			nw.Dir, deck.DecksDir)
 	}
 	fatalf("error: %v", err)
@@ -187,7 +187,7 @@ func runServe(flagDir string) {
 
 	// The root was already reported by mustWorkspace, immediately above.
 	addr := fmt.Sprintf(":%d", cfg.Port)
-	log.Printf("slides-builder: listening on http://localhost%s", addr)
+	log.Printf("decks: listening on http://localhost%s", addr)
 	if err := http.ListenAndServe(addr, srv); err != nil {
 		log.Fatalf("server: %v", err)
 	}
@@ -195,7 +195,7 @@ func runServe(flagDir string) {
 
 // runNew scaffolds a new deck.  It is the one *initializing* command: when no workspace
 // encloses the cwd (or the explicit --dir is not yet a workspace), that directory becomes
-// one.  When a workspace is found, the deck lands there — so `slides new intro` from
+// one.  When a workspace is found, the deck lands there — so `decks new intro` from
 // inside decks/my-talk/ creates decks/intro beside it, not a nested workspace.
 func runNew(flagDir, name string) {
 	root, err := resolve(flagDir)
@@ -208,10 +208,10 @@ func runNew(flagDir, name string) {
 		if err := initWorkspace(root); err != nil {
 			log.Fatalf("workspace: %v", err)
 		}
-		fmt.Printf("Initialized slides workspace at %s\n", root)
+		fmt.Printf("Initialized decks workspace at %s\n", root)
 
 		// Install the authoring skill on workspace init only — never silently on
-		// every run (spec claude-code-integration). `slides install-skill` refreshes it.
+		// every run (spec claude-code-integration). `decks install-skill` refreshes it.
 		res, err := skill.Install(root)
 		if err != nil {
 			log.Fatalf("install-skill: %v", err)
