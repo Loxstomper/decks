@@ -98,9 +98,10 @@ of origin's old tip and its local rewritten twin diffed clean.
   public).
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
-- [ ] Not a blocker: the 8 open dependabot PRs currently have failing CI — several are major
-  bumps (typescript 5.9→7.0, vitest 3.2→4.1, tailwindcss 3.4→4.3) and will be publicly visible as
-  red PRs on day one; they need triage on their own merits.
+- [x] **Dependency updates landed as one big-bang branch (`deps/big-bang-2026-07`), not the 8
+  individual dependabot PRs** — see below for why per-PR merging couldn't work here. Dependabot is
+  now configured (`.github/dependabot.yml`) to group updates per ecosystem into a single PR, so
+  this can't recur. PRs #1–#8 are superseded by the big-bang branch and should be closed.
 
 ## e2e: 37/37, and the suite is now order-independent (2026-07-10)
 
@@ -160,6 +161,49 @@ copy-pasted into six specs.
 Still uncovered by any headless check: the **visual-only** confirmations several phases flagged
 (overlay alignment at non-1.0 zoom, drag/snap feel, toolbar and palette UX, live restyles).
 
+## Dependency big-bang + CI cost (2026-07-10)
+
+- **CI's e2e job spent 471s installing Chromium against 72s of actual testing.** The instinctive
+  fix — cache `~/.cache/ms-playwright` — would have been nearly worthless: of that 471s, `apt-get`
+  was 456s and the browser download only 14s. The job now runs inside
+  `mcr.microsoft.com/playwright:v1.61.1-noble`, which ships the browsers *and* their system libs,
+  as the runner's uid rather than root (Chromium's sandbox refuses to start as root, and checkout
+  would otherwise leave root-owned files). A guard step asserts the image tag matches
+  `@playwright/test` in `package-lock.json` — a mismatch makes Playwright silently re-download the
+  browsers, undoing the change. Verified by running the suite inside that exact image: 37/37, no
+  apt, no download.
+
+- **All dependency updates were done as one branch, not 8 dependabot PRs.** Go: toml 1.4.0→1.6.0,
+  fsnotify 1.7.0→1.10.1, x/net 0.38.0→0.57.0, x/sys 0.31.0→0.47.0. Frontend: vite 6.4.3→8.1.4 (now
+  bundling with rolldown), @sveltejs/vite-plugin-svelte 5.1.1→7.2.0, vitest 3.2.6→4.1.10,
+  tailwindcss 3.4.19→4.3.2, @types/node 22.20.0→26.1.1, @codemirror/state 6.7.0→6.7.1,
+  @codemirror/view 6.43.4→6.43.6, svelte-check 4.7.1→4.7.2, autoprefixer removed.
+
+- **Why one PR per dependency could never have worked here.** vite, @sveltejs/vite-plugin-svelte
+  and vitest constrain each other by peer range, so an individual bump lands in a tree npm cannot
+  resolve — which is why all 8 PRs were red. Installing plugin-svelte 7 additionally required
+  uninstalling the old plugin first: the stale transitive
+  `@sveltejs/vite-plugin-svelte-inspector@4` pins plugin-svelte `^5` and deadlocks npm's resolver.
+  `.github/dependabot.yml` now groups every ecosystem into a single PR.
+
+- **TypeScript 7 is blocked, and pinned as such.** `typescript@7.0.2` is the `latest` dist-tag
+  (the native port), but it leaves `typescript.sys` undefined, and svelte-check 4.x dereferences
+  that at import time — so `npm run check`, this repo's frontend typecheck, dies before it runs.
+  TS stays at 5.9.3, and dependabot now ignores `typescript >=7.0.0`. Revisit when svelte-check
+  supports it.
+
+- **vitest 4 dropped its global augmentation of vite's `UserConfig`.** `vite.config.ts` must
+  import `defineConfig` from `vitest/config`, not `vite`, or svelte-check rejects the `test` block
+  as an unknown property.
+
+- **Tailwind 4 was verified visually, because nothing else could.** v4 changes preflight defaults
+  (border colour, ring width) and the repo has no visual coverage. A throwaway Playwright
+  screenshot of the editor chrome taken on v3 showed **zero** differing pixels after the
+  migration — and the check was proven non-vacuous with a negative control (a magenta sidebar
+  moves 282,348 pixels; an earlier control on `body` moved zero, because the app root covers it).
+  `@config '../tailwind.config.js'` keeps the JS config authoritative rather than porting the
+  `rgb(var(--token) / <alpha-value>)` chrome tokens to `@theme` and duplicating the token list.
+
 ## Open follow-ups
 
 Loose ends surfaced while building, none load-bearing.
@@ -201,6 +245,14 @@ Loose ends surfaced while building, none load-bearing.
   pre-release (nothing is published), but if a deck predates this commit its free elements stay
   offset until `decks vendor <name>`. Consider whether `decks validate` should warn on a stale
   vendored asset.
+- [ ] **No visual regression suite.** The Tailwind 4 migration was only safe to make because a
+  throwaway screenshot test was stood up for it and then deleted. Preflight/token changes are
+  exactly the class of break the headless suite cannot see. Decide whether to keep a small
+  `toHaveScreenshot` baseline for the editor chrome (masking the reveal iframe and thumbnails,
+  which are not Tailwind's). _Done when:_ decided + (if adopted) a baseline lands with a
+  documented update path.
+- [ ] **Revisit TypeScript 7** once svelte-check supports the native port; drop the `ignore` entry
+  in `.github/dependabot.yml`. (Spec: none — toolchain.)
 
 ## Cross-cutting (maintain throughout)
 
