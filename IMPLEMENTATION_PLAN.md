@@ -49,16 +49,58 @@ Decided-but-not-built, carried from earlier phases. Neither blocks anything.
   reloads for structural/external changes. Gate on a guarantee that the canvas cannot drift from
   on-disk bytes. _Done when:_ decided + (if adopted) text commits no longer reload. (Spec canvas-interaction, document-model)
 
+## Before publishing (blocks the first release)
+
+The repo is being open-sourced. Everything below is done and committed on local `main` except
+where noted; **nothing has been pushed**. `origin/main` is still `fd81ea6` (82 commits, original
+history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → the first push must be
+`--force`.
+
+- [x] Renamed to `decks` (module `github.com/Loxstomper/decks`, `cmd/decks`, binary `bin/decks`).
+- [x] MIT `LICENSE` + `THIRD_PARTY_NOTICES.md`; upstream licenses vendored beside the code they
+  cover, so `decks new` copies them into every scaffolded deck.
+- [x] `README.md` + `docs/demo.webp`.
+- [x] CI (`.github/workflows/ci.yml`) + GoReleaser + `decks --version`. Actions pinned to commit
+  SHAs; npm pinned to exact versions; the gitleaks module hash is asserted before use.
+- [x] Secret scan: trufflehog (40.9 MB of blobs) and gitleaks (4.75 MB of patches) over all
+  history. Clean. One documented false positive allowlisted in `.gitleaks.toml`.
+- [x] `git filter-repo` removed both accidentally-committed `slides` binaries (13,533,426 and
+  14,163,730 bytes). `.git` 22 MB → 3.5 MB. Re-grows on `git fetch`, which re-imports
+  `origin/main`'s old objects; harmless, and gc'd once the force-push lands.
+
+- [ ] **Fix the 10 failing e2e tests** (see below), then:
+- [ ] **Force-push `main`**, delete the 2 stale remote branches and the 24 remote tag refs.
+  Note: `git fetch` re-creates the 21 local tags until the remote ones are deleted.
+- [ ] **Enable GitHub secret scanning + push protection** (free on public repos, currently off).
+- [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
+  Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
+
+## e2e: the suite has now been run (2026-07-10)
+
+`npm run test:e2e` against the real binary: **27 passed, 10 failed** of 37. None of the failures
+are regressions — the same 7 fail identically on the pre-rename `fd81ea6`, verified by running the
+four affected spec files against both trees. Two distinct problems:
+
+- [ ] **7 specs have never passed.** Written and type-checked, never executed, so nobody saw the
+  selectors fail. At least the three `context-menu` failures are **spec bugs over a working
+  product**: the failure snapshot shows `menu "Context menu"` with `menuitem "Delete"` present, and
+  relaxing `hasText: /^Delete$/` to `'Delete'` makes the test pass in 593 ms — the anchored regex
+  matches the button's raw `textContent`, which carries the template whitespace around
+  `<span class="cm-label">`. Do not assume the rest are the same shape: the two `free-position`
+  failures are `toBeAttached` on `.move-frame`, i.e. the element never renders, which smells like
+  the test never gets the element into a selected state.
+  Failing: `context-menu` 147/191/250, `free-position` 127/174, `slide-background` 293,
+  `slide-layouts` 196.
+- [ ] **3 specs pass alone and fail in the full suite** — `slide-background` 220/258 and
+  `slide-layouts` 148. All 37 tests share one workspace and one `smoke-deck`, so earlier specs
+  mutate the deck later specs assert on. Order-dependence in the harness, not in the app.
+
+Still uncovered by any headless check: the **visual-only** confirmations several phases flagged
+(overlay alignment at non-1.0 zoom, drag/snap feel, toolbar and palette UX, live restyles).
+
 ## Open follow-ups
 
 Loose ends surfaced while building, none load-bearing.
-
-- [ ] **Run the e2e suite in a real browser.** Specs for per-slide themes, context menu, slide
-  layouts, free position, reveal-frame reload, slide background, phase 17, and QR are **written and
-  type-checked but have never been executed** — the build env has no browsers. Until then, those
-  features rest on unit coverage plus a green `tsc`. Run `cd web && npm run test:e2e:docker`.
-  Several phases also flagged **visual-only** confirmations (overlay alignment at non-1.0 zoom,
-  drag/snap feel, toolbar and palette UX, live restyles) that no headless check covers.
 - [ ] **Relocate `structure-ops.ts`.** It holds pure model tree-mutations (`moveChild`,
   `reparentChild`, `deleteElement`) but lives under `$lib/canvas`. Move into `$lib/model` so every
   tree mutation sits in one layer.
@@ -70,10 +112,9 @@ Loose ends surfaced while building, none load-bearing.
   to `GET /api/capabilities` and disable the button up front instead.
 - [ ] **Feature e2e coverage.** The harness and a create-deck example exist; delete/pane-collapse/
   source-jump/theme-switching still lack specs (`web/e2e/<feature>.spec.ts` convention).
-- [ ] **e2e global-setup now pins `--dir`.** `web/e2e/global-setup.ts` passes `--dir <tmpDir>` to
-  both `new` and `serve` rather than relying on cwd-as-root. It has **not been executed** (no
-  browsers in this env) — the workspace-resolution change it depends on is covered by
-  `cmd/decks/root_test.go` and by manual binary smoke tests instead.
+- [x] **e2e global-setup pins `--dir`.** `web/e2e/global-setup.ts` passes `--dir <tmpDir>` to both
+  `new` and `serve` rather than relying on cwd-as-root. Confirmed working: the suite now runs, the
+  server comes up on :19999 against a temp workspace, and 27 of 37 tests pass.
 - [ ] **Frontend typecheck is `npm run check` (svelte-check), not `npx tsc`.** Bare `tsc` cannot
   resolve types exported from `<script module>` in `.svelte` files (e.g. `MenuItem` from
   `ContextMenu.svelte`) and reports phantom errors. Recorded in `CLAUDE.md`.
