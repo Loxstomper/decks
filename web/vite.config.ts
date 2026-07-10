@@ -1,4 +1,8 @@
-import { defineConfig } from 'vite';
+// `vitest/config`, not `vite`: the `test` block below is vitest's. Up to vitest 3
+// the package augmented vite's `UserConfig` type globally, so importing from
+// `vite` type-checked; vitest 4 dropped that, and svelte-check then rejects
+// `test` as an unknown property. This re-export is a superset of vite's own.
+import { defineConfig } from 'vitest/config';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
 import { fileURLToPath } from 'node:url';
 import { writeFileSync } from 'node:fs';
