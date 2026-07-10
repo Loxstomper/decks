@@ -51,10 +51,11 @@ Decided-but-not-built, carried from earlier phases. Neither blocks anything.
 
 ## Before publishing (blocks the first release)
 
-The repo is being open-sourced. Everything below is done and committed on local `main` except
-where noted; **nothing has been pushed**. `origin/main` is still `fd81ea6` (82 commits, original
-history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → the first push must be
-`--force`.
+The repo is being open-sourced. The force-push landed: `origin/main` is now `70e160c`, in sync
+with local. Of the 62 commits that only existed on the pre-rewrite `origin/main`, 61 were
+content-identical rewrites; the single genuinely-dropped commit was "Phase 9: drop
+accidentally-committed slides binary (build artifact)", which `filter-repo` made empty. The tree
+of origin's old tip and its local rewritten twin diffed clean.
 
 - [x] Renamed to `decks` (module `github.com/Loxstomper/decks`, `cmd/decks`, binary `bin/decks`).
 - [x] MIT `LICENSE` + `THIRD_PARTY_NOTICES.md`; upstream licenses vendored beside the code they
@@ -69,11 +70,37 @@ history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → th
   `origin/main`'s old objects; harmless, and gc'd once the force-push lands.
 
 - [x] **Fixed the 10 failing e2e tests.** Suite is now 37/37 and order-independent (see below).
-- [ ] **Force-push `main`**, delete the 2 stale remote branches and the 24 remote tag refs.
-  Note: `git fetch` re-creates the 21 local tags until the remote ones are deleted.
-- [ ] **Enable GitHub secret scanning + push protection** (free on public repos, currently off).
+- [x] **Force-pushed `main`**; deleted the 2 stale remote branches
+  (`fix/inline-font-size-toolbar`, `fix/outline-each-key-duplicate` — they really did anchor
+  pre-rewrite history containing the binary) and all 21 remote tags (`0.0.1`..`0.0.21`, the
+  per-phase build markers), remote and local. Remote tag count is now 0, local 0. (Earlier
+  entries in this plan said "24 remote tag refs" and "2 stale remote branches" — the true numbers
+  were 21 tags, with 24 counted because of peeled `^{}` refs, and 10 non-main branches: the 2
+  stale ones plus 8 dependabot branches.) The 8 dependabot branches were **not** deleted and must
+  not be — Dependabot auto-rebased them onto the new `main` after the force-push, they contain
+  zero old blobs, and they back open PRs #1–#8. No remaining remote branch reaches the purged
+  `slides` blob; a fresh clone is now 3.1 MB (was 22 MB).
+  Caveat: `refs/pull/1..8/{head,merge}` still point into old history. GitHub creates these and we
+  can't delete them; they survive PR closure and aren't fetched by `git clone`, so they don't
+  affect clone size or ordinary users — they linger only in GitHub's server-side object store
+  until GitHub Support GCs them. Since the secret scan came back clean, this is a storage
+  footnote, not an exposure problem.
+- [x] **Bumped Go 1.23.0 → 1.26.5** (current stable). Every `go-version` pin in
+  `.github/workflows/{ci,release}.yml` reads `go-version-file: go.mod`, so go.mod is the single
+  knob. This also fixed the `Secret scan` CI job, which had been red on every push:
+  `actions/setup-go` exports `GOTOOLCHAIN=local`, so `go run github.com/zricethezav/gitleaks/v8@v8.30.1`
+  couldn't fetch a newer toolchain and failed with "requires go >= 1.24.11 (running go 1.23.0)".
+  Durable warning: go.mod's floor must stay >= the `go` directive of the pinned gitleaks version.
+- [x] **CI is fully green on `main` (`70e160c`)**: Go, Frontend, E2E (Playwright), and Secret scan
+  all pass. This was the last technical blocker.
+- [ ] **Set the repo description** (currently empty on GitHub).
+- [ ] **Enable GitHub secret scanning + push protection** (only available once the repo is
+  public).
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
+- [ ] Not a blocker: the 8 open dependabot PRs currently have failing CI — several are major
+  bumps (typescript 5.9→7.0, vitest 3.2→4.1, tailwindcss 3.4→4.3) and will be publicly visible as
+  red PRs on day one; they need triage on their own merits.
 
 ## e2e: 37/37, and the suite is now order-independent (2026-07-10)
 
