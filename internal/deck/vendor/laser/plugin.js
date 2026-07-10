@@ -1,5 +1,5 @@
 /*!
- * slides-builder laser pointer plugin (P17-19) — offline, self-authored.
+ * decks laser pointer plugin (P17-19) — offline, self-authored.
  *
  * WHY self-authored: there is no small, well-maintained standalone laser-pointer
  * reveal plugin to vendor, and a laser pointer is a handful of lines. Writing it

@@ -1,9 +1,9 @@
 /*!
- * slides-builder chart plugin (P17-14/15) — offline, self-authored.
+ * decks chart plugin (P17-14/15) — offline, self-authored.
  *
  * WHY self-authored instead of the rajgoel reveal.js-plugins chart plugin:
  * that plugin reads chart data as CSV from the <canvas> innerHTML plus a
- * comment-embedded options blob. slides-builder keeps chart data as a single
+ * comment-embedded options blob. decks keeps chart data as a single
  * JSON attribute `data-chart-data` on the canvas, because:
  *   - it is one declarative, byte-stable attribute the document model and the
  *     `slides validate` contract can reason about (no innerHTML/CSV soup);
