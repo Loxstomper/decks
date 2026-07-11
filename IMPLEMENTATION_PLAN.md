@@ -98,10 +98,15 @@ of origin's old tip and its local rewritten twin diffed clean.
   public).
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
-- [x] **Dependency updates landed as one big-bang branch (`deps/big-bang-2026-07`), not the 8
-  individual dependabot PRs** — see below for why per-PR merging couldn't work here. Dependabot is
-  now configured (`.github/dependabot.yml`) to group updates per ecosystem into a single PR, so
-  this can't recur. PRs #1–#8 are superseded by the big-bang branch and should be closed.
+- [x] **Dependency updates landed as one big-bang PR (#9, merged into `main` as `be275e5`), not the
+  8 individual dependabot PRs** — see below for why per-PR merging couldn't work here. Dependabot is
+  now configured (`.github/dependabot.yml`) to group updates per ecosystem into a single PR, so this
+  can't recur; it already produced a grouped npm PR (#10). PRs #1–#8 were closed as superseded. CI on
+  `main` is green post-merge (Go · Frontend · E2E · Secret scan).
+  - **Open decision — dependabot #10 bumps `typescript` 5.9.3 → 6.0.3.** Below the `>=7.0.0` ignore
+    rule (that rule targets the TS 7 *native port*, which breaks svelte-check). TS 6 is still the JS
+    compiler, so it may be fine — but it's an untested major and needs the `npm run check` gate run
+    before merging. Not yet evaluated.
 
 ## e2e: 37/37, and the suite is now order-independent (2026-07-10)
 
