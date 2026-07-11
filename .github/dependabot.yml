@@ -4,6 +4,13 @@ version: 2
 # until something bumps them. Without this file the pins rot: a pinned SHA is
 # immune to tag-repointing attacks but equally immune to security fixes.
 # Dependabot rewrites both the SHA and its trailing `# vX.Y.Z` comment.
+#
+# Every ecosystem is GROUPED into a single PR per run. One-PR-per-dependency does
+# not work here: the frontend deps are interlocked (vite <-> @sveltejs/vite-plugin-svelte
+# <-> vitest all constrain each other by peer range), so an individual bump lands
+# in a tree npm cannot resolve and its CI fails through no fault of the bump. A
+# grouped PR moves them together, which is also the only way the suite can tell
+# you whether the *combination* works.
 updates:
   - package-ecosystem: github-actions
     directory: "/"
@@ -11,6 +18,9 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+    groups:
+      actions:
+        patterns: ["*"]
 
   - package-ecosystem: npm
     directory: "/web"
@@ -18,6 +28,17 @@ updates:
       interval: weekly
     commit-message:
       prefix: "deps"
+    groups:
+      npm:
+        patterns: ["*"]
+    ignore:
+      # TypeScript 7 (the native port) changes the compiler's module shape:
+      # `typescript.sys` is undefined under it, and svelte-check 4.x dereferences
+      # that at import time, so `npm run check` -- this repo's frontend typecheck
+      # -- dies before it runs. Revisit when svelte-check supports TS 7; until
+      # then a 7.x PR can only ever be red.
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
 
   - package-ecosystem: gomod
     directory: "/"
@@ -25,3 +46,6 @@ updates:
       interval: weekly
     commit-message:
       prefix: "deps"
+    groups:
+      gomod:
+        patterns: ["*"]

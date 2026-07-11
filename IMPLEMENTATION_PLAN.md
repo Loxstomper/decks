@@ -51,10 +51,11 @@ Decided-but-not-built, carried from earlier phases. Neither blocks anything.
 
 ## Before publishing (blocks the first release)
 
-The repo is being open-sourced. Everything below is done and committed on local `main` except
-where noted; **nothing has been pushed**. `origin/main` is still `fd81ea6` (82 commits, original
-history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → the first push must be
-`--force`.
+The repo is being open-sourced. The force-push landed: `origin/main` is now `70e160c`, in sync
+with local. Of the 62 commits that only existed on the pre-rewrite `origin/main`, 61 were
+content-identical rewrites; the single genuinely-dropped commit was "Phase 9: drop
+accidentally-committed slides binary (build artifact)", which `filter-repo` made empty. The tree
+of origin's old tip and its local rewritten twin diffed clean.
 
 - [x] Renamed to `decks` (module `github.com/Loxstomper/decks`, `cmd/decks`, binary `bin/decks`).
 - [x] MIT `LICENSE` + `THIRD_PARTY_NOTICES.md`; upstream licenses vendored beside the code they
@@ -69,11 +70,38 @@ history); local `main` is `61c5c21` (94 commits, rewritten). They diverge → th
   `origin/main`'s old objects; harmless, and gc'd once the force-push lands.
 
 - [x] **Fixed the 10 failing e2e tests.** Suite is now 37/37 and order-independent (see below).
-- [ ] **Force-push `main`**, delete the 2 stale remote branches and the 24 remote tag refs.
-  Note: `git fetch` re-creates the 21 local tags until the remote ones are deleted.
-- [ ] **Enable GitHub secret scanning + push protection** (free on public repos, currently off).
+- [x] **Force-pushed `main`**; deleted the 2 stale remote branches
+  (`fix/inline-font-size-toolbar`, `fix/outline-each-key-duplicate` — they really did anchor
+  pre-rewrite history containing the binary) and all 21 remote tags (`0.0.1`..`0.0.21`, the
+  per-phase build markers), remote and local. Remote tag count is now 0, local 0. (Earlier
+  entries in this plan said "24 remote tag refs" and "2 stale remote branches" — the true numbers
+  were 21 tags, with 24 counted because of peeled `^{}` refs, and 10 non-main branches: the 2
+  stale ones plus 8 dependabot branches.) The 8 dependabot branches were **not** deleted and must
+  not be — Dependabot auto-rebased them onto the new `main` after the force-push, they contain
+  zero old blobs, and they back open PRs #1–#8. No remaining remote branch reaches the purged
+  `slides` blob; a fresh clone is now 3.1 MB (was 22 MB).
+  Caveat: `refs/pull/1..8/{head,merge}` still point into old history. GitHub creates these and we
+  can't delete them; they survive PR closure and aren't fetched by `git clone`, so they don't
+  affect clone size or ordinary users — they linger only in GitHub's server-side object store
+  until GitHub Support GCs them. Since the secret scan came back clean, this is a storage
+  footnote, not an exposure problem.
+- [x] **Bumped Go 1.23.0 → 1.26.5** (current stable). Every `go-version` pin in
+  `.github/workflows/{ci,release}.yml` reads `go-version-file: go.mod`, so go.mod is the single
+  knob. This also fixed the `Secret scan` CI job, which had been red on every push:
+  `actions/setup-go` exports `GOTOOLCHAIN=local`, so `go run github.com/zricethezav/gitleaks/v8@v8.30.1`
+  couldn't fetch a newer toolchain and failed with "requires go >= 1.24.11 (running go 1.23.0)".
+  Durable warning: go.mod's floor must stay >= the `go` directive of the pinned gitleaks version.
+- [x] **CI is fully green on `main` (`70e160c`)**: Go, Frontend, E2E (Playwright), and Secret scan
+  all pass. This was the last technical blocker.
+- [ ] **Set the repo description** (currently empty on GitHub).
+- [ ] **Enable GitHub secret scanning + push protection** (only available once the repo is
+  public).
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
+- [x] **Dependency updates landed as one big-bang branch (`deps/big-bang-2026-07`), not the 8
+  individual dependabot PRs** — see below for why per-PR merging couldn't work here. Dependabot is
+  now configured (`.github/dependabot.yml`) to group updates per ecosystem into a single PR, so
+  this can't recur. PRs #1–#8 are superseded by the big-bang branch and should be closed.
 
 ## e2e: 37/37, and the suite is now order-independent (2026-07-10)
 
@@ -133,6 +161,49 @@ copy-pasted into six specs.
 Still uncovered by any headless check: the **visual-only** confirmations several phases flagged
 (overlay alignment at non-1.0 zoom, drag/snap feel, toolbar and palette UX, live restyles).
 
+## Dependency big-bang + CI cost (2026-07-10)
+
+- **CI's e2e job spent 471s installing Chromium against 72s of actual testing.** The instinctive
+  fix — cache `~/.cache/ms-playwright` — would have been nearly worthless: of that 471s, `apt-get`
+  was 456s and the browser download only 14s. The job now runs inside
+  `mcr.microsoft.com/playwright:v1.61.1-noble`, which ships the browsers *and* their system libs,
+  as the runner's uid rather than root (Chromium's sandbox refuses to start as root, and checkout
+  would otherwise leave root-owned files). A guard step asserts the image tag matches
+  `@playwright/test` in `package-lock.json` — a mismatch makes Playwright silently re-download the
+  browsers, undoing the change. Verified by running the suite inside that exact image: 37/37, no
+  apt, no download.
+
+- **All dependency updates were done as one branch, not 8 dependabot PRs.** Go: toml 1.4.0→1.6.0,
+  fsnotify 1.7.0→1.10.1, x/net 0.38.0→0.57.0, x/sys 0.31.0→0.47.0. Frontend: vite 6.4.3→8.1.4 (now
+  bundling with rolldown), @sveltejs/vite-plugin-svelte 5.1.1→7.2.0, vitest 3.2.6→4.1.10,
+  tailwindcss 3.4.19→4.3.2, @types/node 22.20.0→26.1.1, @codemirror/state 6.7.0→6.7.1,
+  @codemirror/view 6.43.4→6.43.6, svelte-check 4.7.1→4.7.2, autoprefixer removed.
+
+- **Why one PR per dependency could never have worked here.** vite, @sveltejs/vite-plugin-svelte
+  and vitest constrain each other by peer range, so an individual bump lands in a tree npm cannot
+  resolve — which is why all 8 PRs were red. Installing plugin-svelte 7 additionally required
+  uninstalling the old plugin first: the stale transitive
+  `@sveltejs/vite-plugin-svelte-inspector@4` pins plugin-svelte `^5` and deadlocks npm's resolver.
+  `.github/dependabot.yml` now groups every ecosystem into a single PR.
+
+- **TypeScript 7 is blocked, and pinned as such.** `typescript@7.0.2` is the `latest` dist-tag
+  (the native port), but it leaves `typescript.sys` undefined, and svelte-check 4.x dereferences
+  that at import time — so `npm run check`, this repo's frontend typecheck, dies before it runs.
+  TS stays at 5.9.3, and dependabot now ignores `typescript >=7.0.0`. Revisit when svelte-check
+  supports it.
+
+- **vitest 4 dropped its global augmentation of vite's `UserConfig`.** `vite.config.ts` must
+  import `defineConfig` from `vitest/config`, not `vite`, or svelte-check rejects the `test` block
+  as an unknown property.
+
+- **Tailwind 4 was verified visually, because nothing else could.** v4 changes preflight defaults
+  (border colour, ring width) and the repo has no visual coverage. A throwaway Playwright
+  screenshot of the editor chrome taken on v3 showed **zero** differing pixels after the
+  migration — and the check was proven non-vacuous with a negative control (a magenta sidebar
+  moves 282,348 pixels; an earlier control on `body` moved zero, because the app root covers it).
+  `@config '../tailwind.config.js'` keeps the JS config authoritative rather than porting the
+  `rgb(var(--token) / <alpha-value>)` chrome tokens to `@theme` and duplicating the token list.
+
 ## Open follow-ups
 
 Loose ends surfaced while building, none load-bearing.
@@ -174,6 +245,14 @@ Loose ends surfaced while building, none load-bearing.
   pre-release (nothing is published), but if a deck predates this commit its free elements stay
   offset until `decks vendor <name>`. Consider whether `decks validate` should warn on a stale
   vendored asset.
+- [ ] **No visual regression suite.** The Tailwind 4 migration was only safe to make because a
+  throwaway screenshot test was stood up for it and then deleted. Preflight/token changes are
+  exactly the class of break the headless suite cannot see. Decide whether to keep a small
+  `toHaveScreenshot` baseline for the editor chrome (masking the reveal iframe and thumbnails,
+  which are not Tailwind's). _Done when:_ decided + (if adopted) a baseline lands with a
+  documented update path.
+- [ ] **Revisit TypeScript 7** once svelte-check supports the native port; drop the `ignore` entry
+  in `.github/dependabot.yml`. (Spec: none — toolchain.)
 
 ## Cross-cutting (maintain throughout)
 
