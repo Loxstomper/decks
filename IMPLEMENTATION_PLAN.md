@@ -55,6 +55,10 @@ committed binaries, the e2e suite at 37/37, Go 1.26.5, and the dependency big-ba
 repo description + topics are set. What's left is maintainer-only and mostly outward-facing:
 
 - [ ] **Enable GitHub secret scanning + push protection** (only available once the repo is public).
+- [ ] **Add `main` branch protection.** Also gated on going public (403 "Upgrade to Pro or make
+  public" on the free plan). Decide the shape when flipping public: light (block force-push +
+  deletion, require CI, keep direct push) vs strict (PR-only). Required check contexts are `Go`,
+  `Frontend`, `E2E (Playwright)`, `Secret scan`.
 - [ ] **Flip public**, then `git tag v0.0.1 && git push origin v0.0.1` to trigger the release.
   Both `README.md` and `web.ErrNotBuilt` link `/releases`, which 404s until this lands.
 - [ ] **Decide dependabot #10** (`typescript` 5.9.3 → 6.0.3). Below the `>=7.0.0` ignore rule
