@@ -105,26 +105,3 @@ Loose ends surfaced while building, none load-bearing.
   _Done when:_ decided + (if adopted) a baseline lands with a documented update path.
 - [ ] **Revisit TypeScript 7** once svelte-check supports the native port; drop the `ignore` entry
   in `.github/dependabot.yml`. (Toolchain — no spec.)
-
-## Cross-cutting (maintain throughout)
-
-- [x] **X-1 — Offline guard test.** A CI/dev check that the built deck loads no external URLs. (Spec principles-and-invariants)
-- [x] **X-2 — Round-trip corpus grows.** Add any odd HTML encountered to the golden-file corpus. (Spec principles-and-invariants)
-- [x] **X-3 — Never-destroy badge.** Passthrough/partially-editable elements show a "source only" badge wherever surfaced. (Spec document-model, principles-and-invariants)
-- [x] **X-4 — Secrets hygiene.** Provider keys only via env/gitignored config; never written to `config.toml` or decks. (Spec principles-and-invariants, project-structure)
-
-## Milestones
-
-| # | Theme | Status |
-|---|---|---|
-| M1 | Usable — visual editing + alignment beats hand-authoring | ✅ Phase 3 |
-| M2 | Rich — full content + assets | ✅ Phase 5 |
-| M3 | Complete — motion, theming, present, export | ✅ Phase 7 |
-| M4 | AI-native — authoring skill + safe handoff | ✅ Phase 8 |
-| M5 | Polished — adjustable chrome, e2e coverage | ✅ Phase 9 |
-| M6 | Per-slide theming | ✅ Phases 10 + 18 |
-| M7 | Slides-app parity — context menu, layouts, thumbnails, backgrounds | ✅ Phases 11–16 |
-| M8 | Everyday-authoring parity — inline text, links, charts, palette | ✅ Phase 17 |
-| M9 | **Installable CLI** — `decks` on `$PATH`, run from anywhere | ✅ Phase 20 (core) |
-| M10 | **AI-native distribution** — the binary ships the skill that teaches its own contract | ✅ P21-2 |
-| M11 | **Run from anywhere** — workspace found by walking up; deck named by name, path, or `.` | ✅ Phase 21 |
