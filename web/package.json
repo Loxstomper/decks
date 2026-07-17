@@ -15,16 +15,16 @@
   "devDependencies": {
     "@playwright/test": "1.61.1",
     "@sveltejs/vite-plugin-svelte": "7.2.0",
-    "@tailwindcss/postcss": "4.3.2",
+    "@tailwindcss/postcss": "4.3.3",
     "@types/jsdom": "28.0.3",
     "@types/node": "26.1.1",
     "jsdom": "29.1.1",
     "postcss": "8.5.19",
-    "svelte": "5.56.5",
+    "svelte": "5.56.6",
     "svelte-check": "4.7.3",
-    "tailwindcss": "4.3.2",
+    "tailwindcss": "4.3.3",
     "typescript": "6.0.3",
-    "vite": "8.1.4",
+    "vite": "8.1.5",
     "vitest": "4.1.10"
   },
   "dependencies": {
